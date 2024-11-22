@@ -1,0 +1,52 @@
+# Extensions
+
+*.a
+*.bat
+*.bin
+*.d
+*.dll
+*.dot
+*.etag
+*.exe
+*.gcda
+*.gcno
+*.gcov
+*.gguf
+*.gguf.json
+*.lastModified
+*.log
+*.metallib
+*.o
+*.so
+*.tmp
+
+# IDE
+
+.cache/
+.ccls-cache/
+.direnv/
+.DS_Store
+.envrc
+.idea/
+.swiftpm
+.vs/
+.vscode/
+nppBackup
+
+
+# Build Artifacts
+
+.build/
+build*
+/liblparler.so
+cmake-build-*
+CMakeSettings.json
+ggml-metal-embed.metal
+/rpc-server
+out/
+tmp/
+
+
+# Models
+
+models/*
