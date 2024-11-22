@@ -1,0 +1,6 @@
+torch==2.4.0
+transformers==4.43.3
+parler_tts==0.2
+gguf==0.10.0
+
+
