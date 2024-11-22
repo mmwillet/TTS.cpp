@@ -57,7 +57,7 @@ static const std::map<std::string, dac_tensor> DAC_TENSOR_GGUF_LOOKUP = {
     {".final.weight", DAC_ENCODER_LAYER_OUT_KERNEL},
     {".res.initial.alpha", DAC_ENCODER_LAYER_RES_BLK_IN_SNAKE},
     {".res.initial.bias", DAC_ENCODER_LAYER_RES_BLK_IN_BIAS},
-    {".res.initial.weigh", DAC_ENCODER_LAYER_RES_BLK_IN_KERNEL},
+    {".res.initial.weight", DAC_ENCODER_LAYER_RES_BLK_IN_KERNEL},
     {".res.final.alpha", DAC_ENCODER_LAYER_RES_BLK_OUT_SNAKE},
     {".res.final.bias", DAC_ENCODER_LAYER_RES_BLK_OUT_BIAS},
     {".res.final.weight", DAC_ENCODER_LAYER_RES_BLK_OUT_KERNEL},
@@ -69,35 +69,40 @@ static const std::map<std::string, dac_tensor> DAC_TENSOR_GGUF_LOOKUP = {
 };
 
 void assign_residual_unit(dac_model & model, dac_residual_unit & l, std::string name, ggml_tensor * tensor) {
-    dac_tensor tensor_type = DAC_TENSOR_GGUF_LOOKUP.at(name);
-    switch (tensor_type) {
-        case DAC_ENCODER_LAYER_RES_BLK_IN_SNAKE:
-            l.in_snake_alpha = ggml_dup_tensor(model.ctx, tensor);
-            model.set_tensor(l.in_snake_alpha, tensor);
-            break;
-        case DAC_ENCODER_LAYER_RES_BLK_OUT_SNAKE:
-            l.out_snake_alpha = ggml_dup_tensor(model.ctx, tensor);
-            model.set_tensor(l.out_snake_alpha, tensor);
-            break;
-        case DAC_ENCODER_LAYER_RES_BLK_IN_KERNEL:
-            l.in_conv_kernel = ggml_dup_tensor(model.ctx, tensor);
-            model.set_tensor(l.in_conv_kernel, tensor);
-            break;
-        case DAC_ENCODER_LAYER_RES_BLK_OUT_KERNEL:
-            l.out_conv_kernel = ggml_dup_tensor(model.ctx, tensor);
-            model.set_tensor(l.out_conv_kernel, tensor);
-            break;
-        case DAC_ENCODER_LAYER_RES_BLK_IN_BIAS:
-            l.in_conv_bias = ggml_dup_tensor(model.ctx, ggml_transpose(model.ctx, tensor));
-            model.set_tensor(l.in_conv_bias, tensor);
-            break;
-        case DAC_ENCODER_LAYER_RES_BLK_OUT_BIAS:
-            l.out_conv_bias = ggml_dup_tensor(model.ctx, ggml_transpose(model.ctx, tensor));
-            model.set_tensor(l.out_conv_bias, tensor);
-            break;
-        default:
-            break;
+    try {
+        dac_tensor tensor_type = DAC_TENSOR_GGUF_LOOKUP.at(name);
+        switch (tensor_type) {
+            case DAC_ENCODER_LAYER_RES_BLK_IN_SNAKE:
+                l.in_snake_alpha = ggml_dup_tensor(model.ctx, tensor);
+                model.set_tensor(l.in_snake_alpha, tensor);
+                break;
+            case DAC_ENCODER_LAYER_RES_BLK_OUT_SNAKE:
+                l.out_snake_alpha = ggml_dup_tensor(model.ctx, tensor);
+                model.set_tensor(l.out_snake_alpha, tensor);
+                break;
+            case DAC_ENCODER_LAYER_RES_BLK_IN_KERNEL:
+                l.in_conv_kernel = ggml_dup_tensor(model.ctx, tensor);
+                model.set_tensor(l.in_conv_kernel, tensor);
+                break;
+            case DAC_ENCODER_LAYER_RES_BLK_OUT_KERNEL:
+                l.out_conv_kernel = ggml_dup_tensor(model.ctx, tensor);
+                model.set_tensor(l.out_conv_kernel, tensor);
+                break;
+            case DAC_ENCODER_LAYER_RES_BLK_IN_BIAS:
+                l.in_conv_bias = ggml_dup_tensor(model.ctx, ggml_transpose(model.ctx, tensor));
+                model.set_tensor(l.in_conv_bias, tensor);
+                break;
+            case DAC_ENCODER_LAYER_RES_BLK_OUT_BIAS:
+                l.out_conv_bias = ggml_dup_tensor(model.ctx, ggml_transpose(model.ctx, tensor));
+                model.set_tensor(l.out_conv_bias, tensor);
+                break;
+            default:
+                break;
+        }
+    } catch (const std::out_of_range& e) {
+        TTS_ABORT("Error: %s\nTensor, '%s', is not a valid tensor.", e.what(), name.c_str());
     }
+
 }
 
 void assign_dac_layer(dac_model & model, dac_layer & layer, std::string name, ggml_tensor * tensor) {
@@ -127,21 +132,25 @@ void assign_dac_layer(dac_model & model, dac_layer & layer, std::string name, gg
 }
 
 void assign_quantizer_layer(dac_model & model, dac_quantize_layer & layer, std::string name, ggml_tensor * tensor) {
-    switch(DAC_TENSOR_GGUF_LOOKUP.at(name)) {
-        case DAC_QUANTIZER_LAYER_OUT_KERNEL:
-            layer.out_proj_kernel = ggml_dup_tensor(model.ctx, tensor);
-            model.set_tensor(layer.out_proj_kernel, tensor);
-            break;
-        case DAC_QUANTIZER_LAYER_OUT_BIAS:
-            layer.out_proj_bias = ggml_dup_tensor(model.ctx, ggml_transpose(model.ctx, tensor));
-            model.set_tensor(layer.out_proj_bias, tensor);
-            break;
-        case DAC_QUANTIZER_LAYER_CODEBOOK:
-            layer.codebook = ggml_dup_tensor(model.ctx, tensor);
-            model.set_tensor(layer.codebook, tensor);
-            break;
-        default:
-            break;
+    try {
+        switch(DAC_TENSOR_GGUF_LOOKUP.at(name)) {
+            case DAC_QUANTIZER_LAYER_OUT_KERNEL:
+                layer.out_proj_kernel = ggml_dup_tensor(model.ctx, tensor);
+                model.set_tensor(layer.out_proj_kernel, tensor);
+                break;
+            case DAC_QUANTIZER_LAYER_OUT_BIAS:
+                layer.out_proj_bias = ggml_dup_tensor(model.ctx, ggml_transpose(model.ctx, tensor));
+                model.set_tensor(layer.out_proj_bias, tensor);
+                break;
+            case DAC_QUANTIZER_LAYER_CODEBOOK:
+                layer.codebook = ggml_dup_tensor(model.ctx, tensor);
+                model.set_tensor(layer.codebook, tensor);
+                break;
+            default:
+                break;
+        }
+    }  catch (const std::out_of_range& e) {
+        TTS_ABORT("Error: %s\nTensor, '%s', is not a valid tensor.", e.what(), name.c_str());
     }
 }
 
@@ -212,102 +221,109 @@ static const std::map<std::string, parler_tensor> PARLER_TENSOR_GGUF_LOOKUP = {
 };
 
 void assign_parler_layer(parler_tts_model * model, parler_layer * layer, std::string name, ggml_tensor * tensor) {
-    switch(PARLER_TENSOR_GGUF_LOOKUP.at(name)) {
-        case PARLER_LAYER_SELF_ATTN_Q:
-            layer->self_attn_q_proj = ggml_dup_tensor(model->ctx, tensor);
-            model->set_tensor(layer->self_attn_q_proj, tensor);
-            break;
-        case PARLER_LAYER_SELF_ATTN_K:
-            layer->self_attn_k_proj = ggml_dup_tensor(model->ctx, tensor);
-            model->set_tensor(layer->self_attn_k_proj, tensor);
-            break;
-        case PARLER_LAYER_SELF_ATTN_V:
-            layer->self_attn_v_proj = ggml_dup_tensor(model->ctx, tensor);
-            model->set_tensor(layer->self_attn_v_proj, tensor);
-            break;
-        case PARLER_LAYER_SELF_ATTN_O:
-            layer->self_attn_o_proj = ggml_dup_tensor(model->ctx, tensor);
-            model->set_tensor(layer->self_attn_o_proj, tensor);
-            break;
-        case PARLER_LAYER_SELF_ATTN_NORM:
-            layer->self_attn_norm = ggml_dup_tensor(model->ctx, tensor);
-            model->set_tensor(layer->self_attn_norm, tensor);
-            break;
-        case PARLER_LAYER_SELF_ATTN_NORM_BIAS:
-            layer->self_attn_norm_bias = ggml_dup_tensor(model->ctx, tensor);
-            model->set_tensor(layer->self_attn_norm_bias, tensor);
-            break;
-        case PARLER_LAYER_ATTN_Q:
-            layer->attn_q_proj = ggml_dup_tensor(model->ctx, tensor);
-            model->set_tensor(layer->attn_q_proj, tensor);
-            break;
-        case PARLER_LAYER_ATTN_K:
-            layer->attn_k_proj = ggml_dup_tensor(model->ctx, tensor);
-            model->set_tensor(layer->attn_k_proj, tensor);
-            break;
-        case PARLER_LAYER_ATTN_V:
-            layer->attn_v_proj = ggml_dup_tensor(model->ctx, tensor);
-            model->set_tensor(layer->attn_v_proj, tensor);
-            break;
-        case PARLER_LAYER_ATTN_O:
-            layer->attn_o_proj = ggml_dup_tensor(model->ctx, tensor);
-            model->set_tensor(layer->attn_o_proj, tensor);
-            break;
-        case PARLER_LAYER_ATTN_NORM:
-            layer->attn_norm = ggml_dup_tensor(model->ctx, tensor);
-            model->set_tensor(layer->attn_norm, tensor);
-            break;
-        case PARLER_LAYER_ATTN_NORM_BIAS:
-            layer->attn_norm_bias = ggml_dup_tensor(model->ctx, tensor);
-            model->set_tensor(layer->attn_norm_bias, tensor);
-            break;
-        case PARLER_LAYER_FC1:
-            layer->fc1 = ggml_dup_tensor(model->ctx, tensor);
-            model->set_tensor(layer->fc1, tensor);
-            break;
-        case PARLER_LAYER_FC2:
-            layer->fc2 = ggml_dup_tensor(model->ctx, tensor);
-            model->set_tensor(layer->fc2, tensor);
-            break;
-        case PARLER_LAYER_OUT_NORM:
-            layer->final_norm = ggml_dup_tensor(model->ctx, tensor);
-            model->set_tensor(layer->final_norm, tensor);
-            break;
-        case PARLER_LAYER_OUT_NORM_BIAS:
-            layer->final_norm_bias = ggml_dup_tensor(model->ctx, tensor);
-            model->set_tensor(layer->final_norm_bias, tensor);
-            break;
-        default:
-            break;
+    try {
+        switch(PARLER_TENSOR_GGUF_LOOKUP.at(name)) {
+            case PARLER_LAYER_SELF_ATTN_Q:
+                layer->self_attn_q_proj = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(layer->self_attn_q_proj, tensor);
+                break;
+            case PARLER_LAYER_SELF_ATTN_K:
+                layer->self_attn_k_proj = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(layer->self_attn_k_proj, tensor);
+                break;
+            case PARLER_LAYER_SELF_ATTN_V:
+                layer->self_attn_v_proj = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(layer->self_attn_v_proj, tensor);
+                break;
+            case PARLER_LAYER_SELF_ATTN_O:
+                layer->self_attn_o_proj = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(layer->self_attn_o_proj, tensor);
+                break;
+            case PARLER_LAYER_SELF_ATTN_NORM:
+                layer->self_attn_norm = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(layer->self_attn_norm, tensor);
+                break;
+            case PARLER_LAYER_SELF_ATTN_NORM_BIAS:
+                layer->self_attn_norm_bias = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(layer->self_attn_norm_bias, tensor);
+                break;
+            case PARLER_LAYER_ATTN_Q:
+                layer->attn_q_proj = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(layer->attn_q_proj, tensor);
+                break;
+            case PARLER_LAYER_ATTN_K:
+                layer->attn_k_proj = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(layer->attn_k_proj, tensor);
+                break;
+            case PARLER_LAYER_ATTN_V:
+                layer->attn_v_proj = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(layer->attn_v_proj, tensor);
+                break;
+            case PARLER_LAYER_ATTN_O:
+                layer->attn_o_proj = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(layer->attn_o_proj, tensor);
+                break;
+            case PARLER_LAYER_ATTN_NORM:
+                layer->attn_norm = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(layer->attn_norm, tensor);
+                break;
+            case PARLER_LAYER_ATTN_NORM_BIAS:
+                layer->attn_norm_bias = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(layer->attn_norm_bias, tensor);
+                break;
+            case PARLER_LAYER_FC1:
+                layer->fc1 = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(layer->fc1, tensor);
+                break;
+            case PARLER_LAYER_FC2:
+                layer->fc2 = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(layer->fc2, tensor);
+                break;
+            case PARLER_LAYER_OUT_NORM:
+                layer->final_norm = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(layer->final_norm, tensor);
+                break;
+            case PARLER_LAYER_OUT_NORM_BIAS:
+                layer->final_norm_bias = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(layer->final_norm_bias, tensor);
+                break;
+            default:
+                break;
+        }
+    } catch (const std::out_of_range& e) {
+        TTS_ABORT("Error: %s\nTensor, '%s', is not a valid tensor.", e.what(), name.c_str());
     }
 }
 
 void assign_to_decoder(parler_tts_model * model, const std::string name, ggml_tensor * tensor) {
-    model->n_tensors++;
     if (PARLER_TENSOR_GGUF_LOOKUP.find(name) != PARLER_TENSOR_GGUF_LOOKUP.end()) {
-        switch (PARLER_TENSOR_GGUF_LOOKUP.at(name)) {
-            case PARLER_NORM:
-                model->layer_norm = ggml_dup_tensor(model->ctx, tensor);
-                model->set_tensor(model->layer_norm, tensor);
-                break;
-            case PARLER_NORM_BIAS:
-                model->layer_norm_bias = ggml_dup_tensor(model->ctx, tensor);
-                model->set_tensor(model->layer_norm_bias, tensor);
-                break;
-            case PARLER_EMBD_PROMPTS:
-                model->prompt_embd = ggml_dup_tensor(model->ctx, tensor);
-                model->set_tensor(model->prompt_embd, tensor);
-                break;
-            case PARLER_TEXT_ENCODING:
-                model->precomputed_input_emb = ggml_dup_tensor(model->ctx, tensor);
-                model->set_tensor(model->precomputed_input_emb, tensor);
-                break;
-            case PARLER_POSITIONAL_EMBD:
-                model->precomputed_positional_embds = ggml_dup_tensor(model->ctx, tensor);
-                model->set_tensor(model->precomputed_positional_embds, tensor);
-                break;
-            default:
-                break;
+        try {
+            switch (PARLER_TENSOR_GGUF_LOOKUP.at(name)) {
+                case PARLER_NORM:
+                    model->layer_norm = ggml_dup_tensor(model->ctx, tensor);
+                    model->set_tensor(model->layer_norm, tensor);
+                    break;
+                case PARLER_NORM_BIAS:
+                    model->layer_norm_bias = ggml_dup_tensor(model->ctx, tensor);
+                    model->set_tensor(model->layer_norm_bias, tensor);
+                    break;
+                case PARLER_EMBD_PROMPTS:
+                    model->prompt_embd = ggml_dup_tensor(model->ctx, tensor);
+                    model->set_tensor(model->prompt_embd, tensor);
+                    break;
+                case PARLER_TEXT_ENCODING:
+                    model->precomputed_input_emb = ggml_dup_tensor(model->ctx, tensor);
+                    model->set_tensor(model->precomputed_input_emb, tensor);
+                    break;
+                case PARLER_POSITIONAL_EMBD:
+                    model->precomputed_positional_embds = ggml_dup_tensor(model->ctx, tensor);
+                    model->set_tensor(model->precomputed_positional_embds, tensor);
+                    break;
+                default:
+                    break;
+            }
+        } catch (const std::out_of_range& e) {
+            TTS_ABORT("Error: %s\nTensor, '%s', is not a valid tensor.", e.what(), name.c_str());
         }
     } else if (std::find_if(name.begin(), name.end(), ::isdigit) != name.end())  {
         auto pair = parse_layer_count(name);

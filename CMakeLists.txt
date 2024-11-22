@@ -3,6 +3,10 @@ cmake_minimum_required(VERSION 3.14)
 project("parler.cpp" C CXX)
 include(CheckIncludeFileCXX)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 set(CMAKE_WARN_UNUSED_CLI YES)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -23,18 +27,6 @@ if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     include(git-vars)
 else()
     set(TTS_STANDALONE OFF)
-endif()
-
-if (EMSCRIPTEN)
-    set(BUILD_SHARED_LIBS_DEFAULT OFF)
-
-    option(LLAMA_WASM_SINGLE_FILE "llama: embed WASM inside the generated llama.js" ON)
-else()
-    if (MINGW)
-        set(BUILD_SHARED_LIBS_DEFAULT OFF)
-    else()
-        set(BUILD_SHARED_LIBS_DEFAULT ON)
-    endif()
 endif()
 
 option(BUILD_SHARED_LIBS "build shared libraries" ${BUILD_SHARED_LIBS_DEFAULT})
@@ -101,25 +93,30 @@ if (GGML_TARGET_DEFINES)
 endif()
 get_target_property(GGML_LINK_LIBRARIES ggml LINK_LIBRARIES)
 
-set_target_properties(parler PROPERTIES PUBLIC_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/include/parler.h)
+# all public headers
+set(TTS_PUBLIC_HEADERS
+    include/parler.h
+    include/audio_file.h)
+
+set_target_properties(parler PROPERTIES PUBLIC_HEADER "${TTS_PUBLIC_HEADERS}")
 install(TARGETS parler LIBRARY PUBLIC_HEADER)
 
 configure_package_config_file(
-        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/tts-config.cmake.in
-        ${CMAKE_CURRENT_BINARY_DIR}/tts-config.cmake
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/parler-config.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/parler-config.cmake
     INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/tts
     PATH_VARS TTS_INCLUDE_INSTALL_DIR
               TTS_LIB_INSTALL_DIR
               TTS_BIN_INSTALL_DIR )
 
 write_basic_package_version_file(
-        ${CMAKE_CURRENT_BINARY_DIR}/llama-version.cmake
-    VERSION ${LLAMA_INSTALL_VERSION}
+        ${CMAKE_CURRENT_BINARY_DIR}/parler-version.cmake
+    VERSION ${TTS_INSTALL_VERSION}
     COMPATIBILITY SameMajorVersion)
 
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/llama-config.cmake
-              ${CMAKE_CURRENT_BINARY_DIR}/llama-version.cmake
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/llama)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/parler-config.cmake
+              ${CMAKE_CURRENT_BINARY_DIR}/parer-version.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/parler)
 
 configure_file(cmake/parler.pc.in
         "${CMAKE_CURRENT_BINARY_DIR}/parler.pc"

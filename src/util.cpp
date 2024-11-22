@@ -18,7 +18,7 @@ struct ggml_tensor * reciprocal(ggml_context * ctx, struct ggml_tensor * a) {
 }
 
 // Described in https://arxiv.org/abs/2006.08195
-// Snake1d is a common trainable activation function used in the DAC model.
+// Snake1d is a common tunable activation function used in the DAC model.
 struct ggml_tensor * dac_snake_1d(ggml_context * ctx, struct ggml_tensor * alpha, struct ggml_tensor * a) {
     assert(a->ne[2] == 1 && a->ne[3] == 1);
     return ggml_add(ctx, a, ggml_mul(ctx, ggml_sqr(ctx, ggml_sin(ctx, ggml_mul(ctx, a, alpha))), reciprocal(ctx, alpha)));

@@ -81,6 +81,10 @@ struct parler_kv_cache {
 };
 
 struct parler_ubatch {
+    parler_ubatch(bool audio_generation, size_t n_tokens, size_t n_audio_tokens, size_t sequence_length, 
+        uint32_t * tokens, uint32_t * audio_tokens, uint32_t * positions, uint32_t * true_order, 
+        int current_step): audio_generation(audio_generation), n_tokens(n_tokens), n_audio_tokens(n_audio_tokens), sequence_length(sequence_length), tokens(tokens), audio_tokens(audio_tokens), positions(positions), true_order(true_order), current_step(current_step) {};
+    parler_ubatch() {};
     bool audio_generation; // whether we are receiving codebook decoded tokens or text tokens
     size_t n_tokens; // total sentence tokens
     size_t n_audio_tokens; // total audio tokens

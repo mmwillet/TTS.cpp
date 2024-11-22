@@ -61,9 +61,9 @@ struct dac_model {
     struct ggml_context * ctx;
     
     void prep_layers(gguf_context * meta);
-    void prep_buffers_and_context(bool cpu_only, ggml_context * load_context);
+    void prep_buffers_and_context(ggml_context * load_context);
     void prep_constants(gguf_context * meta);
-    void setup_from_file(gguf_context * meta_ctx, ggml_context * load_context, bool cpu_only);
+    void setup_from_file(gguf_context * meta_ctx, ggml_context * load_context);
     void set_tensor(struct ggml_tensor * tensor, struct ggml_tensor * target);
     size_t max_nodes();
     void free();

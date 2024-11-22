@@ -11,6 +11,7 @@ void parler_context::reset(int32_t n_output_heads) {
 
 void parler_context::set_threads() {
     if (backend != nullptr) {
+        // this is form copied from llama.cpp, but has since been removed. I don't know if this should be tuned.
         ggml_backend_metal_set_n_cb(backend, 999);
     }
     if (backend_cpu != nullptr) {
@@ -452,7 +453,7 @@ void parler_tts_runner::adjust_output_tokens(std::vector<uint32_t> & output_toke
         bool remove = false;
         for (int ii = 0; ii < model->n_output_heads; ii++) {
             int next_index = i*model->n_output_heads+ii*model->n_output_heads+ii;
-            if (next_index <= size && output_tokens[i*model->n_output_heads+ii] >= model->audio_vocab_size) {
+            if (next_index > size || output_tokens[i*model->n_output_heads+ii] >= model->audio_vocab_size) {
                 remove = true;
                 break;
             }
@@ -543,7 +544,7 @@ struct parler_tts_runner * runner_from_file(const std::string & fname, int n_thr
     ut->initialize_tokenizer();
 
     model->setup_from_file(meta_ctx, weight_ctx, cpu_only);
-    audio_model->setup_from_file(meta_ctx, weight_ctx, cpu_only);
+    audio_model->setup_from_file(meta_ctx, weight_ctx);
     
     // TODO: change this weight assignment pattern to mirror llama.cpp
     for (ggml_tensor * cur = ggml_get_first_tensor(weight_ctx); cur; cur = ggml_get_next_tensor(weight_ctx, cur)) {
@@ -551,7 +552,7 @@ struct parler_tts_runner * runner_from_file(const std::string & fname, int n_thr
     }
     model->prep_cross_key_values();
     
-    struct dac_context * dctx = build_new_dac_context(audio_model, n_threads, cpu_only);
+    struct dac_context * dctx = build_new_dac_context(audio_model, n_threads);
     struct dac_runner * audio_decoder = new dac_runner(audio_model, dctx);
     audio_decoder->prepare_post_load();
     struct sampler * samp = new sampler;

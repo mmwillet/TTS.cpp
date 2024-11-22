@@ -1,9 +1,9 @@
 #include "dac_runner.h"
 
 void dac_context::set_threads() {
-    if (backend != nullptr) {
+    /*if (backend != nullptr) {
         ggml_backend_metal_set_n_cb(backend, 999);
-    }
+    }*/
     if (backend_cpu != nullptr) {
         ggml_backend_cpu_set_n_threads(backend_cpu, n_threads);
         ggml_backend_cpu_set_threadpool(backend_cpu, threadpool);
@@ -41,7 +41,7 @@ static struct ggml_tensor * dac_build_audio_inputs(struct ggml_context * ctx, st
         code = ggml_reshape_1d(ctx, code, batch.sequence_length);
         code = ggml_get_rows(ctx, quantize_layer.codebook, code);
         code = ggml_cont(ctx, ggml_transpose(ctx, code));
-        code = ggml_conv_1d_32(ctx, quantize_layer.out_proj_kernel, code, 1, 0, 1);
+        code = ggml_conv_1d(ctx, quantize_layer.out_proj_kernel, code, 1, 0, 1);
         code = ggml_add(ctx, code, quantize_layer.out_proj_bias);
 
         if (i == 0) {
@@ -56,10 +56,10 @@ static struct ggml_tensor * dac_build_audio_inputs(struct ggml_context * ctx, st
 static struct ggml_tensor * build_residual_unit(ggml_context * ctx, struct ggml_tensor * cur, dac_residual_unit & u, int padding, int dilation) {
     struct ggml_tensor * residual = cur;
     cur = dac_snake_1d(ctx, u.in_snake_alpha, cur);
-    cur = ggml_conv_1d_32(ctx, u.in_conv_kernel, cur, 1, padding, dilation);
+    cur = ggml_conv_1d(ctx, u.in_conv_kernel, cur, 1, padding, dilation);
     cur = ggml_add(ctx, cur, u.in_conv_bias);
     cur = dac_snake_1d(ctx, u.out_snake_alpha, cur);
-    cur = ggml_conv_1d_32(ctx, u.out_conv_kernel,  cur, 1, 0, 1);
+    cur = ggml_conv_1d(ctx, u.out_conv_kernel,  cur, 1, 0, 1);
     cur = ggml_add(ctx, cur, u.out_conv_bias);
     return ggml_add(ctx, cur, residual);
 }
@@ -107,13 +107,12 @@ void dac_runner::free_build() {
 void dac_runner::prepare_post_load() {
     dac_ubatch batch;
     batch.sequence_length = model->max_generation_size;
-    init_build();
     ggml_cgraph * gf = build_dac_graph(batch);
-    free_build();
     dctx->prep_schedule(gf);
 }
     
 struct ggml_cgraph * dac_runner::build_dac_graph(dac_ubatch & batch) {
+    init_build();
     // splitting this out from the primary graph so that we can better manage streaming (i.e. sentence chunks are better performed this way)
     struct ggml_cgraph * gf = ggml_new_graph_custom(ctx, 8192, false);
     
@@ -124,16 +123,17 @@ struct ggml_cgraph * dac_runner::build_dac_graph(dac_ubatch & batch) {
     ggml_set_name(inputs, "quanitzed_inputs");
     
     // everything besides the inputs is just a forward pass
-    cur = ggml_conv_1d_32(ctx, model->in_conv_kernel, inputs, 1, 3, 1);
+    cur = ggml_conv_1d(ctx, model->in_conv_kernel, inputs, 1, 3, 1);
     cur = ggml_add(ctx, cur, model->in_conv_bias);
     for (auto l : model->layers) {
         cur = build_decoder_block(ctx, cur, l);
     }
     cur = dac_snake_1d(ctx, model->snake_alpha, cur);
-    cur = ggml_conv_1d_32(ctx, model->out_conv_kernel, cur, 1, 3, 1);
+    cur = ggml_conv_1d(ctx, model->out_conv_kernel, cur, 1, 3, 1);
     cur = ggml_add(ctx, cur, model->out_conv_bias);
     cur = ggml_tanh(ctx, cur);
     ggml_build_forward_expand(gf, cur);
+    free_build();
     return gf;
 }
 
@@ -162,9 +162,7 @@ void dac_runner::run(uint32_t * input_tokens, uint32_t sequence_length, std::vec
     ggml_backend_buffer_clear(dctx->buf_output, 0);
     
     struct ggml_cgraph * gf = NULL;
-    init_build();
     gf = build_dac_graph(batch);
-    free_build();
     
     // the output is always the last tensor in the graph
     struct ggml_tensor * result = gf->nodes[gf->n_nodes - 1];

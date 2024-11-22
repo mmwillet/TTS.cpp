@@ -27,7 +27,7 @@
 .direnv/
 .DS_Store
 .envrc
-.idea/
+.idea*
 .swiftpm
 .vs/
 .vscode/

@@ -1,0 +1,10 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: llama
+Description: Port of Hugging Face Parler TTS model in C/C++ via GGML
+Version: @PROJECT_VERSION@
+Libs: -L${libdir} -lparler
+Cflags: -I${includedir}

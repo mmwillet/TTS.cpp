@@ -10,9 +10,9 @@
 #include "ggml-metal.h"
 #include "ggml-backend.h"
 #include "ggml-alloc.h"
+#include "ggml-cpu.h"
 #include "ggml.h"
 #include "ggml-impl.h"
-#include "common.h"
 
 #define TTS_ABORT(...) tts_abort(__FILE__, __LINE__, __VA_ARGS__)
 
