@@ -271,8 +271,6 @@ int main(int argc, const char ** argv) {
         args.help();
         return 0;
     }
-
-    fprintf(stdout, "%s\n", args.get_string_param("--model-path").c_str());
     args.validate();
 
     struct parler_tts_runner * runner = runner_from_file(args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), true);
