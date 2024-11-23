@@ -1,8 +1,12 @@
 ### Overview
 
-This directory contains a simple torch to gguf file conversion script for the Parler TTS Mini Model.
+This directory contains a simple torch to gguf format conversion script for the [Parler TTS Mini Model](https://huggingface.co/ylacombe/parler_tts_mini_v0.1).
 
-**Please note that the model encoding pattern used here is extremely naive and subject to further development** (especially in order to align its pattern with gguf patterns in llama.cpp ad whisper.cpp).
+Please note that the model encoding pattern used here is extremely naive and subject to further development (especially in order to align its pattern with gguf patterns in llama.cpp ad whisper.cpp). **WARNING! The current format will not be forward compatible with future versions of TTS.cpp** 
+
+### Requirements
+
+In order to run the installation and conversion script you will need python3 and [pip3](https://packaging.python.org/en/latest/tutorials/installing-packages/) installed locally.
 
 ### Installation
 
@@ -15,10 +19,10 @@ pip3 install -r requirements.txt
 
 The gguf conversion script can be run via the `convert_parerl_tts_to_gguf` file locally like so: 
 ```commandline
-python3 ./convert_parler_tts_to_gguf --save-path ./test.gguf
+python3 ./convert_parler_tts_to_gguf --save-path ./test.gguf --voice-prompt "female voice"
 ```
 
-the command accepts _--save-path_ which described where to save the gguf model file to and _--voice-prompt_ which is a sentence which is a sentence desribing how the model's voice should sound.
+the command accepts _--save-path_ which described where to save the gguf model file to and _--voice-prompt_ which is a sentence or statement that desribes how the model's voice should sound at generation time.
 
 #### Voice Prompt
 

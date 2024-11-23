@@ -15,7 +15,7 @@ struct arg {
         if (abbreviation != "") {
             htxt += " (" + abbreviation + ")";
         }
-        htxt += ": ";
+        htxt += ":\n    ";
         if (description != "") {
             htxt += description + "\n";
         } else {
@@ -261,11 +261,11 @@ int main(int argc, const char ** argv) {
     float default_temperature = 0.9f;
     int default_n_threads = 10;
     arg_list args;
-    args.add_argument(string_arg("--model-path", "The local path of the gguf model file for Parler TTS mini v1.", "-mp", true));
-    args.add_argument(string_arg("--prompt", "The text prompt for which to generate audio.", "-p", true));
-    args.add_argument(string_arg("--save-path", "The path to save the audio output to in a .wav format.", "-sp", true));
-    args.add_argument(float_arg("--temperature", "The temperature to use when generating outputs.", "-t", false, &default_temperature));
-    args.add_argument(int_arg("--n-threads", "The number of cpu threads to run generation with.", "-nt", false, &default_n_threads));
+    args.add_argument(string_arg("--model-path", "(REQUIRED) The local path of the gguf model file for Parler TTS mini v1.", "-mp", true));
+    args.add_argument(string_arg("--prompt", "(REQUIRED) The text prompt for which to generate audio in quotation markers.", "-p", true));
+    args.add_argument(string_arg("--save-path", "(REQUIRED) The path to save the audio output to in a .wav format.", "-sp", true));
+    args.add_argument(float_arg("--temperature", "The temperature to use when generating outputs. Defaults to 0.9.", "-t", false, &default_temperature));
+    args.add_argument(int_arg("--n-threads", "The number of cpu threads to run generation with. Defaults to 10.", "-nt", false, &default_n_threads));
     args.parse(argc, argv);
     if (args.for_help) {
         args.help();
