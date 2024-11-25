@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
-from .parler_tts_gguf import ParlerTTSMiniEncoder
+from parler_tts_gguf import ParlerTTSMiniEncoder
 from os.path import isdir, dirname
 
 

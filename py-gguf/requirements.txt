@@ -1,6 +1,5 @@
-torch==2.4.0
-transformers==4.43.3
-parler_tts==0.2
+torch>=2.4.0
+torchaudio>=2.4.0
+transformers>=4.43.3
+parler_tts @ git+https://github.com/huggingface/parler-tts.git
 gguf==0.10.0
-
-

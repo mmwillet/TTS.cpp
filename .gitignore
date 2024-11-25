@@ -27,11 +27,15 @@
 .direnv/
 .DS_Store
 .envrc
-.idea*
+.idea/
 .swiftpm
 .vs/
 .vscode/
 nppBackup
+
+# python
+
+py-gguf/__pycache__
 
 
 # Build Artifacts
