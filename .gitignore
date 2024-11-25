@@ -41,7 +41,7 @@ py-gguf/__pycache__
 # Build Artifacts
 
 .build/
-build*
+build/*
 /liblparler.so
 cmake-build-*
 CMakeSettings.json
