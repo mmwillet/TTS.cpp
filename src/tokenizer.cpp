@@ -47,7 +47,9 @@ void unigram_tokenizer::initialize_tokenizer() {
 // The particular algorithm used here effectively works by walking the text and at each index storing the max value of all possible gram combinations
 // we can then reverse that sequence to pick the best possible tokens.
 void unigram_tokenizer::tokenize(const std::string & text, std::vector<uint32_t> & tokens) {
-    assert(init);
+    if (!init) {
+        TTS_ABORT("Error: %s\nTokenizer must be initialized before #tokenize is called.");
+    }
     // the parler tokenizer's normalizer (i.e. the bert normalizer implemented by huggingface tokenizers libs) only deduplicates and strips extra spaces and
     // optionally handles chinese characters and accents (neither of which are currently supported here).
     std::string normalized = text;
