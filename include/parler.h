@@ -126,7 +126,7 @@ struct parler_tts_runner {
     struct dac_runner * dac_runner;
     struct parler_context * pctx;
     struct unigram_tokenizer * tokenizer;
-    struct parler_kv_cache * kv_self;
+    struct parler_kv_cache * kv_self = nullptr;
     struct sampler * sampler;
     struct ggml_context * ctx = nullptr;
 
@@ -144,6 +144,7 @@ struct parler_tts_runner {
     int generate_from_batch(parler_ubatch & batch, std::vector<float> * output);
     void parler_graph_compute(ggml_cgraph * gf);
     void just_decode(uint32_t * tokens, int32_t sq_len, std::vector<float> * outputs);
+    int generate_audio_tokens(std::string sentence);
 };
 
 struct parler_tts_runner * runner_from_file(const std::string & fname, int n_threads, bool cpu_only = true);

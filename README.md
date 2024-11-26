@@ -41,6 +41,8 @@ Additional Model support will initially be added based on open source model perf
 * C++17 and C17
   * XCode Command Line Tools (via `xcode-select --install`) should suffice for OS X
 * CMake (>=3.14) 
+* GGML pulled locally
+  * this can be accomplished via `git clone -b support-for-tts git@github.com:mmwillet/ggml.git`
   
 #### Build:
 
