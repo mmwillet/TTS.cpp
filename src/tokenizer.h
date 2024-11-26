@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <map>
 #include <regex>
+#include "util.h"
 
 
 struct token_trie {
