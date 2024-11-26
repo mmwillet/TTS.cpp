@@ -20,17 +20,19 @@ Additional Model support will initially be added based on open source model perf
 
 #### Functionality
 
-| Planned Functionality | OS X  | Linux | Windows |
-|----------------------|-------|---|---|
-| Basic CPU Generation | &check; |&cross;|&cross;|
-| Metal Acceleration   | &cross; | _ | _ |
-| CUDA support         | _     |&cross;|&cross;|
-| Layer Offloading     | &cross; |&cross;|&cross;|
-| Server Support       | &cross; |&cross;|&cross;|
-| Vulkan Support       | _     |&cross;|&cross;|
-| Kompute Support      | _     |&cross;|&cross;|
-| Streaming Audio      | &cross; |&cross;|&cross;|
+| Planned Functionality | OS X       | Linux | Windows |
+|----------------------|------------|---|---|
+| Basic CPU Generation | &check;    |&cross;|&cross;|
+| Metal Acceleration   | &check;_*_ | _ | _ |
+| CUDA support         | _          |&cross;|&cross;|
+| Quantization         | &cross;    |&cross;|&cross;|
+| Layer Offloading     | &cross;    |&cross;|&cross;|
+| Server Support       | &cross;    |&cross;|&cross;|
+| Vulkan Support       | _          |&cross;|&cross;|
+| Kompute Support      | _          |&cross;|&cross;|
+| Streaming Audio      | &cross;    |&cross;|&cross;|
 
+ _*_ Currently only the generative model supports metal acceleration
 ### Installation
 
 **WARNING!** This library is only currently supported on OS X
