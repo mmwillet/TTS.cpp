@@ -1,5 +1,4 @@
 #include "parler.h"
-#include <iostream>
 
 void parler_context::reset(int32_t n_output_heads) {
     n_outputs = 0;
@@ -48,7 +47,7 @@ struct parler_context * build_new_parler_context(struct parler_tts_model * model
     if (!use_cpu) {
         pctx->backend = ggml_backend_metal_init();
     }
-    pctx->eos_seen.reserve(9);
+    pctx->eos_seen.reserve(model->n_output_heads);
     pctx->backend_cpu = ggml_backend_cpu_init();
     pctx->set_threads();
     pctx->build_schedule();
@@ -514,7 +513,6 @@ int parler_tts_runner::generate_audio_tokens(std::string sentence) {
     int32_t seq_id = std::mt19937(std::random_device{}())();
     delete kv_self;
     kv_self = new parler_kv_cache;
-    std::cout << "here\n";
     if (!parler_kv_cache_init(kv_self, model, pctx, seq_id)) {
         return 1;
     }
