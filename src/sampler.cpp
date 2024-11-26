@@ -9,6 +9,9 @@ void sampler::sample(float * logits, std::vector<uint32_t> & output_tokens) {
         softmax(logits);
     }
     bool has_repetition_penalty = repetition_penalty != 1.0;
+    if (has_repetition_penalty && (last_token_ids.size() == 0 || repetition_counts.size() == 0)) {
+        reset();
+    }
     std::minstd_rand gen(std::random_device{}());
     std::uniform_real_distribution<float> dist(0.0f, 1.0f);
     for (int i = 0; i < n_output_heads; i++) {
@@ -18,15 +21,26 @@ void sampler::sample(float * logits, std::vector<uint32_t> & output_tokens) {
             cumulative += *(logits+i*vocab_size+ii);
             if ((assignment <= cumulative) || (ii >= vocab_size + 1)) {
                 if (has_repetition_penalty) {
-                    if (last_token_id != ii) {
-                        repetition_count = 0;
+                    if (last_token_ids[i] != ii) {
+                        repetition_counts[i] = 0;
                     }
-                    last_token_id = ii;
-                    repetition_count += 1;
+                    last_token_ids[i] = ii;
+                    repetition_counts[i] += 1;
                 }
                 output_tokens.push_back(ii);
                 break;
             }
+        }
+    }
+}
+
+void sampler::reset() {
+    if (repetition_penalty != 1.0) {
+        last_token_ids.clear();
+        repetition_counts.clear();
+        for (int i = 0; i < n_output_heads; i++) {
+            last_token_ids.push_back(-1);
+            repetition_counts.push_back(0);
         }
     }
 }
@@ -39,8 +53,8 @@ void sampler::softmax(float * logits) {
         for (int ii = 0; ii < vocab_size; ii++) {
             int index = i * vocab_size + ii;
             float v = *(logits + index);
-            if (has_repetition_penalty && last_token_id == ii) {
-                v /= (pow(repetition_penalty, repetition_count));
+            if (has_repetition_penalty && last_token_ids[i] == ii) {
+                v /= (pow(repetition_penalty, repetition_counts[i]));
             }
             if (has_temperature) {
                 v /= temperature;

@@ -23,6 +23,8 @@ In order to get a detailed breakdown the functionality currently available you c
     (REQUIRED) The text prompt for which to generate audio in quotation markers.
 --save-path (-sp):
     (REQUIRED) The path to save the audio output to in a .wav format.
+--use-metal (-m):
+    Whether to use metal acceleration.
 ```
 
 General usage should follow from these possible parameters. E.G. The following command will save generated speech to the `/tmp/test.wav` file.
@@ -30,4 +32,3 @@ General usage should follow from these possible parameters. E.G. The following c
 ```commandline
 ./cli --model-path /model/path/to/gguf_file.gguf --prompt "I am saying some words" --save-path /tmp/test.wav
 ```
-

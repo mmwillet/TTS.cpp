@@ -510,6 +510,7 @@ int parler_tts_runner::generate_from_batch(parler_ubatch & batch, std::vector<fl
 int parler_tts_runner::generate_audio_tokens(std::string sentence) {
     parler_ubatch batch = batch_from_sentence(sentence, model, tokenizer);
     pctx->reset(model->n_output_heads);
+    sampler->reset();
     int32_t seq_id = std::mt19937(std::random_device{}())();
     delete kv_self;
     kv_self = new parler_kv_cache;
@@ -552,6 +553,7 @@ void parler_tts_runner::just_decode(uint32_t * tokens, int32_t sq_len, std::vect
 int parler_tts_runner::generate(std::string sentence, std::vector<float> * output, int32_t seq_id) {
     parler_ubatch batch = batch_from_sentence(sentence, model, tokenizer);
     pctx->reset(model->n_output_heads);
+    sampler->reset();
     if (pctx->seq_id != seq_id || seq_id == -1) {
         seq_id = std::mt19937(std::random_device{}())();
         pctx->current_position = 0;

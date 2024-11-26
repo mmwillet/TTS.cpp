@@ -9,6 +9,7 @@ endif()
 
 add_library(parler
             ../include/parler.h
+            ../include/args.h
             parler.cpp
             tokenizer.cpp
             sampler.cpp
@@ -17,6 +18,7 @@ add_library(parler
             parler_model.cpp
             dac_model.cpp
             util.cpp
+            args.cpp
             )
 
 target_include_directories(parler PUBLIC . ../include ../ggml/src/)

@@ -16,14 +16,15 @@ struct sampler {
     uint32_t vocab_size = 1088;
     float temperature = 1.0f;
     float repetition_penalty = 1.0f;
-    int32_t last_token_id = -1;
-    uint32_t repetition_count = 0;
+    std::vector<int32_t> last_token_ids;
+    std::vector<uint32_t> repetition_counts;
     bool do_sample = true;
     bool apply_softmax = true;
     
     void sample(float * logits, std::vector<uint32_t> & output_tokens);
     void softmax(float * logits);
     void max(float * logits, std::vector<uint32_t> & output_tokens);
+    void reset();
 };
 
 #endif
