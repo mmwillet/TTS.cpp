@@ -1,5 +1,4 @@
 #include "parler.h"
-#include <iostream>
 
 void parler_context::reset(int32_t n_output_heads) {
     n_outputs = 0;
@@ -725,7 +724,6 @@ void quantize_gguf(const std::string & ifile, const std::string & ofile, struct 
     gguf_set_val_u32(ctx_out.get(), "general.quantization_type", params->quantize_type);
 
     for (ggml_tensor * tensor = ggml_get_first_tensor(weight_ctx); tensor; tensor = ggml_get_next_tensor(weight_ctx, tensor)) {
-        std::cout << tensor->name << "\n";
         gguf_add_tensor(ctx_out.get(), tensor);
     }
 
@@ -773,7 +771,6 @@ void quantize_gguf(const std::string & ifile, const std::string & ofile, struct 
         std::string name = ggml_get_name(cur);
         if (name.size() != 0 && is_quanitizable(name, params)) {
             if ((cur->type) != GGML_TYPE_F32) {
-                std::cout << name << "\n";
                 TTS_ABORT("ERROR: All quantized tensors must be transformed from 32bit floats. Tensor, '%s', has impropert type, '%d'\n", cur->name, cur->type);
             }
             new_type = params->quantize_type;
@@ -803,7 +800,7 @@ void quantize_gguf(const std::string & ifile, const std::string & ofile, struct 
 
         gguf_set_tensor_type(ctx_out.get(), name.c_str(), new_type);
         gguf_set_tensor_data(ctx_out.get(), name.c_str(), new_data, new_size);
-        std::cout << "tensor: '" << name << "' with size: " << new_size << "\n";
+        fprintf(stdout, "At tensor: '%s' with new size: %d bytes\n", name.c_str(), new_size);
         // write tensor data + padding
         fout.write((const char *) new_data, new_size);
         zeros(fout, GGML_PAD(new_size, align) - new_size);

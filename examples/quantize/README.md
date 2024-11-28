@@ -2,8 +2,8 @@
 
 This script converts a 32bit floating point TTS.cpp GGUF model file to a quantized format. [Quantization](https://huggingface.co/docs/optimum/en/concept_guides/quantization) is a technique used to miniturize weight and bias values in order to reduce overhead memory requirements and reduce inference time. Typically the extent of quantization results in a proportionate though minor impact to model proficiency.
 
-**WARNING** Full QA has not been completed for quantization. Some quantization types are not functioning as expected.
-
+**WARNING** Quantization to smaller modes than Q4_0 is not currently supported and importance matrices are currently not supported.
+ 
 ### Requirements
 
 * quantize and the parler library must be built 
