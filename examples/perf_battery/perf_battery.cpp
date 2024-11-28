@@ -123,6 +123,7 @@ int main(int argc, const char ** argv) {
     	double decode_ms = benchmark_ms(cb2);
     	generation_samples.push_back(generation_ms);
     	decode_samples.push_back(decode_ms);
+    	fprintf(stdout, benchmark_printout(generation_samples, decode_samples, output_times, tokens).c_str());
     }
 
     fprintf(stdout, benchmark_printout(generation_samples, decode_samples, output_times, tokens).c_str());

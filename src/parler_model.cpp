@@ -120,19 +120,17 @@ void parler_tts_model::prep_cross_key_values() {
     ggml_backend_free(backend_cpu);
 }
 
-void parler_tts_model::prep_buffers_and_context(bool cpu_only, ggml_context * load_context) {
+void parler_tts_model::prep_buffers_and_context(bool cpu_only) {
     backend = cpu_only ? ggml_backend_cpu_init() : ggml_backend_metal_init();
     buffer = cpu_only ? ggml_backend_cpu_buffer_type() : ggml_backend_metal_buffer_type();
-    size_t ctx_size = ggml_tensor_overhead() * (size_t) (n_tensors * 1.25);
+    size_t ctx_size = ggml_tensor_overhead() * (size_t) (tensor_meta.n_tensors * 1.25);
     struct ggml_init_params params = {
         /*.mem_size   =*/ ctx_size,
         /*.mem_buffer =*/ NULL,
         /*.no_alloc   =*/ true,
     };
     ctx = ggml_init(params);
-    
-    // TODO: compute parameter size and allocate appropriate buffers as part of model load instead of using the context size from gguf load
-    buf = ggml_backend_buft_alloc_buffer(buffer, load_context->mem_size + n_encode_length*hidden_size*sizeof(float)*n_layers*2);
+    buf = ggml_backend_buft_alloc_buffer(buffer, tensor_meta.n_bytes + n_encode_length*hidden_size*sizeof(float)*n_layers*2);
     return;
 }
 
@@ -141,17 +139,19 @@ void parler_tts_model::set_tensor(struct ggml_tensor * tensor, struct ggml_tenso
     tensor->data = (void *)((uint8_t *) ggml_backend_buffer_get_base(buf) + offset);
     size_t size = ggml_nbytes(target);
     ggml_backend_tensor_set(tensor, target->data, 0, size);
+    ggml_set_name(tensor, target->name);
     offset += size;
 }
 
 void parler_tts_model::setup_from_file(gguf_context * meta_ctx, ggml_context * load_context, bool cpu_only) {
     prep_constants(meta_ctx);
     prep_layers(meta_ctx);
-    prep_buffers_and_context(cpu_only, load_context);
+    tensor_meta = compute_tensor_meta("decoder", load_context);
+    prep_buffers_and_context(cpu_only);
 }
 
 size_t parler_tts_model::max_nodes() {
-    return std::max<size_t>(8192, n_tensors*5);
+    return std::max<size_t>(8192, tensor_meta.n_tensors*5);
 }
 
 void parler_tts_model::free() {

@@ -32,11 +32,8 @@ struct dac_quantize_layer {
 // this struct maintains the static tensors for the dac audio decoder graph.
 // As such, this is designed to contain basic configuration and ggml tensor support for DAC.
 // The dac_runner describes how the graph is built and run.
-struct dac_model {
-    // it doesn't make sense to expect gguf constant configuration to store information on the number of ggml tensors
-    // as the gguf file is compiled from a pytorch model. This should be changed along with the load pattern.
-    uint32_t n_tensors = 620;
-    
+struct dac_model {    
+    struct model_tensor_meta tensor_meta;
     // These configs  are essentially built for the 44khZ 8kbps standard DAC model audio encoder and decoder
     uint32_t n_layers = 4;
     uint32_t n_heads = 9;
@@ -61,7 +58,7 @@ struct dac_model {
     struct ggml_context * ctx;
     
     void prep_layers(gguf_context * meta);
-    void prep_buffers_and_context(ggml_context * load_context);
+    void prep_buffers_and_context();
     void prep_constants(gguf_context * meta);
     void setup_from_file(gguf_context * meta_ctx, ggml_context * load_context);
     void set_tensor(struct ggml_tensor * tensor, struct ggml_tensor * target);

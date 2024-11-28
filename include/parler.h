@@ -3,6 +3,8 @@
 
 #include "dac_runner.h"
 #include "sampler.h"
+#include <thread>
+#include <fstream>
 
 struct parler_context {
     parler_context(parler_tts_model * model, int n_threads): model(model), n_threads(n_threads) {};
@@ -148,5 +150,14 @@ struct parler_tts_runner {
 };
 
 struct parler_tts_runner * runner_from_file(const std::string & fname, int n_threads, bool cpu_only = true);
+
+struct quantization_params {
+    quantization_params(uint32_t n_threads, enum ggml_type quantize_type, void * imatrix = nullptr): n_threads(n_threads), quantize_type(quantize_type), imatrix(imatrix) {};
+    uint32_t n_threads;
+    enum ggml_type quantize_type; // quantization type
+    void * imatrix = nullptr; // pointer to importance matrix data
+};
+
+void quantize_gguf(const std::string & ifile, const std::string & ofile, struct quantization_params * params);
 
 #endif

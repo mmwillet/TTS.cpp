@@ -33,3 +33,24 @@ uint64_t get_cpu_count() {
     }
     return cpu_count;
 }
+
+bool has_suffix(std::string value, std::string suffix) {
+    return value.size() >= suffix.size() && value.compare(value.size()-suffix.size(), suffix.size(), suffix) == 0;
+}
+
+bool has_prefix(std::string value, std::string prefix) {
+    return value.size() >= prefix.size() && value.compare(0, prefix.size(), prefix) == 0;
+}
+
+struct model_tensor_meta compute_tensor_meta(std::string name_prefix, ggml_context * weight_ctx) {
+    model_tensor_meta meta;
+    for (ggml_tensor * cur = ggml_get_first_tensor(weight_ctx); cur; cur = ggml_get_next_tensor(weight_ctx, cur)) {
+        std::string::size_type pos = std::string(cur->name).find(".", 0);
+        std::string top_level(std::string(cur->name).substr(0, pos));
+        if (top_level == name_prefix) {
+            meta.n_tensors += 1;
+            meta.n_bytes += ggml_nbytes_pad(cur);
+        }
+    }
+    return meta;
+}

@@ -25,7 +25,7 @@ int int_arg::parse(int argc, const char ** argv) {
         required = false;
     }
     int val = atoi(argv[0]);
-    value = &val;
+    *value = val;
     return 1;
 }
 
@@ -34,7 +34,7 @@ int float_arg::parse(int argc, const char ** argv) {
         required = false;
     }
     float val = strtof(argv[0], nullptr);
-    value = &val;
+    *value = val;
     return 1;
 }
 

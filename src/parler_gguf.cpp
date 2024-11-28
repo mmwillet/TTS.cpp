@@ -155,7 +155,6 @@ void assign_quantizer_layer(dac_model & model, dac_quantize_layer & layer, std::
 }
 
 void assign_to_audio_encoder(dac_model & model, std::string name, ggml_tensor * tensor) {
-    model.n_tensors++;
     if (DAC_TENSOR_GGUF_LOOKUP.find(name) != DAC_TENSOR_GGUF_LOOKUP.end()) {
         switch(DAC_TENSOR_GGUF_LOOKUP.at(name)) {
             case DAC_ENCODER_IN_BIAS:

@@ -28,10 +28,7 @@ struct parler_layer {
 };
 
 struct parler_tts_model {
-    // it doesn't make sense to expect gguf constant configuration to store information on the number of ggml tensors
-    // as the gguf file is compiled from a pytorch model. This should be changed along with the load pattern.
-    uint32_t n_tensors = 512;
-    
+    struct model_tensor_meta tensor_meta;
     // These default configurations are based on the configuration of Parler TTS Mini (version 1.0)
     uint32_t n_output_heads = 9;
     uint32_t n_encode_length;
@@ -70,7 +67,7 @@ struct parler_tts_model {
     
     void prep_layers(gguf_context * meta);
     void prep_cross_key_values();
-    void prep_buffers_and_context(bool cpu_only, ggml_context * load_context);
+    void prep_buffers_and_context(bool cpu_only);
     void prep_constants(gguf_context * meta);
     void setup_from_file(gguf_context * meta_ctx, ggml_context * load_context, bool cpu_only);
     void set_tensor(struct ggml_tensor * tensor, struct ggml_tensor * target);
