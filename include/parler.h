@@ -156,6 +156,9 @@ struct quantization_params {
     uint32_t n_threads;
     enum ggml_type quantize_type; // quantization type
     void * imatrix = nullptr; // pointer to importance matrix data
+    bool quantize_output_heads = false;
+    bool quantize_text_embeddings = false;
+    bool quantize_cross_attn_kv = false;
 };
 
 void quantize_gguf(const std::string & ifile, const std::string & ofile, struct quantization_params * params);

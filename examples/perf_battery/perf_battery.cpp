@@ -100,7 +100,7 @@ int main(int argc, const char ** argv) {
     args.validate();
 
     struct parler_tts_runner * runner = runner_from_file(args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), !args.get_bool_param("--use-metal"));
-    runner->sampler->temperature = 1.0;
+    runner->sampler->temperature = 0.8;
     runner->sampler->repetition_penalty = 1.1;
     std::vector<double> generation_samples;
     std::vector<double> decode_samples;

@@ -14,10 +14,10 @@ void parler_context::reset(int32_t n_output_heads) {
 }
 
 void parler_context::set_threads() {
-    if (backend != nullptr) {
+    /*if (backend != nullptr) {
         // this is form copied from llama.cpp, but has since been removed. I don't know if this should be tuned.
         ggml_backend_metal_set_n_cb(backend, 999);
-    }
+    }*/
     if (backend_cpu != nullptr) {
         ggml_backend_cpu_set_n_threads(backend_cpu, n_threads);
         ggml_backend_cpu_set_threadpool(backend_cpu, threadpool);
@@ -609,9 +609,19 @@ struct parler_tts_runner * runner_from_file(const std::string & fname, int n_thr
     return runner;
 }
 
-bool is_quanitizable(std::string name) {
+bool is_quanitizable(std::string name, struct quantization_params * params) {
     // the DAC audio encoder / decoder is not compatible with quantization, normalization weight shouldn't be quantized, and the text encoding shouldn't be normalized.
-    return !has_prefix(name, "audio_encoder") && !has_suffix(name, "norm.weight") && !has_suffix(name, "text_encoding") && !has_suffix(name, "positional_embed") && !has_suffix(name, "norm.bias") && !has_suffix(name, "weight.head") && !has_prefix(name, "decoder.embed");
+    bool quantizable = !has_prefix(name, "audio_encoder") && !has_suffix(name, "norm.weight") && !has_suffix(name, "text_encoding") && !has_suffix(name, "positional_embed") && !has_suffix(name, "norm.bias");
+    if (!params->quantize_output_heads) {
+        quantizable = quantizable && !has_suffix(name, "weight.head");
+    }
+    if (!params->quantize_text_embeddings) {
+        quantizable = quantizable && !has_suffix(name, "embed_prompts");
+    }
+    if (!params->quantize_cross_attn_kv) {
+        quantizable = quantizable && !has_suffix(name, "encoder_attn.k_proj.weight") && !has_suffix(name, "encoder_attn.v_proj.weight");   
+    }
+    return quantizable;
 }
 
 size_t quantize_tensor(void * new_data, struct ggml_tensor * tensor, const float * imatrix, enum ggml_type qtype, uint32_t n_threads) {
@@ -761,7 +771,7 @@ void quantize_gguf(const std::string & ifile, const std::string & ofile, struct 
         void * new_data;
         size_t new_size;
         std::string name = ggml_get_name(cur);
-        if (name.size() != 0 && is_quanitizable(name)) {
+        if (name.size() != 0 && is_quanitizable(name, params)) {
             if ((cur->type) != GGML_TYPE_F32) {
                 std::cout << name << "\n";
                 TTS_ABORT("ERROR: All quantized tensors must be transformed from 32bit floats. Tensor, '%s', has impropert type, '%d'\n", cur->name, cur->type);

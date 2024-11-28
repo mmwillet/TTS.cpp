@@ -19,6 +19,12 @@ In order to get a detailed breakdown the functionality currently available you c
     The ggml enum of the quantized type to convert compatible model tensors to. For more information see readme. Defaults to Q4_0 quantizatio (2).
 --n-threads (-nt):
     The number of cpu threads to run the quantization process with. Defaults to known hardware concurrency.
+--quantize-output-heads (-qh):
+    Whether to quantize the output heads. Defaults to false and is true when passed (does not accept a parameter).
+--quantize-text-embedding (-qe):
+    Whether to quantize the input text embededings. Defaults to false and is true when passed (does not accept a parameter).
+--quantize-cross-attn-kv (-qkv):
+    Whether to quantize the cross attention keys and values. Defaults to false and is true when passed (does not accept a parameter).
 --model-path (-mp):
     (REQUIRED) The local path of the gguf model file for Parler TTS mini v1 to quantize.
 --quantized-model-path (-qp):
@@ -65,28 +71,33 @@ Valid types passed to `--quantized-type` are described by the `ggml_type` enum i
 
 ### Findings
 
-In general results with quantization have thus far been mixed. While the model's generation speed is improved and it does not completely degrade with full quantization, it more frequently repeats words, rarely maintains tonal consistency, and sometimes lengthens speech production unnecessarily. Some improvement is observed when the embeddings and channel heads are not quantized, but the model still often produces unnecessary audio tokens.
+In general results with quantization have thus far been mixed. While the model's generation speed is improved and it does not completely degrade with full Q4 quantization, full quantization and smaller than Q5_0 quantization is not recommended. With Q4 quantization, the model more frequently repeats words, rarely maintains tonal consistency, and sometimes lengthens speech production unnecessarily. Improvement is observed when the text embeddings, persistent cross attention values, and output heads are not quantized and quantization is limited to Q5 and higher.
 
-Several future iterations will be tried including:
+#### Approaches to Resolve Inconsisency:
+
+The following approaches were experimented with:
 
 - Avoiding quantization of the persistent cross attention keys and values.
-  - _Since the voice's distinct qualities are largely determined by the cross attention it is possible that quantization of key and value parameters is damaging consistency._
+  - **Why**: _Since the voice's distinct qualities are largely determined by the cross attention it is possible that quantization of key and value parameters is damaging consistency._
+  - **Result**: _Voice consistency improved, but not completely (This could be reflection of the Parler itself being somewhat inconsistent)._
 - Cluster sampling 
-  - _Generally the model performs better with lower temperatures or no sampling, but often fails to terminate on time without sampling. Reducing room for error while still sampling will likely improve quality._
+  - **Why**: _Generally the model performs better with lower temperatures or no sampling, but often fails to terminate on time without sampling. Reducing room for error while still sampling will likely improve quality._
+  - **Result**: _Did not improve the model's performance noticeably over simple tempature changes. It is possible that it reduces catastrophic edge cases._
 - Adding a static prompt with non-quantized generation (via a persistent cache) before each generation.
-  - _The model rarely changes its voice mid generation so having an upfront pattern to generate from likely improve consistency._
+  - **Why**: _The model rarely changes its voice mid generation so having an upfront pattern to generate from likely improve consistency._
+  - **Result**: _Drastically improved voice consistency_.
   
 #### Performance Observations
 
-A clear improvment in tokens per second via the generative model is observed with quantization. Seen below with Q5_0 quantization, the model is now capable of completing its generation in real time (it generates tokens faster than it takes to listen to them), and the model's TPS has improved from ~693 to ~916.
+A clear improvement in tokens per second via the generative model is observed with quantization. Seen below with Q5_0 quantization, the model is now capable of completing its generation in real time (it generates tokens faster than it takes to listen to them), and the model's TPS has improved from ~693 to ~986.
 
 ```
 Mean Stats:
 
-  Generation Time (ms):      4089.173764
-  Decode Time (ms):          5806.669719
-  Generation TPS:            915.998475
-  Decode TPS:                575.483766
-  Generation by output (ms): 0.847787
-  Decode by output (ms):     1.350455
+  Generation Time (ms):      1945.434146
+  Decode Time (ms):          3416.610760
+  Generation TPS:            986.040513
+  Decode TPS:                562.941718
+  Generation by output (ms): 0.786301
+  Decode by output (ms):     1.379292
 ```
