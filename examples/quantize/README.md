@@ -65,8 +65,17 @@ Valid types passed to `--quantized-type` are described by the `ggml_type` enum i
 
 ### Findings
 
-In general results with quantization have thus far been mixed. While the model does not completely degrade with full quantization, it more frequently repeats words, rarely maintains tonal consistency, and sometimes lengthens speech production unnecessarily. Some improvement is observed when the embeddings and channel heads are not quantized, but the model still often produces unnecessary audio tokens.
+In general results with quantization have thus far been mixed. While the model's generation speed is improved and it does not completely degrade with full quantization, it more frequently repeats words, rarely maintains tonal consistency, and sometimes lengthens speech production unnecessarily. Some improvement is observed when the embeddings and channel heads are not quantized, but the model still often produces unnecessary audio tokens.
 
+Several future iterations will be tried including:
+
+- Avoiding quantization of the persistent cross attention keys and values.
+  - _Since the voice's distinct qualities are largely determined by the cross attention it is possible that quantization of key and value parameters is damaging consistency._
+- Cluster sampling 
+  - _Generally the model performs better with lower temperatures or no sampling, but often fails to terminate on time without sampling. Reducing room for error while still sampling will likely improve quality._
+- Adding a static prompt with non-quantized generation (via a persistent cache) before each generation.
+  - _The model rarely changes its voice mid generation so having an upfront pattern to generate from likely improve consistency._
+  
 #### Performance Observations
 
 A clear improvment in tokens per second via the generative model is observed with quantization. Seen below with Q5_0 quantization, the model is now capable of completing its generation in real time (it generates tokens faster than it takes to listen to them), and the model's TPS has improved from ~693 to ~916.
