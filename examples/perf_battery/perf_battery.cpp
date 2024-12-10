@@ -92,6 +92,7 @@ int main(int argc, const char ** argv) {
     args.add_argument(string_arg("--model-path", "(REQUIRED) The local path of the gguf model file for Parler TTS mini v1.", "-mp", true));
     args.add_argument(int_arg("--n-threads", "The number of cpu threads to run generation with. Defaults to 10.", "-nt", false, &default_n_threads));
     args.add_argument(bool_arg("--use-metal", "(OPTIONAL) whether or not to use metal acceleration.", "-m"));
+    args.add_argument(bool_arg("--no-cross-attn", "(OPTIONAL) Whether to not include cross attention", "-ca"));
     args.parse(argc, argv);
     if (args.for_help) {
         args.help();
@@ -99,7 +100,7 @@ int main(int argc, const char ** argv) {
     }
     args.validate();
 
-    struct parler_tts_runner * runner = runner_from_file(args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), !args.get_bool_param("--use-metal"));
+    struct parler_tts_runner * runner = runner_from_file(args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), !args.get_bool_param("--use-metal"), !args.get_bool_param("--no-cross-attn"));
     runner->sampler->temperature = 0.8;
     runner->sampler->repetition_penalty = 1.1;
     std::vector<double> generation_samples;

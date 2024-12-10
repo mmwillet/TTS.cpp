@@ -1,9 +1,10 @@
 #include "dac_runner.h"
 
 void dac_context::set_threads() {
-    /*if (backend != nullptr) {
-        ggml_backend_metal_set_n_cb(backend, 999);
-    }*/
+    if (backend != nullptr) {
+        // this is form copied from llama.cpp, but has since been removed. I don't know if this should be tuned.
+        ggml_backend_metal_set_n_cb(backend, 2);
+    }
     if (backend_cpu != nullptr) {
         ggml_backend_cpu_set_n_threads(backend_cpu, n_threads);
         ggml_backend_cpu_set_threadpool(backend_cpu, threadpool);
@@ -16,7 +17,6 @@ void dac_context::build_schedule() {
         backend_buffer = ggml_backend_metal_buffer_type();
         std::vector<ggml_backend_buffer_type_t> bufs = {backend_buffer, backend_cpu_buffer};
         std::vector<ggml_backend_t> backs = {backend, backend_cpu};
-        
         sched = ggml_backend_sched_new(backs.data(), bufs.data(), 2, model->max_nodes(), false);
     } else {
         std::vector<ggml_backend_buffer_type_t> bufs = {backend_cpu_buffer};
@@ -34,6 +34,9 @@ static struct ggml_tensor * dac_build_audio_inputs(struct ggml_context * ctx, st
     
     dctx->inp_tokens = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, batch.sequence_length*dctx->model->n_heads);
     ggml_set_input(dctx->inp_tokens);
+    if (dctx->backend) {
+        ggml_backend_sched_set_tensor_backend(dctx->sched, dctx->inp_tokens, dctx->backend);
+    }
 
     for(int i = 0; i < dctx->model->n_heads; i++) {
         auto quantize_layer = dctx->model->quantizer_layers[i];
@@ -64,7 +67,7 @@ static struct ggml_tensor * build_residual_unit(ggml_context * ctx, struct ggml_
     return ggml_add(ctx, cur, residual);
 }
 
-static struct ggml_tensor * build_decoder_block(ggml_context * ctx, struct ggml_tensor * cur, dac_layer & l) {
+static struct ggml_tensor * build_decoder_block(ggml_context * ctx, struct ggml_tensor * cur, dac_layer & l, struct dac_context * dctx) {
     cur = dac_snake_1d(ctx, l.snake_alpha_in, cur);
     cur = ggml_conv_transpose_1d(ctx, l.out_conv_kernel, cur, l.stride, l.padding, 1);
     cur = ggml_add(ctx, cur, l.out_conv_bias);
@@ -126,7 +129,7 @@ struct ggml_cgraph * dac_runner::build_dac_graph(dac_ubatch & batch) {
     cur = ggml_conv_1d(ctx, model->in_conv_kernel, inputs, 1, 3, 1);
     cur = ggml_add(ctx, cur, model->in_conv_bias);
     for (auto l : model->layers) {
-        cur = build_decoder_block(ctx, cur, l);
+        cur = build_decoder_block(ctx, cur, l, dctx);
     }
     cur = dac_snake_1d(ctx, model->snake_alpha, cur);
     cur = ggml_conv_1d(ctx, model->out_conv_kernel, cur, 1, 3, 1);
@@ -169,10 +172,11 @@ void dac_runner::run(uint32_t * input_tokens, uint32_t sequence_length, std::vec
     ggml_backend_sched_alloc_graph(dctx->sched, gf);
     
     ggml_backend_tensor_set(dctx->inp_tokens, batch.input_tokens, 0, batch.sequence_length*model->n_heads*ggml_element_size(dctx->inp_tokens));
-    
+
     ggml_backend_sched_graph_compute_async(dctx->sched, gf);
-    
+
     ggml_backend_t backend_res = ggml_backend_sched_get_tensor_backend(dctx->sched, result);
+
     ggml_backend_tensor_get_async(backend_res, result, output, 0, batch.sequence_length*sizeof(float)*model->up_sampling_factor);
 
     // Reset state for the next token before backend sync, to allow the CPU activities in the reset to

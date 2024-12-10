@@ -47,6 +47,8 @@ struct parler_tts_model {
     
     // this is the current byte offset into the model's buffer.
     size_t offset = 0;
+
+    bool use_cross_attn = true;
     
     ggml_backend_buffer_type_t buffer = nullptr;
     ggml_backend_t backend = nullptr;

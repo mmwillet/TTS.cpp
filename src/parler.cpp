@@ -13,10 +13,10 @@ void parler_context::reset(int32_t n_output_heads) {
 }
 
 void parler_context::set_threads() {
-    /*if (backend != nullptr) {
+    if (backend != nullptr) {
         // this is form copied from llama.cpp, but has since been removed. I don't know if this should be tuned.
-        ggml_backend_metal_set_n_cb(backend, 999);
-    }*/
+        ggml_backend_metal_set_n_cb(backend, 1);
+    }
     if (backend_cpu != nullptr) {
         ggml_backend_cpu_set_n_threads(backend_cpu, n_threads);
         ggml_backend_cpu_set_threadpool(backend_cpu, threadpool);
@@ -29,7 +29,6 @@ void parler_context::build_schedule() {
         backend_buffer = ggml_backend_metal_buffer_type();
         std::vector<ggml_backend_buffer_type_t> bufs = {backend_buffer, backend_cpu_buffer};
         std::vector<ggml_backend_t> backs = {backend, backend_cpu};
-        
         sched = ggml_backend_sched_new(backs.data(), bufs.data(), 2, model->max_nodes(), false);
     } else {
         std::vector<ggml_backend_buffer_type_t> bufs = {backend_cpu_buffer};
@@ -291,14 +290,16 @@ struct ggml_cgraph * parler_tts_runner::build_parler_graph(parler_ubatch & batch
         }
 
         cur = ggml_add(ctx, attn_out, residual);
-        struct ggml_tensor * residuala = cur;
+        struct ggml_tensor * residualffn = cur;
         
-        // norm
-        cur = parler_build_layer_norm(ctx, cur, model->layers[l]->attn_norm, model->layers[l]->attn_norm_bias);
-        struct ggml_tensor * cross_attn_out;
+        if (model->use_cross_attn) {
+            struct ggml_tensor * residuala = cur;
 
-        // cross-attention
-        {
+            // norm
+            cur = parler_build_layer_norm(ctx, cur, model->layers[l]->attn_norm, model->layers[l]->attn_norm_bias);
+            struct ggml_tensor * cross_attn_out;
+
+            //cross-attention
             struct ggml_tensor * Qcur = ggml_mul_mat(ctx, model->layers[l]->attn_q_proj, cur);
             Qcur = ggml_reshape_3d(ctx, Qcur,  model->head_size, model->n_attn_heads, batch.sequence_length);
             
@@ -311,8 +312,10 @@ struct ggml_cgraph * parler_tts_runner::build_parler_graph(parler_ubatch & batch
             struct ggml_tensor * kqv_merged = ggml_permute(ctx, kqv, 2, 0, 1, 3);
             cross_attn_out = ggml_cont_2d(ctx, kqv_merged, model->hidden_size, batch.sequence_length);
             cross_attn_out = ggml_mul_mat(ctx, model->layers[l]->attn_o_proj, cross_attn_out);
+
+            residualffn = ggml_add(ctx, cross_attn_out, residuala);
         }
-        struct ggml_tensor * residualffn = ggml_add(ctx, cross_attn_out, residuala);
+
         cur = parler_build_layer_norm(ctx, residualffn, model->layers[l]->final_norm, model->layers[l]->final_norm_bias);
         cur = ggml_mul_mat(ctx, model->layers[l]->fc1, cur);
         cur = ggml_gelu(ctx, cur);
@@ -346,13 +349,16 @@ void parler_tts_runner::set_inputs(parler_ubatch & batch) {
         }
     }
     
-    float * d2 = nullptr;
-    d2 = (float *) pctx->attn_mask_cross->data;
-    for (int i = 0; i < model->n_encode_length; i++) {
-        for (int ii = 0; ii < batch.sequence_length; ii++) {
-            d2[i*batch.sequence_length + ii] = 0.0f;
+    if (model->use_cross_attn) {
+        float * d2 = nullptr;
+        d2 = (float *) pctx->attn_mask_cross->data;
+        for (int i = 0; i < model->n_encode_length; i++) {
+            for (int ii = 0; ii < batch.sequence_length; ii++) {
+                d2[i*batch.sequence_length + ii] = 0.0f;
+            }
         }
     }
+
 }
 void parler_tts_runner::parler_graph_compute(ggml_cgraph * gf) {
     ggml_backend_sched_graph_compute_async(pctx->sched, gf);
@@ -499,6 +505,7 @@ int parler_tts_runner::generate_from_batch(parler_ubatch & batch, std::vector<fl
         };
     }
 
+
     std::vector<uint32_t> filtered_output_tokens;
     adjust_output_tokens(pctx->output_tokens, filtered_output_tokens);
     dac_runner->run(filtered_output_tokens.data(), (int32_t) filtered_output_tokens.size() / model->n_output_heads, output);
@@ -569,7 +576,7 @@ int parler_tts_runner::generate(std::string sentence, std::vector<float> * outpu
 }
 
 // currently only metal and cpu devices are supported, so cpu_only only describes whether or not to try to load and run on metal.
-struct parler_tts_runner * runner_from_file(const std::string & fname, int n_threads, bool cpu_only) {
+struct parler_tts_runner * runner_from_file(const std::string & fname, int n_threads, bool cpu_only, bool use_cross_attn) {
     parler_tts_model * model = new parler_tts_model;
     dac_model * audio_model = new dac_model;
     ggml_context * weight_ctx = NULL;
@@ -584,17 +591,19 @@ struct parler_tts_runner * runner_from_file(const std::string & fname, int n_thr
     }
     unigram_tokenizer * ut = tokenizer_from_gguf(meta_ctx);
     ut->initialize_tokenizer();
-
+    model->use_cross_attn = use_cross_attn;
     model->setup_from_file(meta_ctx, weight_ctx, cpu_only);
-    audio_model->setup_from_file(meta_ctx, weight_ctx);
+    audio_model->setup_from_file(meta_ctx, weight_ctx, cpu_only);
     
     // TODO: change this weight assignment pattern to mirror llama.cpp
     for (ggml_tensor * cur = ggml_get_first_tensor(weight_ctx); cur; cur = ggml_get_next_tensor(weight_ctx, cur)) {
         assign_weight(model, *audio_model, cur->name, cur);
     }
-    model->prep_cross_key_values();
+    if (use_cross_attn) {
+        model->prep_cross_key_values();
+    }
     
-    struct dac_context * dctx = build_new_dac_context(audio_model, n_threads);
+    struct dac_context * dctx = build_new_dac_context(audio_model, n_threads, cpu_only);
     struct dac_runner * audio_decoder = new dac_runner(audio_model, dctx);
     audio_decoder->prepare_post_load();
     struct sampler * samp = new sampler;

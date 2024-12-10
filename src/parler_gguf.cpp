@@ -247,28 +247,40 @@ void assign_parler_layer(parler_tts_model * model, parler_layer * layer, std::st
                 model->set_tensor(layer->self_attn_norm_bias, tensor);
                 break;
             case PARLER_LAYER_ATTN_Q:
-                layer->attn_q_proj = ggml_dup_tensor(model->ctx, tensor);
-                model->set_tensor(layer->attn_q_proj, tensor);
+                if (model->use_cross_attn) {
+                    layer->attn_q_proj = ggml_dup_tensor(model->ctx, tensor);
+                    model->set_tensor(layer->attn_q_proj, tensor);
+                }
                 break;
             case PARLER_LAYER_ATTN_K:
-                layer->attn_k_proj = ggml_dup_tensor(model->ctx, tensor);
-                model->set_tensor(layer->attn_k_proj, tensor);
+                if (model->use_cross_attn) {
+                    layer->attn_k_proj = ggml_dup_tensor(model->ctx, tensor);
+                    model->set_tensor(layer->attn_k_proj, tensor);
+                }
                 break;
             case PARLER_LAYER_ATTN_V:
-                layer->attn_v_proj = ggml_dup_tensor(model->ctx, tensor);
-                model->set_tensor(layer->attn_v_proj, tensor);
+                if (model->use_cross_attn) {
+                    layer->attn_v_proj = ggml_dup_tensor(model->ctx, tensor);
+                    model->set_tensor(layer->attn_v_proj, tensor);
+                }
                 break;
             case PARLER_LAYER_ATTN_O:
-                layer->attn_o_proj = ggml_dup_tensor(model->ctx, tensor);
-                model->set_tensor(layer->attn_o_proj, tensor);
+                if (model->use_cross_attn) {
+                    layer->attn_o_proj = ggml_dup_tensor(model->ctx, tensor);
+                    model->set_tensor(layer->attn_o_proj, tensor);
+                }
                 break;
             case PARLER_LAYER_ATTN_NORM:
-                layer->attn_norm = ggml_dup_tensor(model->ctx, tensor);
-                model->set_tensor(layer->attn_norm, tensor);
+                if (model->use_cross_attn) {
+                    layer->attn_norm = ggml_dup_tensor(model->ctx, tensor);
+                    model->set_tensor(layer->attn_norm, tensor);
+                }
                 break;
             case PARLER_LAYER_ATTN_NORM_BIAS:
-                layer->attn_norm_bias = ggml_dup_tensor(model->ctx, tensor);
-                model->set_tensor(layer->attn_norm_bias, tensor);
+                if (model->use_cross_attn) {
+                    layer->attn_norm_bias = ggml_dup_tensor(model->ctx, tensor);
+                    model->set_tensor(layer->attn_norm_bias, tensor);
+                }
                 break;
             case PARLER_LAYER_FC1:
                 layer->fc1 = ggml_dup_tensor(model->ctx, tensor);
@@ -311,8 +323,10 @@ void assign_to_decoder(parler_tts_model * model, const std::string name, ggml_te
                     model->set_tensor(model->prompt_embd, tensor);
                     break;
                 case PARLER_TEXT_ENCODING:
-                    model->precomputed_input_emb = ggml_dup_tensor(model->ctx, tensor);
-                    model->set_tensor(model->precomputed_input_emb, tensor);
+                    if (model->use_cross_attn) {
+                        model->precomputed_input_emb = ggml_dup_tensor(model->ctx, tensor);
+                        model->set_tensor(model->precomputed_input_emb, tensor);                        
+                    }
                     break;
                 case PARLER_POSITIONAL_EMBD:
                     model->precomputed_positional_embds = ggml_dup_tensor(model->ctx, tensor);

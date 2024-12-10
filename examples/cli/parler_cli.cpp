@@ -27,7 +27,8 @@ int main(int argc, const char ** argv) {
     args.add_argument(float_arg("--temperature", "The temperature to use when generating outputs. Defaults to 0.8.", "-t", false, &default_temperature));
     args.add_argument(int_arg("--n-threads", "The number of cpu threads to run generation with. Defaults to 10.", "-nt", false, &default_n_threads));
     args.add_argument(float_arg("--repetition-penalty", "The by channel repetition penalty to be applied the sampled output of the model. defaults to 1.1.", "-r", false, &default_repetition_penalty));
-    args.add_argument(bool_arg("--use-metal", "Whether to use metal acceleration", "-m"));
+    args.add_argument(bool_arg("--use-metal", "(OPTIONAL) Whether to use metal acceleration", "-m"));
+    args.add_argument(bool_arg("--no-cross-attn", "(OPTIONAL) Whether to not include cross attention", "-ca"));
     args.parse(argc, argv);
     if (args.for_help) {
         args.help();
@@ -35,7 +36,7 @@ int main(int argc, const char ** argv) {
     }
     args.validate();
 
-    struct parler_tts_runner * runner = runner_from_file(args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), !args.get_bool_param("--use-metal"));
+    struct parler_tts_runner * runner = runner_from_file(args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), !args.get_bool_param("--use-metal"), !args.get_bool_param("--no-cross-attn"));
     runner->sampler->temperature = *args.get_float_param("--temperature");
     runner->sampler->repetition_penalty = *args.get_float_param("--repetition-penalty");
     std::vector<float> data;

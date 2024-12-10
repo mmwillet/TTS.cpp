@@ -149,7 +149,7 @@ struct parler_tts_runner {
     int generate_audio_tokens(std::string sentence);
 };
 
-struct parler_tts_runner * runner_from_file(const std::string & fname, int n_threads, bool cpu_only = true);
+struct parler_tts_runner * runner_from_file(const std::string & fname, int n_threads, bool cpu_only = true, bool use_cross_attn = true);
 
 struct quantization_params {
     quantization_params(uint32_t n_threads, enum ggml_type quantize_type, void * imatrix = nullptr): n_threads(n_threads), quantize_type(quantize_type), imatrix(imatrix) {};

@@ -48,10 +48,10 @@ void dac_model::prep_layers(gguf_context * meta) {
     }
 }
 
-void dac_model::prep_buffers_and_context() {
+void dac_model::prep_buffers_and_context(bool cpu_only) {
     // currently DAC is only supported on cpu because the ops are not implemented on other devices;
-    backend = ggml_backend_cpu_init(); /*cpu_only ? ggml_backend_cpu_init() : ggml_backend_metal_init();*/
-    buffer = ggml_backend_cpu_buffer_type(); /*cpu_only ? ggml_backend_cpu_buffer_type() : ggml_backend_metal_buffer_type();*/
+    backend = cpu_only ? ggml_backend_cpu_init() : ggml_backend_metal_init();
+    buffer = cpu_only ? ggml_backend_cpu_buffer_type() : ggml_backend_metal_buffer_type();
     size_t ctx_size = ggml_tensor_overhead() * (tensor_meta.n_tensors * 1.25);
     struct ggml_init_params params = {
         /*.mem_size   =*/ ctx_size,
@@ -71,11 +71,11 @@ void dac_model::set_tensor(struct ggml_tensor * tensor, struct ggml_tensor * tar
     offset += size;
 }
 
-void dac_model::setup_from_file(gguf_context * meta_ctx, ggml_context * load_context) {
+void dac_model::setup_from_file(gguf_context * meta_ctx, ggml_context * load_context, bool cpu_only) {
     prep_layers(meta_ctx);
     prep_constants(meta_ctx);
     tensor_meta = compute_tensor_meta("audio_encoder", load_context);
-    prep_buffers_and_context();
+    prep_buffers_and_context(cpu_only);
 }
 
 size_t dac_model::max_nodes() {
