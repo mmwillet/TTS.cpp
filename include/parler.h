@@ -5,6 +5,14 @@
 #include "sampler.h"
 #include <thread>
 #include <fstream>
+#include <vector>
+
+std::vector<ggml_type> valid_quantization_types = {
+    GGML_TYPE_F16,
+    GGML_TYPE_Q4_0,
+    GGML_TYPE_Q5_0,
+    GGML_TYPE_Q8_0,
+};
 
 struct parler_context {
     parler_context(parler_tts_model * model, int n_threads): model(model), n_threads(n_threads) {};
@@ -159,6 +167,7 @@ struct quantization_params {
     bool quantize_output_heads = false;
     bool quantize_text_embeddings = false;
     bool quantize_cross_attn_kv = false;
+    bool convert_dac_to_f16 = false;
 };
 
 void quantize_gguf(const std::string & ifile, const std::string & ofile, struct quantization_params * params);

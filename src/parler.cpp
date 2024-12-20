@@ -790,7 +790,7 @@ void quantize_gguf(const std::string & ifile, const std::string & ofile, struct 
             if (imatrix_data) {
                 auto it = imatrix_data->find(cur->name);
                 if (it == imatrix_data->end()) {
-                    TTS_ABORT("ERROR: important matrix does not contain information for tensor, '%s.'\n", cur->name);
+                    TTS_ABORT("ERROR: importance matrix does not contain information for tensor, '%s.'\n", cur->name);
                 } else {
                     imatrix = it->second.data();
                 }
@@ -801,6 +801,17 @@ void quantize_gguf(const std::string & ifile, const std::string & ofile, struct 
             }
             new_data = work.data();
             new_size = quantize_tensor(new_data, cur, imatrix, new_type, params->n_threads);
+        } else if (params->convert_dac_to_f16 && has_prefix(name, "audio_encoder") && !has_suffix(name, "alpha") && !has_suffix(name, "bias")) {
+            if ((cur->type) != GGML_TYPE_F32) {
+                TTS_ABORT("ERROR: All converted tensors must be transformed from 32bit floats. Tensor, '%s', has impropert type, '%d'\n", cur->name, cur->type);
+            }
+            new_type = GGML_TYPE_F16;
+            const int64_t nelement_size = ggml_nelements(cur) * 4;
+            if (work.size() < (size_t)nelement_size) {
+                work.resize(nelement_size); // upper bound on size
+            }
+            new_data = work.data();
+            new_size = quantize_tensor(new_data, cur, nullptr, new_type, params->n_threads);
         } else {
             new_type = cur->type;
             new_data = cur->data;

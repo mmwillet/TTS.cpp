@@ -23,7 +23,7 @@ Additional Model support will initially be added based on open source model perf
 | Planned Functionality | OS X       | Linux | Windows |
 |----------------------|------------|---|---|
 | Basic CPU Generation | &check;    |&cross;|&cross;|
-| Metal Acceleration   | &check;_*_ | _ | _ |
+| Metal Acceleration   | &check; | _ | _ |
 | CUDA support         | _          |&cross;|&cross;|
 | Quantization         | &check;_*_ |&cross;|&cross;|
 | Layer Offloading     | &cross;    |&cross;|&cross;|
@@ -59,3 +59,9 @@ The CLI executable will be in the `./build/cli` directory and the compiled libra
 ### Usage
 
 See the [CLI example readme](./examples/cli/README.md) for more details on its general usage.
+
+### Performance
+
+ Given that the central goal of this library is to support realtime speech generation on OS X, generation speed has only been rigorously tested in that environment with supported models (i.e. Parler Mini version 0.1.0).
+
+ With the introduction of metal acceleration support for the DAC audio decoder model, text to speech generation is nearly possible in real time on a standard Apply M1 Max with ~3GB memory overhead. For every second of generated audio, the accelerated models require approximately 1.112033 seconds of generation time (with Q5_0 quantization applied to the generative model). For the latest stats via the performance battery see the README therein.

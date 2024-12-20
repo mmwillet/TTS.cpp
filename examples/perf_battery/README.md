@@ -30,10 +30,27 @@ the output will look like the following:
 ```
 Mean Stats:
 
-  Generation Time (ms):      2707.983408
-  Decode Time (ms):          3336.636650
-  Generation TPS:            692.753165
-  Decode TPS:                562.703661
-  Generation by output (ms): 1.119094
-  Decode by output (ms):     1.379688
+  Generation Time (ms):      8599.550347
+  Decode Time (ms):          4228.528055
+  Generation TPS:            1134.453434
+  Decode TPS:                1808.758339
+  Generation by output (ms): 0.695635
+  Decode by output (ms):     0.432398
 ```
+
+### Latest Results
+
+The currently measured performance breakdown for Parler Mini v0.1 with Q5_0 quantization without cross attention (i.e. the fastest stable generation with the Parler model) and 32bit floating point weights in the audio decoder:
+
+```
+Mean Stats:
+
+  Generation Time (ms):      8599.550347
+  Decode Time (ms):          4228.528055
+  Generation TPS:            1134.453434
+  Decode TPS:                1878.693855
+  Generation by output (ms): 0.695635
+  Decode by output (ms):     0.416398
+```
+
+Please note that while memory overhead improved a small amount, no substantial difference in inference speed was observed when the audio decoder model was converted from 32bit to 16bit floats.
