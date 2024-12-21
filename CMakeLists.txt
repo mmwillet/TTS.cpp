@@ -95,6 +95,7 @@ get_target_property(GGML_LINK_LIBRARIES ggml LINK_LIBRARIES)
 
 # all public headers
 set(TTS_PUBLIC_HEADERS
+    include/common.h
     include/parler.h
     include/audio_file.h
     include/args.h)

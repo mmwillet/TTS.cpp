@@ -1,16 +1,17 @@
 #include "parler.h"
 #include "audio_file.h"
 #include "args.h"
+#include "common.h"
 
-void write_audio_file(std::string path, std::vector<float> * data, float sample_rate = 44100.f, float frequency = 440.f, int channels = 1) {
+void write_audio_file(std::string path, struct tts_response * data, float sample_rate = 44100.f, float frequency = 440.f, int channels = 1) {
     AudioFile<float> file;
     file.setBitDepth(16);
     file.setNumChannels(channels);
-    int samples = (int) (data->size() / channels);
+    int samples = (int) (data->n_outputs / channels);
     file.setNumSamplesPerChannel(samples);
     for (int channel = 0; channel < channels; channel++) {
         for (int i = 0; i < samples; i++) {
-            file.samples[channel][i] = (*data)[i];
+            file.samples[channel][i] = data->data[i];
         }
     }
     file.save(path, AudioFileFormat::Wave);
@@ -39,7 +40,7 @@ int main(int argc, const char ** argv) {
     struct parler_tts_runner * runner = runner_from_file(args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), !args.get_bool_param("--use-metal"), !args.get_bool_param("--no-cross-attn"));
     runner->sampler->temperature = *args.get_float_param("--temperature");
     runner->sampler->repetition_penalty = *args.get_float_param("--repetition-penalty");
-    std::vector<float> data;
+    tts_response data;
     
     runner->generate(args.get_string_param("--prompt"), &data);
     write_audio_file(args.get_string_param("--save-path"), &data);

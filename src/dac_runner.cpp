@@ -140,9 +140,7 @@ struct ggml_cgraph * dac_runner::build_dac_graph(dac_ubatch & batch) {
     return gf;
 }
 
-void dac_runner::run(uint32_t * input_tokens, uint32_t sequence_length, std::vector<float> * outputs) {
-    outputs->reserve(sequence_length*model->up_sampling_factor);
-    outputs->resize(sequence_length*model->up_sampling_factor);
+void dac_runner::run(uint32_t * input_tokens, uint32_t sequence_length, struct tts_response * outputs) {
     dac_ubatch batch;
     batch.input_tokens = input_tokens;
     batch.sequence_length = sequence_length;
@@ -161,7 +159,7 @@ void dac_runner::run(uint32_t * input_tokens, uint32_t sequence_length, std::vec
         dctx->buf_output = ggml_backend_buft_alloc_buffer(dctx->backend_cpu_buffer, new_size);
     }
     
-    float * output = (float *) ggml_backend_buffer_get_base(dctx->buf_output);
+    outputs->data = (float *) ggml_backend_buffer_get_base(dctx->buf_output);
     ggml_backend_buffer_clear(dctx->buf_output, 0);
     
     struct ggml_cgraph * gf = NULL;
@@ -177,13 +175,11 @@ void dac_runner::run(uint32_t * input_tokens, uint32_t sequence_length, std::vec
 
     ggml_backend_t backend_res = ggml_backend_sched_get_tensor_backend(dctx->sched, result);
 
-    ggml_backend_tensor_get_async(backend_res, result, output, 0, batch.sequence_length*sizeof(float)*model->up_sampling_factor);
+    ggml_backend_tensor_get_async(backend_res, result, outputs->data, 0, batch.sequence_length*sizeof(float)*model->up_sampling_factor);
 
     // Reset state for the next token before backend sync, to allow the CPU activities in the reset to
     // overlap with device computation.
     ggml_backend_sched_reset(dctx->sched);
-    for (int i = 0; i < sequence_length * model->up_sampling_factor; i++) {
-        (*outputs)[i] = output[i];
-    }
+    outputs->n_outputs = sequence_length * model->up_sampling_factor;
     return;
 }

@@ -148,12 +148,12 @@ struct parler_tts_runner {
     int decode(parler_ubatch & batch);
     void prepare_post_load();
     bool adjust_for_sequence_continuation(struct parler_ubatch & batch);
-    int generate(std::string sentence, std::vector<float> * output, int32_t seq_id = -1);
+    int generate(std::string sentence, struct tts_response * response, int32_t seq_id = -1);
     bool check_stopping();
     void adjust_output_tokens(std::vector<uint32_t> & output_tokens, std::vector<uint32_t> & filtered);
-    int generate_from_batch(parler_ubatch & batch, std::vector<float> * output);
+    int generate_from_batch(parler_ubatch & batch, struct tts_response * output);
     void parler_graph_compute(ggml_cgraph * gf);
-    void just_decode(uint32_t * tokens, int32_t sq_len, std::vector<float> * outputs);
+    void just_audio_token_decode(uint32_t * tokens, int32_t sq_len, struct tts_response * output);
     int generate_audio_tokens(std::string sentence);
 };
 

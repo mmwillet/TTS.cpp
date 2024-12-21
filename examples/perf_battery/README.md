@@ -1,6 +1,6 @@
 ### Overview
 
-This script runs a series of benchmarks to test the generative throughput of the TTS.cpp implementation. Over 30 sentences, it aggregates the tokens per second for both the generative model and the decoder model, the generation time per model divided by the time length of the audio output, and the end to end mean generation in in milliseconds.
+This script runs a series of benchmarks to test the generative throughput of the TTS.cpp implementation. Over 30 sentences, it aggregates the tokens per second for both the generative model and the decoder model, the real time factor (i.e. the generation time per model divided by the time length of the audio output), and the end to end mean generation in in milliseconds.
 
 ### Requirements
 
@@ -30,12 +30,12 @@ the output will look like the following:
 ```
 Mean Stats:
 
-  Generation Time (ms):      8599.550347
-  Decode Time (ms):          4228.528055
-  Generation TPS:            1134.453434
-  Decode TPS:                1808.758339
-  Generation by output (ms): 0.695635
-  Decode by output (ms):     0.432398
+  Generation Time (ms):             8599.550347
+  Decode Time (ms):                 4228.528055
+  Generation TPS:                   1134.453434
+  Decode TPS:                       1808.758339
+  Generation Real Time Factor (ms): 0.695635
+  Decode Real Time Factor (ms):     0.432398
 ```
 
 ### Latest Results
@@ -45,12 +45,12 @@ The currently measured performance breakdown for Parler Mini v0.1 with Q5_0 quan
 ```
 Mean Stats:
 
-  Generation Time (ms):      8599.550347
-  Decode Time (ms):          4228.528055
-  Generation TPS:            1134.453434
-  Decode TPS:                1878.693855
-  Generation by output (ms): 0.695635
-  Decode by output (ms):     0.416398
+  Generation Time (ms):             8599.550347
+  Decode Time (ms):                 4228.528055
+  Generation TPS:                   1134.453434
+  Decode TPS:                       1878.693855
+  Generation Real Time Factor (ms): 0.695635
+  Decode Real Time Factor (ms):     0.416398
 ```
 
 Please note that while memory overhead improved a small amount, no substantial difference in inference speed was observed when the audio decoder model was converted from 32bit to 16bit floats.

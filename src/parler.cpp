@@ -479,7 +479,7 @@ void parler_tts_runner::adjust_output_tokens(std::vector<uint32_t> & output_toke
     }
 }
 
-int parler_tts_runner::generate_from_batch(parler_ubatch & batch, std::vector<float> * output) {
+int parler_tts_runner::generate_from_batch(parler_ubatch & batch, struct tts_response * output) {
     std::vector<uint32_t> next_decoder_token_ids;
     next_decoder_token_ids.reserve(model->n_output_heads);
 
@@ -517,10 +517,11 @@ int parler_tts_runner::generate_audio_tokens(std::string sentence) {
     pctx->reset(model->n_output_heads);
     sampler->reset();
     int32_t seq_id = std::mt19937(std::random_device{}())();
-    delete kv_self;
-    kv_self = new parler_kv_cache;
-    if (!parler_kv_cache_init(kv_self, model, pctx, seq_id)) {
-        return 1;
+    if (!kv_self) {
+        kv_self = new parler_kv_cache;
+        if (!parler_kv_cache_init(kv_self, model, pctx, seq_id)) {
+            return 1;
+        }
     }
 
     std::vector<uint32_t> next_decoder_token_ids;
@@ -551,21 +552,22 @@ int parler_tts_runner::generate_audio_tokens(std::string sentence) {
     return 0;
 }
 
-void parler_tts_runner::just_decode(uint32_t * tokens, int32_t sq_len, std::vector<float> * outputs) {
+void parler_tts_runner::just_audio_token_decode(uint32_t * tokens, int32_t sq_len, struct tts_response * outputs) {
     dac_runner->run(tokens, sq_len, outputs);
 }
 
-int parler_tts_runner::generate(std::string sentence, std::vector<float> * output, int32_t seq_id) {
+int parler_tts_runner::generate(std::string sentence, struct tts_response * output, int32_t seq_id) {
     parler_ubatch batch = batch_from_sentence(sentence, model, tokenizer);
     pctx->reset(model->n_output_heads);
     sampler->reset();
     if (pctx->seq_id != seq_id || seq_id == -1) {
         seq_id = std::mt19937(std::random_device{}())();
         pctx->current_position = 0;
-        delete kv_self;
-        kv_self = new parler_kv_cache;
-        if (!parler_kv_cache_init(kv_self, model, pctx, seq_id)) {
-            return 1;
+        if (!kv_self) {
+            kv_self = new parler_kv_cache;
+            if (!parler_kv_cache_init(kv_self, model, pctx, seq_id)) {
+                return 1;
+            }
         }
     } else {
         if (!adjust_for_sequence_continuation(batch)) {

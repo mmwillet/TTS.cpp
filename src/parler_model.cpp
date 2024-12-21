@@ -65,6 +65,21 @@ void parler_tts_model::prep_constants(gguf_context * meta) {
     if (n_layers_key != -1) {
         n_layers = gguf_get_val_u32(meta, n_layers_key);
     }
+
+    int max_cross_nodes_key = gguf_find_key(meta, "max_cross_nodes");
+    if (max_cross_nodes_key != -1) {
+        max_cross_nodes = gguf_get_val_u32(meta, max_cross_nodes_key);
+    }
+
+    int bos_token_id_key = gguf_find_key(meta, "bos_token_id");
+    if (bos_token_id_key != -1) {
+        bos_token_id = gguf_get_val_u32(meta, bos_token_id_key);
+    }
+
+    int eos_token_id_key = gguf_find_key(meta, "eos_token_id");
+    if (eos_token_id_key != -1) {
+        eos_token_id = gguf_get_val_u32(meta, eos_token_id_key);
+    }
 }
 
 void parler_tts_model::prep_cross_key_values() {

@@ -2,6 +2,7 @@
 #define dac_runner_h
 
 #include "parler_gguf.h"
+#include "common.h"
 
 struct dac_context {
     dac_context(dac_model * model, int n_threads): model(model), n_threads(n_threads) {};
@@ -72,7 +73,7 @@ struct dac_runner {
     
     void prepare_post_load();
     struct ggml_cgraph * build_dac_graph(dac_ubatch & batch);
-    void run(uint32_t * input_tokens, uint32_t sequence_length, std::vector<float> * outputs);
+    void run(uint32_t * input_tokens, uint32_t sequence_length, struct tts_response * outputs);
 };
 
 #endif

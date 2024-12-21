@@ -1,5 +1,6 @@
 #include "parler.h"
 #include "args.h"
+#include "common.h"
 #include <stdio.h>
 #include <chrono>
 #include <functional>
@@ -118,8 +119,8 @@ int main(int argc, const char ** argv) {
     	output_times.push_back((double)(((audio_tokens.size() / 9) * 512) / 44.1));
     	tokens.push_back((int)audio_tokens.size());
 		perf_cb cb2 = [&]{
-    		std::vector<float> outputs;
-    		runner->just_decode((uint32_t *)audio_tokens.data(), audio_tokens.size() / 9, &outputs);
+    		tts_response outputs;
+    		runner->just_audio_token_decode((uint32_t *)audio_tokens.data(), audio_tokens.size() / 9, &outputs);
     	};
     	double decode_ms = benchmark_ms(cb2);
     	generation_samples.push_back(generation_ms);
