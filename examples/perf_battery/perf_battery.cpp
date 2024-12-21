@@ -77,12 +77,12 @@ std::string benchmark_printout(std::vector<double> generation_samples, std::vect
 	double dec_out_mean = mean(dec_output);
 	double mean_gtps = mean(gen_tps);
 	double mean_dtps = mean(dec_tps);
-	std::string printout = (std::string) "Mean Stats:\n\n" + (std::string) "  Generation Time (ms):      " +  std::to_string(gen_mean) +  (std::string) "\n";
-	printout += (std::string) "  Decode Time (ms):          " + std::to_string(dec_mean) + (std::string) "\n";
-	printout += (std::string) "  Generation TPS:            " + std::to_string(mean_gtps) + (std::string) "\n";
-	printout += (std::string) "  Decode TPS:                " + std::to_string(mean_dtps) + (std::string) "\n";
-	printout += (std::string) "  Generation by output (ms): " + std::to_string(gen_out_mean) + (std::string) "\n";
-	printout += (std::string) "  Decode by output (ms):     " + std::to_string(dec_out_mean) + (std::string) "\n";
+	std::string printout = (std::string) "Mean Stats:\n\n" + (std::string) "  Generation Time (ms):             " +  std::to_string(gen_mean) + (std::string) "\n";
+	printout += (std::string) "  Decode Time (ms):                 " + std::to_string(dec_mean) + (std::string) "\n";
+	printout += (std::string) "  Generation TPS:                   " + std::to_string(mean_gtps) + (std::string) "\n";
+	printout += (std::string) "  Decode TPS:                       " + std::to_string(mean_dtps) + (std::string) "\n";
+	printout += (std::string) "  Generation Real Time Factor (ms): " + std::to_string(gen_out_mean) + (std::string) "\n";
+	printout += (std::string) "  Decode Real Time Factor (ms):     " + std::to_string(dec_out_mean) + (std::string) "\n";
 	return printout;
 }
 

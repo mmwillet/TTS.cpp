@@ -15,10 +15,12 @@ In order to get a detailed breakdown the functionality currently available you c
 
 --n-threads (-nt):
     The number of cpu threads to run generation with. Defaults to 10.
+--use-metal (-m):
+    (OPTIONAL) whether or not to use metal acceleration.
+--no-cross-attn (-ca):
+    (OPTIONAL) Whether to not include cross attention
 --model-path (-mp):
     (REQUIRED) The local path of the gguf model file for Parler TTS mini v1.
---use-metal (-m):
-    Whether to use metal acceleration.
 ```
 
 General usage should follow from these possible parameters. E.G. The following command will save generated speech to the `/tmp/test.wav` file.

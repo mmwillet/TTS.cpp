@@ -14,17 +14,21 @@ In order to get a detailed breakdown the functionality currently available you c
 ./cli --help
 
 --temperature (-t):
-    The temperature to use when generating outputs. Defaults to 0.9.
+    The temperature to use when generating outputs. Defaults to 0.7.
+--repetition-penalty (-r):
+    The by channel repetition penalty to be applied the sampled output of the model. defaults to 1.1.
 --n-threads (-nt):
     The number of cpu threads to run generation with. Defaults to 10.
+--use-metal (-m):
+    (OPTIONAL) Whether to use metal acceleration
+--no-cross-attn (-ca):
+    (OPTIONAL) Whether to not include cross attention
 --model-path (-mp):
     (REQUIRED) The local path of the gguf model file for Parler TTS mini v1.
 --prompt (-p):
     (REQUIRED) The text prompt for which to generate audio in quotation markers.
 --save-path (-sp):
     (REQUIRED) The path to save the audio output to in a .wav format.
---use-metal (-m):
-    Whether to use metal acceleration.
 ```
 
 General usage should follow from these possible parameters. E.G. The following command will save generated speech to the `/tmp/test.wav` file.

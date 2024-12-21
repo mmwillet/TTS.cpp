@@ -19,6 +19,8 @@ In order to get a detailed breakdown the functionality currently available you c
     The ggml enum of the quantized type to convert compatible model tensors to. For more information see readme. Defaults to Q4_0 quantizatio (2).
 --n-threads (-nt):
     The number of cpu threads to run the quantization process with. Defaults to known hardware concurrency.
+--convert-dac-to-f16 (-df):
+    Whether to convert the DAC audio decoder model to a 16 bit float.
 --quantize-output-heads (-qh):
     Whether to quantize the output heads. Defaults to false and is true when passed (does not accept a parameter).
 --quantize-text-embedding (-qe):
