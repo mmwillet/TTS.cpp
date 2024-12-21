@@ -16,7 +16,7 @@ In this endeavor, MacOS and metal support will be treated as a the primary platf
 
 Currently [Parler TTS Mini v0.1](https://huggingface.co/ylacombe/parler_tts_mini_v0.1) is the only supported TTS model.
 
-Additional Model support will initially be added based on open source model performance in the [TTS model arena](https://huggingface.co/spaces/TTS-AGI/TTS-Arena).
+Additional Model support will initially be added based on open source model performance in the [TTS model arena](https://huggingface.co/spaces/TTS-AGI/TTS-Arena) and the availability of said models' architectures and checkpoints.
 
 #### Functionality
 
@@ -64,4 +64,4 @@ See the [CLI example readme](./examples/cli/README.md) for more details on its g
 
  Given that the central goal of this library is to support real time speech generation on OS X, generation speed has only been rigorously tested in that environment with supported models (i.e. Parler Mini version 0.1.0).
 
- With the introduction of metal acceleration support for the DAC audio decoder model, text to speech generation is nearly possible in real time on a standard Apply M1 Max with ~3GB memory overhead. The best real time factor for accelerated models is currently 1.112033. This means that for every second of generated audio, the accelerated models require approximately 1.112033 seconds of generation time (with Q5_0 quantization applied to the generative model). For the latest stats via the performance battery see the README therein.
+ With the introduction of metal acceleration support for the DAC audio decoder model, text to speech generation is nearly possible in real time on a standard Apply M1 Max with ~3GB memory overhead. The best real time factor for accelerated models is currently 1.112033. This means that for every second of generated audio, the accelerated models require approximately 1.112033 seconds of generation time (with Q5_0 quantization applied to the generative model). For the latest stats via the performance battery see the [readme therein](./examples/perf_battery/README.md).
