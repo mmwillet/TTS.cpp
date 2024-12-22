@@ -3,6 +3,14 @@
 #include <stdio.h>
 #include <thread>
 #include "ggml.h"
+#include <vector>
+
+std::vector<ggml_type> valid_quantization_types = {
+    GGML_TYPE_F16,
+    GGML_TYPE_Q4_0,
+    GGML_TYPE_Q5_0,
+    GGML_TYPE_Q8_0,
+};
 
 int main(int argc, const char ** argv) {
 	int default_quantization = 2;

@@ -5,14 +5,6 @@
 #include "sampler.h"
 #include <thread>
 #include <fstream>
-#include <vector>
-
-std::vector<ggml_type> valid_quantization_types = {
-    GGML_TYPE_F16,
-    GGML_TYPE_Q4_0,
-    GGML_TYPE_Q5_0,
-    GGML_TYPE_Q8_0,
-};
 
 struct parler_context {
     parler_context(parler_tts_model * model, int n_threads): model(model), n_threads(n_threads) {};
