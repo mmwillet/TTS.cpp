@@ -44,7 +44,7 @@ uint64_t get_cpu_count() {
     }
 #elif __linux__
     cpu_count = sysconf(_SC_NPROCESSORS_ONLN);
-    if (cpu_count == -1){
+    if (cpu_count == -1) {
         return 1;
     }
 #else
