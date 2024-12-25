@@ -1,5 +1,15 @@
 #include "util.h"
 
+#include <cstdio>
+#include <stdarg.h>
+#ifdef __APPLE__
+#include <sys/sysctl.h>
+#elif __linux__
+#include <unistd.h>
+#else
+// windows stuff
+#endif
+
 void tts_abort(const char * file, int line, const char * fmt, ...) {
     fflush(stdout);
     fprintf(stderr, "%s:%d: ", file, line);
@@ -27,10 +37,19 @@ struct ggml_tensor * dac_snake_1d(ggml_context * ctx, struct ggml_tensor * alpha
 uint64_t get_cpu_count() {
     uint64_t cpu_count = 0;
     size_t size = sizeof(cpu_count);
+#ifdef __APPLE__
     if (sysctlbyname("hw.ncpu", &cpu_count, &size, NULL, 0) < 0) {
         // this functionis only currently used to prepare static cross attention keys and values, and it is fast enough with a single cpu.
         return 1;
     }
+#elif __linux__
+    cpu_count = sysconf(_SC_NPROCESSORS_ONLN);
+    if (cpu_count == -1) {
+        return 1;
+    }
+#else
+    // windows stuff
+#endif
     return cpu_count;
 }
 
