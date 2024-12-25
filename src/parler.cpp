@@ -670,7 +670,8 @@ size_t quantize_tensor(void * new_data, struct ggml_tensor * tensor, const float
                     size_t local_size = 0;
                     while (true) {
                         std::unique_lock<std::mutex> lock(mutex);
-                        int64_t first_row = counter; counter += nrows_per_chunk;
+                        int64_t first_row = counter; 
+                        counter += nrows_per_chunk;
                         if (first_row >= nrows) {
                             if (local_size > 0) {
                                 new_size += local_size;
@@ -780,7 +781,12 @@ void quantize_gguf(const std::string & ifile, const std::string & ofile, struct 
         void * new_data;
         size_t new_size;
         std::string name = ggml_get_name(cur);
-        if (name.size() != 0 && is_quanitizable(name, params)) {
+        
+        if (name.size() == 0) {
+            continue;
+        }
+
+        if (is_quanitizable(name, params)) {
             if ((cur->type) != GGML_TYPE_F32) {
                 TTS_ABORT("ERROR: All quantized tensors must be transformed from 32bit floats. Tensor, '%s', has impropert type, '%d'\n", cur->name, cur->type);
             }
