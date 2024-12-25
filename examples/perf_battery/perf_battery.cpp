@@ -127,6 +127,6 @@ int main(int argc, const char ** argv) {
     	decode_samples.push_back(decode_ms);
     }
 
-    fprintf(stdout, benchmark_printout(generation_samples, decode_samples, output_times, tokens).c_str());
+    fprintf(stdout, "%s", benchmark_printout(generation_samples, decode_samples, output_times, tokens).c_str());
 	return 0;
 }

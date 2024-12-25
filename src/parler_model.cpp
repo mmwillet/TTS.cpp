@@ -136,8 +136,15 @@ void parler_tts_model::prep_cross_key_values() {
 }
 
 void parler_tts_model::prep_buffers_and_context(bool cpu_only) {
-    backend = cpu_only ? ggml_backend_cpu_init() : ggml_backend_metal_init();
-    buffer = cpu_only ? ggml_backend_cpu_buffer_type() : ggml_backend_metal_buffer_type();
+    if (cpu_only) {
+        backend = ggml_backend_cpu_init();
+        buffer = ggml_backend_cpu_buffer_type();
+    } else {
+#ifdef GGML_METAL
+        backend = ggml_backend_metal_init();
+        buffer = ggml_backend_metal_buffer_type();
+#endif
+    }
     size_t ctx_size = ggml_tensor_overhead() * (size_t) (tensor_meta.n_tensors * 1.25);
     struct ggml_init_params params = {
         /*.mem_size   =*/ ctx_size,

@@ -1,4 +1,8 @@
 #include "parler.h"
+#include "ggml-backend.h"
+#include "ggml-cpu.h"
+
+#include <mutex>
 
 void parler_context::reset(int32_t n_output_heads) {
     n_outputs = 0;
@@ -14,8 +18,10 @@ void parler_context::reset(int32_t n_output_heads) {
 
 void parler_context::set_threads() {
     if (backend != nullptr) {
+#ifdef GGML_METAL
         // this is form copied from llama.cpp, but has since been removed. I don't know if this should be tuned.
         ggml_backend_metal_set_n_cb(backend, 1);
+#endif
     }
     if (backend_cpu != nullptr) {
         ggml_backend_cpu_set_n_threads(backend_cpu, n_threads);
@@ -26,7 +32,9 @@ void parler_context::set_threads() {
 void parler_context::build_schedule() {
     backend_cpu_buffer = ggml_backend_cpu_buffer_type();
     if (backend != nullptr) {
+#ifdef GGML_METAL
         backend_buffer = ggml_backend_metal_buffer_type();
+#endif
         std::vector<ggml_backend_buffer_type_t> bufs = {backend_buffer, backend_cpu_buffer};
         std::vector<ggml_backend_t> backs = {backend, backend_cpu};
         sched = ggml_backend_sched_new(backs.data(), bufs.data(), 2, model->max_nodes(), false);
@@ -44,7 +52,9 @@ bool parler_context::prep_schedule(ggml_cgraph * gf) {
 struct parler_context * build_new_parler_context(struct parler_tts_model * model, int n_threads, bool use_cpu) {
     parler_context * pctx = new parler_context(model, n_threads);
     if (!use_cpu) {
+#ifdef GGML_METAL
         pctx->backend = ggml_backend_metal_init();
+#endif
     }
     pctx->eos_seen.reserve(model->n_output_heads);
     pctx->backend_cpu = ggml_backend_cpu_init();
@@ -61,7 +71,9 @@ static bool parler_kv_cache_init(struct parler_kv_cache * cache, parler_tts_mode
     ggml_backend_buffer_type_t buft = nullptr;
     // this will only really support cpu or metal for the time being;
     if (pctx->backend != nullptr) {
+#ifdef GGML_METAL
         buft = ggml_backend_metal_buffer_type();
+#endif
     } else {
         buft = ggml_backend_cpu_buffer_type();
     }

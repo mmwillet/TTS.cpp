@@ -55,7 +55,7 @@ void arg_list::help() {
         help_text += arg.help_text();
 
     }
-    fprintf(stdout, help_text.c_str());
+    fprintf(stdout, "%s", help_text.c_str());
 }
 
 void arg_list::validate() {

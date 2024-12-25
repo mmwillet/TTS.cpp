@@ -6,7 +6,6 @@
 #include <vector>
 #include <stdint.h>
 #include <sys/types.h>
-#include <sys/sysctl.h>
 #include "ggml-metal.h"
 #include "ggml-backend.h"
 #include "ggml-alloc.h"
