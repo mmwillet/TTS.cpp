@@ -140,7 +140,7 @@ void parler_tts_model::prep_buffers_and_context(bool cpu_only) {
         backend = ggml_backend_cpu_init();
         buffer = ggml_backend_cpu_buffer_type();
     } else {
-#ifdef GGML_METAL
+#ifdef GGML_USE_METAL
         backend = ggml_backend_metal_init();
         buffer = ggml_backend_metal_buffer_type();
 #endif
