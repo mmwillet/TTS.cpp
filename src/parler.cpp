@@ -1,7 +1,6 @@
 #include "parler.h"
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
-
 #include <mutex>
 
 void parler_context::reset(int32_t n_output_heads) {
@@ -746,7 +745,6 @@ void quantize_gguf(const std::string & ifile, const std::string & ofile, struct 
     gguf_set_kv(ctx_out.get(), meta_ctx);
     gguf_set_val_u32(ctx_out.get(), "general.quantization_version", GGML_QNT_VERSION);
     gguf_set_val_u32(ctx_out.get(), "general.quantization_type", params->quantize_type);
-
     for (ggml_tensor * tensor = ggml_get_first_tensor(weight_ctx); tensor; tensor = ggml_get_next_tensor(weight_ctx, tensor)) {
         std::string name = ggml_get_name(tensor);
         if (name.size() != 0) {

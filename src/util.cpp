@@ -20,11 +20,15 @@ void tts_abort(const char * file, int line, const char * fmt, ...) {
     abort();
 }
 
-// TODO: implement this as a ggml op.
-// This is a hack to support the reciprocal function needed to implemented the snake operation described below. This is currently very slow and
-// should be replaced by a simpler and faster ggml operation.=
-struct ggml_tensor * reciprocal(ggml_context * ctx, struct ggml_tensor * a) {
-    return ggml_div(ctx, a, ggml_mul(ctx, a, a));
+int search_for_gguf_keys(gguf_context * meta, std::vector<std::string> possible_keys) {
+    int gguf_key = -1;
+    for (auto key : possible_keys) {
+        gguf_key = gguf_find_key(meta, key.c_str());
+        if (gguf_key != -1) {
+            return gguf_key;
+        }
+    }
+    return gguf_key;
 }
 
 // Described in https://arxiv.org/abs/2006.08195

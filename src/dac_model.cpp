@@ -3,31 +3,32 @@
 #include "ggml-cpu.h"
 
 void dac_model::prep_constants(gguf_context * meta) {
-    // this is a bad pattern and I should fix it, but was being lazy
-    int output_heads_key = gguf_find_key(meta, "output_heads");
+    int output_heads_key = search_for_gguf_keys(meta, {"parler-tts.decoder.output_heads", "output_heads"});
     if (output_heads_key != -1) {
         n_heads = gguf_get_val_u32(meta, output_heads_key);;
     }
 
-    int sampling_factor_key = gguf_find_key(meta, "up_sampling_factor");
+    int sampling_factor_key = search_for_gguf_keys(meta, {"dac.up_sampling_factor", "up_sampling_factor"});
     if (sampling_factor_key != -1) {
         up_sampling_factor = gguf_get_val_u32(meta, sampling_factor_key);
     }
     
-    int max_gen_key = gguf_find_key(meta, "max_generation");
+    int max_gen_key = search_for_gguf_keys(meta, {"parler-tts.decoder.max_generation", "max_generation"});
     if (max_gen_key != -1) {
         max_generation_size = gguf_get_val_u32(meta, max_gen_key);
     }
     
     for (int i = 0; i < (int) layers.size(); i++)  {
-        int layer_stride_key = gguf_find_key(meta, ("dac_layer_stride_" + std::to_string(i)).c_str());
+        std::string stride_kw = "dac_layer_stride_" + std::to_string(i);
+        std::string padding_kw = "dac_layer_padding_" + std::to_string(i);
+        int layer_stride_key = search_for_gguf_keys(meta, {"dac." + stride_kw, stride_kw});
         if (layer_stride_key == -1) {
-            TTS_ABORT("key %s must be specified in gguf file.", ("dac_layer_stride_" + std::to_string(i)).c_str());
+            TTS_ABORT("key %s must be specified in gguf file.", ("dac." + stride_kw).c_str());
         }
         layers[i].stride = gguf_get_val_u32(meta, layer_stride_key);
-        int layer_padding_key = gguf_find_key(meta, ("dac_layer_padding_" + std::to_string(i)).c_str());
+        int layer_padding_key = search_for_gguf_keys(meta, {"dac." + padding_kw, padding_kw});
         if (layer_padding_key == -1) {
-            TTS_ABORT("key %s must be specified in gguf file.", ("dac_layer_padding_" + std::to_string(i)).c_str());
+            TTS_ABORT("key %s must be specified in gguf file.", ("dac." + padding_kw).c_str());
         }
         layers[i].padding = gguf_get_val_u32(meta, layer_padding_key);
     }
@@ -60,6 +61,10 @@ void dac_model::prep_buffers_and_context(bool cpu_only) {
         backend = ggml_backend_metal_init();
         buffer = ggml_backend_metal_buffer_type();
 #endif
+        // if use metal is not installed then we need to warn here
+        if (!backend || !buffer) {
+            TTS_ABORT("'GGML_USE_METAL' is not defined either set the model to use CPU only or install ggml with metal support.");
+        }
     }
     size_t ctx_size = ggml_tensor_overhead() * (tensor_meta.n_tensors * 1.25);
     struct ggml_init_params params = {

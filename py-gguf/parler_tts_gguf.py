@@ -92,7 +92,7 @@ class ParlerTTSMiniEncoder:
         )
         data = model_kwargs["encoder_outputs"].last_hidden_state.to(dtype=torch.float32).detach().squeeze().numpy()
         self.gguf_writer.add_tensor("decoder.text_encoding", data, raw_dtype=gguf.GGMLQuantizationType.F32)
-        self.gguf_writer.add_uint32(f"encode_length", data.shape[0])
+        self.gguf_writer.add_uint32(f"parler-tts.decoder.encode_length", data.shape[0])
 
     def prep_audio_encoder(self):
         modules = {name: module for name, module in self.model.audio_encoder.model.decoder.named_modules()}
@@ -195,22 +195,29 @@ class ParlerTTSMiniEncoder:
         self.gguf_writer.add_decoder_start_token_id(self.model.config.decoder_start_token_id)
 
         # audio encoder config
+        # this is essentially hard coded for the parler version of dac
+        self.gguf_writer.add_uint32("dac.up_scaling_factor", 512)
         for i in range(4):
-            self.gguf_writer.add_uint32(f"dac_layer_stride_{i}", self.model.audio_encoder.model.decoder.model[i+1].block[1].stride[0])
-            self.gguf_writer.add_uint32(f"dac_layer_padding_{i}", self.model.audio_encoder.model.decoder.model[i+1].block[1].padding[0])
+            self.gguf_writer.add_uint32(f"dac.dac_layer_stride_{i}", self.model.audio_encoder.model.decoder.model[i+1].block[1].stride[0])
+            self.gguf_writer.add_uint32(f"dac.dac_layer_padding_{i}", self.model.audio_encoder.model.decoder.model[i+1].block[1].padding[0])
+
+        # audio token config
+        self.gguf_writer.add_uint32(f"audio.bos_token_id", self.model.decoder.config.bos_token_id)
+        self.gguf_writer.add_uint32(f"audio.eos_token_id", self.model.decoder.config.eos_token_id)
 
         # decoder config
         self.hparams = self.model.config.decoder.to_dict()
         self.audio_hparams = self.model.config.audio_encoder.to_dict()
         self.gguf_writer.arch = "parler-tts.decoder"
-        self.gguf_writer.add_uint32("hidden_size", self.hparams["hidden_size"])
-        self.gguf_writer.add_uint32("output_heads", self.hparams["num_codebooks"])
-        self.gguf_writer.add_uint32("ctx_length", self.hparams["max_position_embeddings"])
-        self.gguf_writer.add_uint32("attn_heads", self.hparams["num_attention_heads"])
-        self.gguf_writer.add_uint32("max_generation", self.model.generation_config.max_length)
-        self.gguf_writer.add_uint32("out_vocab_size", self.hparams["vocab_size"])
-        self.gguf_writer.add_uint32("audio_vocab_size", self.audio_hparams["codebook_size"])
-        self.gguf_writer.add_uint32("num_hidden_layers", self.hparams["num_hidden_layers"])
+        self.gguf_writer.add_uint32(f"{self.gguf_writer.arch}.hidden_size", self.hparams["hidden_size"])
+        self.gguf_writer.add_uint32(f"{self.gguf_writer.arch}.output_heads", self.hparams["num_codebooks"])
+        self.gguf_writer.add_context_length(self.hparams["max_position_embeddings"])
+        self.gguf_writer.add_head_count(self.hparams["num_attention_heads"])
+        self.gguf_writer.add_uint32(f"{self.gguf_writer.arch}.max_generation", self.model.generation_config.max_length)
+        self.gguf_writer.add_uint32(f"{self.gguf_writer.arch}.out_vocab_size", self.hparams["vocab_size"])
+        self.gguf_writer.add_uint32(f"{self.gguf_writer.arch}.audio_vocab_size", self.audio_hparams["codebook_size"])
+        self.gguf_writer.add_uint32(f"{self.gguf_writer.arch}.num_hidden_layers", self.hparams["num_hidden_layers"])
+
         self.gguf_writer.arch = "parler-tts"
         self.gguf_writer.add_file_type(gguf.LlamaFileType.ALL_F32)
 
@@ -224,6 +231,7 @@ class ParlerTTSMiniEncoder:
         scores = [scores_by_token[vocab[i]] for i in range(max(vocab.keys()) + 1)]
         self.gguf_writer.add_token_list(ordered_vocab)
         self.gguf_writer.add_token_scores(scores)
+        # these are hardcoded for all parler tts models at the moment.
         self.gguf_writer.add_eos_token_id(1)
         self.gguf_writer.add_unk_token_id(2)
         self.gguf_writer.add_add_bos_token(False)

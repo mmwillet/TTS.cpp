@@ -20,7 +20,14 @@ unigram_tokenizer * tokenizer_from_gguf(gguf_context * meta) {
     }
     int unkown_token_key = gguf_find_key(meta, "tokenizer.ggml.unknown_token_id");
     uint32_t token = gguf_get_val_u32(meta, unkown_token_key);
-    return new unigram_tokenizer(vocab, token, scores[token], scores);
+
+    auto tokenizer =  new unigram_tokenizer(vocab, token, scores[token], scores);
+    
+    uint32_t eos_token_key = gguf_find_key(meta, "tokenizer.ggml.eos_token_id");
+    if (eos_token_key != -1) {
+        tokenizer->eos_token = gguf_get_val_u32(meta, eos_token_key);
+    }
+    return tokenizer;
 }
 
 // Simple helper function for getting layer count from tensor name

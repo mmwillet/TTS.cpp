@@ -7,7 +7,6 @@
 #include <regex>
 #include "util.h"
 
-
 struct token_trie {
     bool has_value = false;
     uint32_t token;

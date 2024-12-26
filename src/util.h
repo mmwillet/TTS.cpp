@@ -25,7 +25,7 @@ struct model_tensor_meta {
 struct model_tensor_meta compute_tensor_meta(std::string name_prefix, ggml_context * weight_ctx);
 struct ggml_tensor * dac_snake_1d(ggml_context * ctx, struct ggml_tensor * alpha, struct ggml_tensor * a);
 uint64_t get_cpu_count();
-
+int search_for_gguf_keys(gguf_context * meta, std::vector<std::string> possible_keys);
 
 bool has_suffix(std::string value, std::string suffix);
 bool has_prefix(std::string value, std::string prefix);
