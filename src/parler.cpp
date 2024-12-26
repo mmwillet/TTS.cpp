@@ -748,7 +748,10 @@ void quantize_gguf(const std::string & ifile, const std::string & ofile, struct 
     gguf_set_val_u32(ctx_out.get(), "general.quantization_type", params->quantize_type);
 
     for (ggml_tensor * tensor = ggml_get_first_tensor(weight_ctx); tensor; tensor = ggml_get_next_tensor(weight_ctx, tensor)) {
-        gguf_add_tensor(ctx_out.get(), tensor);
+        std::string name = ggml_get_name(cur);
+        if (name.size() != 0) {
+            gguf_add_tensor(ctx_out.get(), tensor);
+        }
     }
 
     std::vector<no_init<uint8_t>> work;
