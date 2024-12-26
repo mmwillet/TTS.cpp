@@ -14,7 +14,7 @@ In this endeavor, MacOS and metal support will be treated as a the primary platf
 
 #### Model Support
 
-Currently [Parler TTS Mini v0.1](https://huggingface.co/ylacombe/parler_tts_mini_v0.1) is the only supported TTS model.
+Currently [Parler TTS Mini v1.0](https://huggingface.co/parler-tts/parler-tts-mini-v1) is the only supported TTS model.
 
 Additional Model support will initially be added based on open source model performance in the [TTS model arena](https://huggingface.co/spaces/TTS-AGI/TTS-Arena) and the availability of said models' architectures and checkpoints.
 

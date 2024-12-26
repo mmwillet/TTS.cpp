@@ -42,7 +42,7 @@ Mean Stats:
 
 ### Latest Results
 
-The currently measured performance breakdown for Parler Mini v0.1 with Q5_0 quantization without cross attention (i.e. the fastest stable generation with the Parler model) and 32bit floating point weights in the audio decoder:
+The currently measured performance breakdown for Parler Mini v1.0 with Q5_0 quantization without cross attention (i.e. the fastest stable generation with the Parler model) and 32bit floating point weights in the audio decoder:
 
 ```
 Mean Stats:
