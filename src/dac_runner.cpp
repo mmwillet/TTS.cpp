@@ -3,7 +3,7 @@
 
 void dac_context::set_threads() {
     if (backend != nullptr) {
-#ifdef GGML_METAL
+#ifdef GGML_USE_METAL
         // this is form copied from llama.cpp, but has since been removed. I don't know if this should be tuned.
         ggml_backend_metal_set_n_cb(backend, 2);
 #endif
@@ -17,7 +17,7 @@ void dac_context::set_threads() {
 void dac_context::build_schedule() {
     backend_cpu_buffer = ggml_backend_cpu_buffer_type();
     if (backend != nullptr) {
-#ifdef GGML_METAL
+#ifdef GGML_USE_METAL
         backend_buffer = ggml_backend_metal_buffer_type();
 #endif
         std::vector<ggml_backend_buffer_type_t> bufs = {backend_buffer, backend_cpu_buffer};
@@ -85,7 +85,7 @@ static struct ggml_tensor * build_decoder_block(ggml_context * ctx, struct ggml_
 struct dac_context * build_new_dac_context(struct dac_model * model, int n_threads, bool use_cpu) {
     dac_context * dctx = new dac_context(model, n_threads);
     if (!use_cpu) {
-#ifdef GGML_METAL
+#ifdef GGML_USE_METAL
         dctx->backend = ggml_backend_metal_init();
 #endif
     }

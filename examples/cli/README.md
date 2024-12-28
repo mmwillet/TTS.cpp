@@ -19,6 +19,8 @@ In order to get a detailed breakdown the functionality currently available you c
     The by channel repetition penalty to be applied the sampled output of the model. defaults to 1.1.
 --n-threads (-nt):
     The number of cpu threads to run generation with. Defaults to 10.
+--topk (-tk):
+    (OPTIONAL) when set to an integer value greater than 0 generation uses nucleus sampling over topk nucleaus size
 --use-metal (-m):
     (OPTIONAL) Whether to use metal acceleration
 --no-cross-attn (-ca):

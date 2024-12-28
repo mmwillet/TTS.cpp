@@ -17,7 +17,7 @@ void parler_context::reset(int32_t n_output_heads) {
 
 void parler_context::set_threads() {
     if (backend != nullptr) {
-#ifdef GGML_METAL
+#ifdef GGML_USE_METAL
         // this is form copied from llama.cpp, but has since been removed. I don't know if this should be tuned.
         ggml_backend_metal_set_n_cb(backend, 1);
 #endif
@@ -31,7 +31,7 @@ void parler_context::set_threads() {
 void parler_context::build_schedule() {
     backend_cpu_buffer = ggml_backend_cpu_buffer_type();
     if (backend != nullptr) {
-#ifdef GGML_METAL
+#ifdef GGML_USE_METAL
         backend_buffer = ggml_backend_metal_buffer_type();
 #endif
         std::vector<ggml_backend_buffer_type_t> bufs = {backend_buffer, backend_cpu_buffer};
@@ -51,7 +51,7 @@ bool parler_context::prep_schedule(ggml_cgraph * gf) {
 struct parler_context * build_new_parler_context(struct parler_tts_model * model, int n_threads, bool use_cpu) {
     parler_context * pctx = new parler_context(model, n_threads);
     if (!use_cpu) {
-#ifdef GGML_METAL
+#ifdef GGML_USE_METAL
         pctx->backend = ggml_backend_metal_init();
 #endif
     }
@@ -70,7 +70,7 @@ static bool parler_kv_cache_init(struct parler_kv_cache * cache, parler_tts_mode
     ggml_backend_buffer_type_t buft = nullptr;
     // this will only really support cpu or metal for the time being;
     if (pctx->backend != nullptr) {
-#ifdef GGML_METAL
+#ifdef GGML_USE_METAL
         buft = ggml_backend_metal_buffer_type();
 #endif
     } else {
@@ -261,8 +261,6 @@ struct ggml_cgraph * parler_tts_runner::build_parler_graph(parler_ubatch & batch
     for (int l = 0; l < model->n_layers; l++) {
         struct ggml_tensor * residual = inpL;
         ggml_set_name(inpL, ("layer_" + std::to_string(l) + "_input").c_str());
-        // each layer goes ->
-        // self-attn-norm -> self-attn -> res + out -> encoder-attn-norm -> res + out -> final-norm -> fc1 -> act -> fc2 -> res + out ->
 
         cur = parler_build_layer_norm(ctx, inpL, model->layers[l]->self_attn_norm, model->layers[l]->self_attn_norm_bias);
 
@@ -622,11 +620,11 @@ struct parler_tts_runner * runner_from_file(const std::string & fname, int n_thr
     struct sampler * samp = new sampler;
     struct parler_context * pctx = build_new_parler_context(model, n_threads, cpu_only);
     struct parler_kv_cache * cache = new parler_kv_cache;
-    
     struct parler_tts_runner * runner = new parler_tts_runner(model, audio_decoder, pctx, ut, samp, cache);//, weight_ctx);
     runner->prepare_post_load();
     gguf_free(meta_ctx);
     ggml_free(weight_ctx);
+
     return runner;
 }
 

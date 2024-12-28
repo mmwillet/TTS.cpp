@@ -47,8 +47,8 @@ DAC_DECODER_BLOCK_PARTS = {
 }
 
 
-class ParlerTTSMiniEncoder:
-    def __init__(self, model_path: Path | str = "./parler-tts.gguf"):
+class ParlerTTSEncoder:
+    def __init__(self, model_path: Path | str = "./parler-tts.gguf", encode_large: bool = False):
         self.path = model_path if isinstance(model_path, Path) else Path(model_path)
         # Configure GGUF Writer
         self.gguf_writer = gguf.GGUFWriter(path=None, arch="parler-tts")
@@ -56,17 +56,22 @@ class ParlerTTSMiniEncoder:
         self.shared_token_embeddings_found = False
         self.text_encoder_tensor_map = gguf.get_tensor_name_map(gguf.MODEL_ARCH.T5ENCODER, 24)
         self._tokenizer = None
+        self.encode_large = encode_large
 
     @property
     def model(self):
         if self._model is None:
-            self._model = ParlerTTSForConditionalGeneration.from_pretrained("parler-tts/parler-tts-mini-v1")
+            self._model = ParlerTTSForConditionalGeneration.from_pretrained(
+                "parler-tts/parler-tts-mini-v1" if not self.encode_large else "parler-tts/parler-tts-large-v1"
+            )
         return self._model
 
     @property
     def tokenizer(self):
         if self._tokenizer is None:
-            self._tokenizer = AutoTokenizer.from_pretrained("parler-tts/parler-tts-mini-v1")
+            self._tokenizer = AutoTokenizer.from_pretrained(
+                "parler-tts/parler-tts-mini-v1" if not self.encode_large else "parler-tts/parler-tts-large-v1"
+            )
         return self._tokenizer
 
     def prepare_tensors(self, text_encoding_prompt: str):
@@ -133,6 +138,9 @@ class ParlerTTSMiniEncoder:
 
         modules = {name: module for name, module in self.model.audio_encoder.model.quantizer.named_modules()}
         for name, param in self.model.audio_encoder.model.quantizer.named_parameters():
+            if "in_proj" in name:
+                # the input projection for the quantized layers is only used when encoding audio not decoding.
+                continue
             parts_for_normalized_weights = name.split(".")
             if parts_for_normalized_weights[-1] == "weight_g":
                 for hook in modules[".".join(parts_for_normalized_weights[:-1])]._forward_pre_hooks.values():
@@ -142,7 +150,7 @@ class ParlerTTSMiniEncoder:
                 parts_for_normalized_weights[-1] = "weight"
                 name = ".".join(parts_for_normalized_weights)
             elif parts_for_normalized_weights[-1] == "weight_v":
-                # ignore
+                # ignore because we will encode the weight when we see the weight_g param
                 continue
             new_name = f"audio_encoder.{name}"
             data = param.data.to(dtype=torch.float32).numpy()
@@ -168,11 +176,11 @@ class ParlerTTSMiniEncoder:
 
     def prepare_metadata(self):
         total_params, shared_params, expert_params, expert_count = self.gguf_writer.get_total_parameter_count()
-        self.metadata = gguf.Metadata.load(None, None, "parler-tts-mini-v1", total_params)
+        self.metadata = gguf.Metadata.load(None, None, "parler-tts-mini-v1" if not self.encode_large else "parler-tts-large-v1", total_params)
 
         # Fallback to model directory name if metadata name is still missing
         if self.metadata.name is None:
-            self.metadata.name = "parler-tts-mini-v1"
+            self.metadata.name = "parler-tts-mini-v1" if not self.encode_large else "parler-tts-large-v1"
 
         # Generate parameter weight class (useful for leader boards) if not yet determined
         if self.metadata.size_label is None and total_params > 0:

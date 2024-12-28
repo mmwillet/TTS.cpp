@@ -28,7 +28,7 @@ void parler_tts_model::prep_constants(gguf_context * meta) {
     if (hidden_size_key != -1) {
         hidden_size = gguf_get_val_u32(meta, hidden_size_key);
     }
-    
+
     int output_heads_key = search_for_gguf_keys(meta, {"parler-tts.decoder.output_heads", "output_heads"});
     if (output_heads_key != -1) {
         n_output_heads = gguf_get_val_u32(meta, output_heads_key);
@@ -38,12 +38,12 @@ void parler_tts_model::prep_constants(gguf_context * meta) {
         max_ctx_length = gguf_get_val_u32(meta, ctx_length_key);
     }
     
-    int attn_heads_key = search_for_gguf_keys(meta, {"parler-tts.decoder.attn_heads", "attn_heads"});
+    int attn_heads_key = search_for_gguf_keys(meta, {"parler-tts.decoder.attention.head_count", "attn_heads"});
     if (attn_heads_key != -1) {
         n_attn_heads = gguf_get_val_u32(meta, attn_heads_key);
-        head_size = hidden_size / n_attn_heads;
-        max_cross_nodes = n_attn_heads * 2;
     }
+    head_size = hidden_size / n_attn_heads;
+    max_cross_nodes = n_attn_heads * 2;
     
     int output_vocab_size_key = search_for_gguf_keys(meta, {"parler-tts.decoder.out_vocab_size", "out_vocab_size"});
     if (output_vocab_size_key != -1) {
@@ -103,10 +103,11 @@ void parler_tts_model::prep_cross_key_values() {
         struct ggml_tensor * Vcur = ggml_mul_mat(cctx, layers[i]->attn_v_proj, precomputed_input_emb);
         Kcur = ggml_reshape_3d(cctx, Kcur, head_size, n_attn_heads, n_encode_length);
         Vcur = ggml_transpose(cctx, Vcur);
-        
+
         struct ggml_tensor * k = ggml_cont(cctx, ggml_permute(cctx, Kcur, 0, 2, 1, 3));
         ggml_set_name(k, ("cross_key_" + std::to_string(i)).c_str());
         ggml_build_forward_expand(gf, k);
+
         struct ggml_tensor * v = ggml_cont_3d(cctx, Vcur, n_encode_length, head_size, n_attn_heads);
         ggml_set_name(v, ("cross_value_" + std::to_string(i)).c_str());
         ggml_build_forward_expand(gf, v);

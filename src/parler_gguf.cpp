@@ -22,7 +22,7 @@ unigram_tokenizer * tokenizer_from_gguf(gguf_context * meta) {
     uint32_t token = gguf_get_val_u32(meta, unkown_token_key);
 
     auto tokenizer =  new unigram_tokenizer(vocab, token, scores[token], scores);
-    
+
     uint32_t eos_token_key = gguf_find_key(meta, "tokenizer.ggml.eos_token_id");
     if (eos_token_key != -1) {
         tokenizer->eos_token = gguf_get_val_u32(meta, eos_token_key);
@@ -104,6 +104,7 @@ void assign_residual_unit(dac_model & model, dac_residual_unit & l, std::string 
                 model.set_tensor(l.out_conv_bias, tensor);
                 break;
             default:
+                fprintf(stdout, "residual unit unassigned tensor %s\n", name.c_str());
                 break;
         }
     } catch (const std::out_of_range& e) {
@@ -128,6 +129,7 @@ void assign_dac_layer(dac_model & model, dac_layer & layer, std::string name, gg
                 model.set_tensor(layer.out_conv_bias, tensor);
                 break;
             default:
+                fprintf(stdout, "layer unassigned tensor %s\n", name.c_str());
                 break;
         }
     } else if (std::find_if(name.begin(), name.end(), ::isdigit) != name.end())  {
@@ -154,6 +156,7 @@ void assign_quantizer_layer(dac_model & model, dac_quantize_layer & layer, std::
                 model.set_tensor(layer.codebook, tensor);
                 break;
             default:
+                fprintf(stdout, "quantized layer unassigned tensor %s\n", name.c_str());
                 break;
         }
     }  catch (const std::out_of_range& e) {
@@ -185,6 +188,7 @@ void assign_to_audio_encoder(dac_model & model, std::string name, ggml_tensor * 
                 model.set_tensor(model.snake_alpha, tensor);
                 break;
             default:
+                fprintf(stdout, "unassigned tensor %s\n", name.c_str());
                 break;
         }
     } else if (std::find_if(name.begin(), name.end(), ::isdigit) != name.end())  {
@@ -306,6 +310,7 @@ void assign_parler_layer(parler_tts_model * model, parler_layer * layer, std::st
                 model->set_tensor(layer->final_norm_bias, tensor);
                 break;
             default:
+                fprintf(stdout, "unassigned tensor %s\n", name.c_str());
                 break;
         }
     } catch (const std::out_of_range& e) {
@@ -340,6 +345,7 @@ void assign_to_decoder(parler_tts_model * model, const std::string name, ggml_te
                     model->set_tensor(model->precomputed_positional_embds, tensor);
                     break;
                 default:
+                    fprintf(stdout, "unassigned tensor %s\n", name.c_str());
                     break;
             }
         } catch (const std::out_of_range& e) {

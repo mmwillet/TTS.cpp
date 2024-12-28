@@ -66,7 +66,7 @@ void dac_model::prep_buffers_and_context(bool cpu_only) {
             TTS_ABORT("'GGML_USE_METAL' is not defined either set the model to use CPU only or install ggml with metal support.");
         }
     }
-    size_t ctx_size = ggml_tensor_overhead() * (tensor_meta.n_tensors * 1.25);
+    size_t ctx_size = ggml_tensor_overhead() * (tensor_meta.n_tensors * 1.4);
     struct ggml_init_params params = {
         /*.mem_size   =*/ ctx_size,
         /*.mem_buffer =*/ NULL,
