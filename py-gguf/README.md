@@ -1,8 +1,8 @@
 ### Overview
 
-This directory contains a simple torch to gguf format conversion script for the [Parler TTS Mini Model](https://huggingface.co/ylacombe/parler_tts_mini_v0.1).
+This directory contains a simple torch to gguf format conversion script for the [Parler TTS Mini Model](https://huggingface.co/parler-tts/parler-tts-mini-v1) or the [Parler TTS Large Model](https://huggingface.co/parler-tts/parler-tts-large-v1).
 
-Please note that the model encoding pattern used here is extremely naive and subject to further development (especially in order to align its pattern with gguf patterns in llama.cpp ad whisper.cpp). **WARNING! The current format will not be forward compatible with future versions of TTS.cpp** 
+Please note that the model encoding pattern used here is extremely naive and subject to further development (especially in order to align its pattern with gguf patterns in llama.cpp ad whisper.cpp).
 
 ### Requirements
 
@@ -19,10 +19,11 @@ pip3 install -r requirements.txt
 
 The gguf conversion script can be run via the `convert_parerl_tts_to_gguf` file locally like so: 
 ```commandline
-python3 ./convert_parler_tts_to_gguf --save-path ./test.gguf --voice-prompt "female voice"
+python3 ./convert_parler_tts_to_gguf --save-path ./parler-tts-large.gguf --voice-prompt "female voice" --large-model
 ```
 
-the command accepts _--save-path_ which described where to save the gguf model file to and _--voice-prompt_ which is a sentence or statement that desribes how the model's voice should sound at generation time.
+the command accepts _--save-path_ which described where to save the gguf model file to, the flag _--large-model_ which when passed encodes [Parler-TTS-large](https://huggingface.co/parler-tts/parler-tts-large-v1) (rather than [mini](https://huggingface.co/parler-tts/parler-tts-mini-v1)), and _--voice-prompt_ which is a sentence or statement that desribes how the model's voice should sound at generation time.
+
 
 #### Voice Prompt
 
