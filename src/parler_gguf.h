@@ -4,7 +4,7 @@
 #include "parler_model.h"
 #include "tokenizer.h"
 
-static std::pair<int, std::string> parse_layer_count(std::string name);
+static std::pair<int, std::string> parse_layer_count(std::string name, int skip = 0);
 
 // for DAC loading
 void assign_residual_unit(dac_model & model, dac_residual_unit & layer, std::string name, ggml_tensor * tensor);
@@ -16,6 +16,10 @@ void assign_to_audio_encoder(dac_model & model, std::string name, ggml_tensor * 
 void assign_parler_layer(parler_tts_model * model, parler_layer & layer, std::string name, ggml_tensor * tensor);
 void assign_to_decoder(parler_tts_model * model, const std::string name, ggml_tensor * tensor);
 void assign_weight(parler_tts_model * model, dac_model & audio_model, std::string name, ggml_tensor * tensor);
+
+// for T5 encoder loading
+void assign_to_t5_encoder(t5_encoder * model, const std::string name, ggml_tensor * tensor);
+void assign_to_t5_layer(t5_encoder * model, t5_layer & layer, std::string name, ggml_tensor * tensor);
 
 // for tokenizer loading
 unigram_tokenizer * tokenizer_from_gguf(gguf_context * meta);
@@ -66,6 +70,23 @@ enum parler_tensor {
     PARLER_LAYER_FC2,
     PARLER_LAYER_OUT_NORM,
     PARLER_LAYER_OUT_NORM_BIAS,
+};
+
+enum t5_tensor {
+    T5_EMBD,
+    T5_NORM,
+    T5_DOWN_PROJ,
+    T5_DOWN_PROJ_BIAS,
+    T5_RELATIVE_BIAS,
+    T5_LAYER_ATTN_Q,
+    T5_LAYER_ATTN_K,
+    T5_LAYER_ATTN_V,
+    T5_LAYER_ATTN_O,
+    T5_LAYER_ATTN_NORM,
+    T5_LAYER_WI_0,
+    T5_LAYER_WI_1,
+    T5_LAYER_WO,
+    T5_LAYER_OUT_NORM,
 };
 
 #endif

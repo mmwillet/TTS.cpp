@@ -23,7 +23,7 @@ int main(int argc, const char ** argv) {
     int default_top_k = 0;
     float default_repetition_penalty = 1.1f;
     arg_list args;
-    args.add_argument(string_arg("--model-path", "(REQUIRED) The local path of the gguf model file for Parler TTS mini v1.", "-mp", true));
+    args.add_argument(string_arg("--model-path", "(REQUIRED) The local path of the gguf model file for Parler TTS mini or large v1.", "-mp", true));
     args.add_argument(string_arg("--prompt", "(REQUIRED) The text prompt for which to generate audio in quotation markers.", "-p", true));
     args.add_argument(string_arg("--save-path", "(REQUIRED) The path to save the audio output to in a .wav format.", "-sp", true));
     args.add_argument(float_arg("--temperature", "The temperature to use when generating outputs. Defaults to 0.7.", "-t", false, &default_temperature));
@@ -32,6 +32,8 @@ int main(int argc, const char ** argv) {
     args.add_argument(float_arg("--repetition-penalty", "The by channel repetition penalty to be applied the sampled output of the model. defaults to 1.1.", "-r", false, &default_repetition_penalty));
     args.add_argument(bool_arg("--use-metal", "(OPTIONAL) Whether to use metal acceleration", "-m"));
     args.add_argument(bool_arg("--no-cross-attn", "(OPTIONAL) Whether to not include cross attention", "-ca"));
+    args.add_argument(string_arg("--conditional-prompt", "(OPTIONAL) A distinct conditional prompt to use for generating. If none is provided the preencoded prompt is used. '--text-encoder-path' must be set to use conditional generation.", "-cp", false));
+    args.add_argument(string_arg("--text-encoder-path", "(OPTIONAL) The local path of the text encoder gguf model for conditional generaiton.", "-tep", false));
     args.parse(argc, argv);
     if (args.for_help) {
         args.help();
@@ -39,10 +41,20 @@ int main(int argc, const char ** argv) {
     }
     args.validate();
 
+    std::string conditional_prompt = args.get_string_param("--conditional-prompt");
+    std::string text_encoder_path = args.get_string_param("--text-encoder-path");
+    if (conditional_prompt.size() > 0 && text_encoder_path.size() <= 0) {
+        fprintf(stderr, "The '--text-encoder-path' must be specified when '--condtional-prompt' is passed.\n");
+        exit(1);
+    }
+
     struct parler_tts_runner * runner = runner_from_file(args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), !args.get_bool_param("--use-metal"), !args.get_bool_param("--no-cross-attn"));
     runner->sampler->temperature = *args.get_float_param("--temperature");
     runner->sampler->repetition_penalty = *args.get_float_param("--repetition-penalty");
     runner->sampler->top_k = *args.get_int_param("--topk");
+    if (conditional_prompt.size() > 0) {
+        runner->update_conditional_prompt(text_encoder_path, conditional_prompt, *args.get_int_param("--n-threads"), true);
+    }
     tts_response data;
     
     runner->generate(args.get_string_param("--prompt"), &data);

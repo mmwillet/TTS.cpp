@@ -2,6 +2,7 @@
 #define parler_model_h
 
 #include "dac_model.h"
+#include "t5_encoder_model.h"
 
 struct parler_layer {
     struct ggml_tensor * self_attn_k_proj;
@@ -68,7 +69,7 @@ struct parler_tts_model {
     struct ggml_tensor * prompt_embd;
     
     void prep_layers(gguf_context * meta);
-    void prep_cross_key_values();
+    void prep_cross_key_values(struct t5_response * conditional_prompt = nullptr);
     void prep_buffers_and_context(bool cpu_only);
     void prep_constants(gguf_context * meta);
     void setup_from_file(gguf_context * meta_ctx, ggml_context * load_context, bool cpu_only);

@@ -1,0 +1,19 @@
+#!/usr/bin/env python3
+
+import argparse
+from t5_encoder_gguf import T5Encoder
+from os.path import isdir, dirname
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--save-path", type=str, required=True, help="the path to save the converted gguf tts model too.")
+    parser.add_argument("--large-model", default=False, action='store_true', help="Whether to encode the large version of Parler TTS.")
+    return parser.parse_known_args()
+
+
+if __name__ == '__main__':
+    args, _ = parse_arguments()
+    if not isdir(dirname(args.save_path)):
+        raise ValueError(f"model path, {args.save_path} is not a valid path.")
+    T5Encoder(args.save_path, encode_large=args.large_model).write()

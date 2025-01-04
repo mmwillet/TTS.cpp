@@ -76,7 +76,7 @@ void parler_tts_model::prep_constants(gguf_context * meta) {
     }
 }
 
-void parler_tts_model::prep_cross_key_values() {
+void parler_tts_model::prep_cross_key_values(struct t5_response * conditional_prompt) {
     ggml_threadpool_t threadpool = nullptr;
     int n_threads = (int) get_cpu_count();
     ggml_backend_t backend_cpu = ggml_backend_cpu_init();
@@ -97,6 +97,11 @@ void parler_tts_model::prep_cross_key_values() {
     };
     struct ggml_context * cctx = ggml_init(params);
     struct ggml_cgraph * gf = ggml_new_graph_custom(cctx, 4096, false);
+    if (conditional_prompt) {
+        precomputed_input_emb = ggml_new_tensor_2d(cctx, GGML_TYPE_F32, conditional_prompt->hidden_size, conditional_prompt->sequence_length);
+        ggml_set_input(precomputed_input_emb);
+        n_encode_length = conditional_prompt->sequence_length;
+    }
     
     for (int i = 0; i < layers.size(); i++) {
         struct ggml_tensor * Kcur = ggml_mul_mat(cctx, layers[i]->attn_k_proj, precomputed_input_emb);
@@ -116,6 +121,10 @@ void parler_tts_model::prep_cross_key_values() {
     ggml_free(cctx);
     ggml_backend_sched_reserve(sched, gf);
     ggml_backend_sched_alloc_graph(sched, gf);
+    if (conditional_prompt) {
+        ggml_backend_tensor_set(precomputed_input_emb, conditional_prompt->encoded_states, 0, conditional_prompt->sequence_length*conditional_prompt->hidden_size*ggml_element_size(precomputed_input_emb));
+    }
+
     ggml_backend_sched_graph_compute_async(sched, gf);
     
     for (int i = 0; i < layers.size(); i++) {

@@ -147,9 +147,11 @@ struct parler_tts_runner {
     void parler_graph_compute(ggml_cgraph * gf);
     void just_audio_token_decode(uint32_t * tokens, int32_t sq_len, struct tts_response * output);
     int generate_audio_tokens(std::string sentence);
+    void update_conditional_prompt(const std::string file_path, const std::string prompt, int n_threads, bool cpu_only = true);
 };
 
 struct parler_tts_runner * runner_from_file(const std::string & fname, int n_threads, bool cpu_only = true, bool use_cross_attn = true);
+struct t5_runner * text_encoder_from_file(std::string file_path, int n_threads, unigram_tokenizer * tokenizer);
 
 struct quantization_params {
     quantization_params(uint32_t n_threads, enum ggml_type quantize_type, void * imatrix = nullptr): n_threads(n_threads), quantize_type(quantize_type), imatrix(imatrix) {};

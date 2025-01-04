@@ -26,11 +26,15 @@ In order to get a detailed breakdown the functionality currently available you c
 --no-cross-attn (-ca):
     (OPTIONAL) Whether to not include cross attention
 --model-path (-mp):
-    (REQUIRED) The local path of the gguf model file for Parler TTS mini v1.
+    (REQUIRED) The local path of the gguf model file for Parler TTS mini or large v1.
 --prompt (-p):
     (REQUIRED) The text prompt for which to generate audio in quotation markers.
 --save-path (-sp):
     (REQUIRED) The path to save the audio output to in a .wav format.
+--conditional-prompt (-cp):
+    (OPTIONAL) A distinct conditional prompt to use for generating. If none is provided the preencoded prompt is used. '--text-encoder-path' must be set to use conditional generation.
+--text-encoder-path (-tep):
+    (OPTIONAL) The local path of the text encoder gguf model for conditional generaiton.
 ```
 
 General usage should follow from these possible parameters. E.G. The following command will save generated speech to the `/tmp/test.wav` file.
@@ -38,3 +42,12 @@ General usage should follow from these possible parameters. E.G. The following c
 ```commandline
 ./cli --model-path /model/path/to/gguf_file.gguf --prompt "I am saying some words" --save-path /tmp/test.wav
 ```
+
+#### Conditional Generation
+
+By default the Parler TTS model is saved to the GGUF format with a pre-encoded conditional prompt (i.e. a prompt used to determine how to generate speech), but if the text encoder model, the T5-Encoder model, is avaiable in gguf format (see the [python convertion scripts](../../py-gguf/README.md) for more information on how to prepare the T5-Encoder model) then a new conditional prompt can be used for generation like so:
+
+```commandline
+./cli --model-path /model/path/to/gguf_file.gguf --prompt "I am saying some words" --save-path /tmp/test.wav --text-encoder-path /model/path/to/t5_encoder_file.gguf --consditional-prompt "deep voice"
+```
+

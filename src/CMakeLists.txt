@@ -19,6 +19,7 @@ add_library(parler
             dac_model.cpp
             util.cpp
             args.cpp
+            t5_encoder_model.cpp
             )
 
 target_include_directories(parler PUBLIC . ../include ../ggml/src/)

@@ -628,6 +628,48 @@ struct parler_tts_runner * runner_from_file(const std::string & fname, int n_thr
     return runner;
 }
 
+struct t5_runner * text_encoder_from_file(std::string file_path, int n_threads, unigram_tokenizer * tokenizer, bool cpu_only) {
+    t5_encoder * model = new t5_encoder;
+    ggml_context * weight_ctx = NULL;
+
+    struct gguf_init_params params = {
+        /*.no_alloc   =*/ false,
+        /*.ctx        =*/ &weight_ctx,
+    };
+    gguf_context * meta_ctx = gguf_init_from_file(file_path.c_str(), params);
+    if (!meta_ctx) {
+        TTS_ABORT("%s failed for file %s\n", __func__, file_path.c_str());
+    }
+    if (!tokenizer) {
+        tokenizer = tokenizer_from_gguf(meta_ctx);
+    }
+    if (!tokenizer->init) {
+        tokenizer->initialize_tokenizer();
+    }
+    model->setup_from_file(meta_ctx, weight_ctx, cpu_only);
+
+    // TODO: change this weight assignment pattern to mirror llama.cpp
+    for (ggml_tensor * cur = ggml_get_first_tensor(weight_ctx); cur; cur = ggml_get_next_tensor(weight_ctx, cur)) {
+        assign_to_t5_encoder(model, cur->name, cur);
+    }
+
+    struct t5_context * t5ctx = build_new_t5_context(model, n_threads, cpu_only);
+    struct t5_runner * runner = new t5_runner(model, t5ctx, tokenizer);
+    runner->prepare_post_load();
+    gguf_free(meta_ctx);
+    ggml_free(weight_ctx);
+
+    return runner;
+}
+
+void parler_tts_runner::update_conditional_prompt(const std::string file_path, const std::string prompt, int n_threads, bool cpu_only) {
+    t5_runner * text_encoder = text_encoder_from_file(file_path, n_threads, tokenizer, cpu_only);
+    t5_response * resp = text_encoder->generate(prompt);
+    model->prep_cross_key_values(resp);
+    delete text_encoder;
+    return;
+}
+
 bool is_quanitizable(std::string name, struct quantization_params * params) {
     // the DAC audio encoder / decoder is not compatible with quantization, normalization weight shouldn't be quantized, and the text encoding shouldn't be normalized.
     bool quantizable = !has_prefix(name, "audio_encoder") && !has_suffix(name, "norm.weight") && !has_suffix(name, "text_encoding") && !has_suffix(name, "positional_embed") && !has_suffix(name, "norm.bias");
