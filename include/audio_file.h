@@ -102,6 +102,11 @@ public:
      * @Returns true if the file was successfully saved
      */
     bool save (std::string filePath, AudioFileFormat format = AudioFileFormat::Wave);
+
+    /** Writes audio data to fileData.
+     * @Returns true if the write was successful
+     */
+    bool writeData (std::vector<uint8_t>& fileData, AudioFileFormat format = AudioFileFormat::Wave);
         
     //=============================================================
     /** Loads an audio file from data in memory */
@@ -188,7 +193,12 @@ private:
     AudioFileFormat determineAudioFileFormat (std::vector<uint8_t>& fileData);
     bool decodeWaveFile (std::vector<uint8_t>& fileData);
     bool decodeAiffFile (std::vector<uint8_t>& fileData);
-    
+
+    //=============================================================
+    bool writeToWaveData (std::vector<uint8_t> & fileData);
+    bool writeToAiffData (std::vector<uint8_t> & fileData);
+
+
     //=============================================================
     bool saveToWaveFile (std::string filePath);
     bool saveToAiffFile (std::string filePath);
@@ -930,6 +940,224 @@ bool AudioFile<T>::save (std::string filePath, AudioFileFormat format)
     }
     
     return false;
+}
+
+//=============================================================
+template <class T>
+bool AudioFile<T>::writeData (std::vector<uint8_t> & fileData, AudioFileFormat format)
+{
+    if (format == AudioFileFormat::Wave)
+    {
+        return writeToWaveData (fileData);
+    }
+    else if (format == AudioFileFormat::Aiff)
+    {
+        return writeToAiffData (fileData);
+    }
+    
+    return false;
+}
+
+
+//=============================================================
+template <class T>
+bool AudioFile<T>::writeToWaveData (std::vector<uint8_t> & fileData)
+{    
+    int32_t dataChunkSize = getNumSamplesPerChannel() * (getNumChannels() * bitDepth / 8);
+    int16_t audioFormat = bitDepth == 32 && std::is_floating_point_v<T> ? WavAudioFormat::IEEEFloat : WavAudioFormat::PCM;
+    int32_t formatChunkSize = audioFormat == WavAudioFormat::PCM ? 16 : 18;
+    int32_t iXMLChunkSize = static_cast<int32_t> (iXMLChunk.size());
+    
+    // -----------------------------------------------------------
+    // HEADER CHUNK
+    addStringToFileData (fileData, "RIFF");
+    
+    // The file size in bytes is the header chunk size (4, not counting RIFF and WAVE) + the format
+    // chunk size (24) + the metadata part of the data chunk plus the actual data chunk size
+    int32_t fileSizeInBytes = 4 + formatChunkSize + 8 + 8 + dataChunkSize;
+    if (iXMLChunkSize > 0)
+    {
+        fileSizeInBytes += (8 + iXMLChunkSize);
+    }
+
+    addInt32ToFileData (fileData, fileSizeInBytes);
+    
+    addStringToFileData (fileData, "WAVE");
+    
+    // -----------------------------------------------------------
+    // FORMAT CHUNK
+    addStringToFileData (fileData, "fmt ");
+    addInt32ToFileData (fileData, formatChunkSize); // format chunk size (16 for PCM)
+    addInt16ToFileData (fileData, audioFormat); // audio format
+    addInt16ToFileData (fileData, (int16_t)getNumChannels()); // num channels
+    addInt32ToFileData (fileData, (int32_t)sampleRate); // sample rate
+    
+    int32_t numBytesPerSecond = (int32_t) ((getNumChannels() * sampleRate * bitDepth) / 8);
+    addInt32ToFileData (fileData, numBytesPerSecond);
+    
+    int16_t numBytesPerBlock = getNumChannels() * (bitDepth / 8);
+    addInt16ToFileData (fileData, numBytesPerBlock);
+    
+    addInt16ToFileData (fileData, (int16_t)bitDepth);
+    
+    if (audioFormat == WavAudioFormat::IEEEFloat)
+        addInt16ToFileData (fileData, 0); // extension size
+    
+    // -----------------------------------------------------------
+    // DATA CHUNK
+    addStringToFileData (fileData, "data");
+    addInt32ToFileData (fileData, dataChunkSize);
+    
+    for (int i = 0; i < getNumSamplesPerChannel(); i++)
+    {
+        for (int channel = 0; channel < getNumChannels(); channel++)
+        {
+            if (bitDepth == 8)
+            {
+                uint8_t byte = AudioSampleConverter<T>::sampleToUnsignedByte (samples[channel][i]);
+                fileData.push_back (byte);
+            }
+            else if (bitDepth == 16)
+            {
+                int16_t sampleAsInt = AudioSampleConverter<T>::sampleToSixteenBitInt (samples[channel][i]);
+                addInt16ToFileData (fileData, sampleAsInt);
+            }
+            else if (bitDepth == 24)
+            {
+                int32_t sampleAsIntAgain = AudioSampleConverter<T>::sampleToTwentyFourBitInt (samples[channel][i]);
+                
+                uint8_t bytes[3];
+                bytes[2] = (uint8_t) (sampleAsIntAgain >> 16) & 0xFF;
+                bytes[1] = (uint8_t) (sampleAsIntAgain >>  8) & 0xFF;
+                bytes[0] = (uint8_t) sampleAsIntAgain & 0xFF;
+                
+                fileData.push_back (bytes[0]);
+                fileData.push_back (bytes[1]);
+                fileData.push_back (bytes[2]);
+            }
+            else if (bitDepth == 32)
+            {
+                int32_t sampleAsInt;
+                
+                if (audioFormat == WavAudioFormat::IEEEFloat)
+                    sampleAsInt = (int32_t) reinterpret_cast<int32_t&> (samples[channel][i]);
+                else // assume PCM
+                    sampleAsInt = AudioSampleConverter<T>::sampleToThirtyTwoBitInt (samples[channel][i]);
+                
+                addInt32ToFileData (fileData, sampleAsInt, Endianness::LittleEndian);
+            }
+            else
+            {
+                assert (false && "Trying to write data with unsupported bit depth");
+                return false;
+            }
+        }
+    }
+    
+    // -----------------------------------------------------------
+    // iXML CHUNK
+    if (iXMLChunkSize > 0)
+    {
+        addStringToFileData (fileData, "iXML");
+        addInt32ToFileData (fileData, iXMLChunkSize);
+        addStringToFileData (fileData, iXMLChunk);
+    }
+    
+    return true;
+}
+
+//=============================================================
+template <class T>
+bool AudioFile<T>::writeToAiffData (std::vector<uint8_t> & fileData)
+{    
+    int32_t numBytesPerSample = bitDepth / 8;
+    int32_t numBytesPerFrame = numBytesPerSample * getNumChannels();
+    int32_t totalNumAudioSampleBytes = getNumSamplesPerChannel() * numBytesPerFrame;
+    int32_t soundDataChunkSize = totalNumAudioSampleBytes + 8;
+    int32_t iXMLChunkSize = static_cast<int32_t> (iXMLChunk.size());
+    
+    // -----------------------------------------------------------
+    // HEADER CHUNK
+    addStringToFileData (fileData, "FORM");
+    
+    // The file size in bytes is the header chunk size (4, not counting FORM and AIFF) + the COMM
+    // chunk size (26) + the metadata part of the SSND chunk plus the actual data chunk size
+    int32_t fileSizeInBytes = 4 + 26 + 16 + totalNumAudioSampleBytes;
+    if (iXMLChunkSize > 0)
+    {
+        fileSizeInBytes += (8 + iXMLChunkSize);
+    }
+
+    addInt32ToFileData (fileData, fileSizeInBytes, Endianness::BigEndian);
+    
+    addStringToFileData (fileData, "AIFF");
+    
+    // -----------------------------------------------------------
+    // COMM CHUNK
+    addStringToFileData (fileData, "COMM");
+    addInt32ToFileData (fileData, 18, Endianness::BigEndian); // commChunkSize
+    addInt16ToFileData (fileData, getNumChannels(), Endianness::BigEndian); // num channels
+    addInt32ToFileData (fileData, getNumSamplesPerChannel(), Endianness::BigEndian); // num samples per channel
+    addInt16ToFileData (fileData, bitDepth, Endianness::BigEndian); // bit depth
+    addSampleRateToAiffData (fileData, sampleRate);
+    
+    // -----------------------------------------------------------
+    // SSND CHUNK
+    addStringToFileData (fileData, "SSND");
+    addInt32ToFileData (fileData, soundDataChunkSize, Endianness::BigEndian);
+    addInt32ToFileData (fileData, 0, Endianness::BigEndian); // offset
+    addInt32ToFileData (fileData, 0, Endianness::BigEndian); // block size
+    
+    for (int i = 0; i < getNumSamplesPerChannel(); i++)
+    {
+        for (int channel = 0; channel < getNumChannels(); channel++)
+        {
+            if (bitDepth == 8)
+            {
+                uint8_t byte = static_cast<uint8_t> (AudioSampleConverter<T>::sampleToSignedByte (samples[channel][i]));
+                fileData.push_back (byte);
+            }
+            else if (bitDepth == 16)
+            {
+                int16_t sampleAsInt = AudioSampleConverter<T>::sampleToSixteenBitInt (samples[channel][i]);
+                addInt16ToFileData (fileData, sampleAsInt, Endianness::BigEndian);
+            }
+            else if (bitDepth == 24)
+            {
+                int32_t sampleAsIntAgain = AudioSampleConverter<T>::sampleToTwentyFourBitInt (samples[channel][i]);
+                
+                uint8_t bytes[3];
+                bytes[0] = (uint8_t) (sampleAsIntAgain >> 16) & 0xFF;
+                bytes[1] = (uint8_t) (sampleAsIntAgain >>  8) & 0xFF;
+                bytes[2] = (uint8_t) sampleAsIntAgain & 0xFF;
+                
+                fileData.push_back (bytes[0]);
+                fileData.push_back (bytes[1]);
+                fileData.push_back (bytes[2]);
+            }
+            else if (bitDepth == 32)
+            {
+                // write samples as signed integers (no implementation yet for floating point, but looking at WAV implementation should help)
+                int32_t sampleAsInt = AudioSampleConverter<T>::sampleToThirtyTwoBitInt (samples[channel][i]);
+                addInt32ToFileData (fileData, sampleAsInt, Endianness::BigEndian);
+            }
+            else
+            {
+                assert (false && "Trying to write data with unsupported bit depth");
+                return false;
+            }
+        }
+    }
+
+    // -----------------------------------------------------------
+    // iXML CHUNK
+    if (iXMLChunkSize > 0)
+    {
+        addStringToFileData (fileData, "iXML");
+        addInt32ToFileData (fileData, iXMLChunkSize, Endianness::BigEndian);
+        addStringToFileData (fileData, iXMLChunk);
+    }
+    return true;
 }
 
 //=============================================================

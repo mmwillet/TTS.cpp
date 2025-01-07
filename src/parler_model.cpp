@@ -23,7 +23,7 @@ void parler_tts_model::prep_constants(gguf_context * meta) {
         TTS_ABORT("key 'parler-tts.decoder.encode_length' must be specified in gguf file.");
     }
     n_encode_length = gguf_get_val_u32(meta, encode_length_key);
-    
+
     int hidden_size_key = search_for_gguf_keys(meta, {"parler-tts.decoder.hidden_size", "hidden_size"});
     if (hidden_size_key != -1) {
         hidden_size = gguf_get_val_u32(meta, hidden_size_key);

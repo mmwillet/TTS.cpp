@@ -14,13 +14,13 @@ In order to get a detailed breakdown the functionality currently available you c
 ./cli --help
 
 --temperature (-t):
-    The temperature to use when generating outputs. Defaults to 0.7.
+    The temperature to use when generating outputs. Defaults to 0.9.
 --repetition-penalty (-r):
     The by channel repetition penalty to be applied the sampled output of the model. defaults to 1.1.
 --n-threads (-nt):
     The number of cpu threads to run generation with. Defaults to 10.
 --topk (-tk):
-    (OPTIONAL) when set to an integer value greater than 0 generation uses nucleus sampling over topk nucleaus size
+    (OPTIONAL) when set to an integer value greater than 0 generation uses nucleus sampling over topk nucleaus size. Defaults to 50.
 --use-metal (-m):
     (OPTIONAL) Whether to use metal acceleration
 --no-cross-attn (-ca):
@@ -50,4 +50,3 @@ By default the Parler TTS model is saved to the GGUF format with a pre-encoded c
 ```commandline
 ./cli --model-path /model/path/to/gguf_file.gguf --prompt "I am saying some words" --save-path /tmp/test.wav --text-encoder-path /model/path/to/t5_encoder_file.gguf --consditional-prompt "deep voice"
 ```
-

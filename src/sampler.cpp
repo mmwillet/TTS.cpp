@@ -64,6 +64,13 @@ void sampler::softmax(float * logits, std::vector<std::vector<size_t>> picks, st
     bool has_temperature = temperature != 1.0f;
     for (int i = 0; i < n_output_heads; i++) {
         float cumsum = 0.0;
+        float max_val = logits[i*vocab_size + max_indices[i]];
+        if (has_repetition_penalty && last_token_ids[i] == max_indices[i]) {
+            max_val /= (pow(repetition_penalty, repetition_counts[i]));
+        }
+        if (has_temperature) {
+            max_val /= temperature;
+        }
         for (int j = 0; j < (use_nucleus_sampling ? picks[i].size() : vocab_size); j++) {
             int ii = use_nucleus_sampling ? (int) picks[i][j] : j;
             int index = i * vocab_size + ii;
@@ -73,13 +80,6 @@ void sampler::softmax(float * logits, std::vector<std::vector<size_t>> picks, st
             }
             if (has_temperature) {
                 v /= temperature;
-            }
-            float max_val = logits[i*vocab_size + max_indices[i]];
-            if (has_repetition_penalty && last_token_ids[i] == max_indices[i]) {
-                max_val /= (pow(repetition_penalty, repetition_counts[i]));
-            }
-            if (has_temperature) {
-                max_val /= temperature;
             }
             v = expf(v - max_val);
             cumsum += v;
