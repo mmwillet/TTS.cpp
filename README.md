@@ -6,7 +6,7 @@
 
 The general purpose of this repository is to support real time generation with open source TTS (_text to speech_) models across common device architectures using the [GGML tensor library](https://github.com/ggerganov/ggml). Rapid STT (_speach to text_), embedding generation, and LLM generation are well supported on GGML (via [whisper.cpp](https://github.com/ggerganov/whisper.cpp) and [llama.cpp](https://github.com/ggerganov/llama.cpp) respectively). As such, this repo seeks to compliment those functionalities with a similarly optimized and portable TTS library.
 
-In this endeavor, MacOS and metal support will be treated as a the primary platform, and, as such, functionality will initially be developed for MacOS and later extended to other OS.   
+In this endeavor, MacOS and metal support will be treated as the primary platform, and, as such, functionality will initially be developed for MacOS and later extended to other OS.   
 
 ### Supported Functionality
 
