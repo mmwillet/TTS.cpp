@@ -10,6 +10,7 @@ endif()
 add_library(parler
             ../include/parler.h
             ../include/args.h
+            ../include/phonemizer.h
             parler.cpp
             tokenizer.cpp
             sampler.cpp
@@ -20,6 +21,7 @@ add_library(parler
             util.cpp
             args.cpp
             t5_encoder_model.cpp
+            phonemizer.cpp
             )
 
 target_include_directories(parler PUBLIC . ../include ../ggml/src/)

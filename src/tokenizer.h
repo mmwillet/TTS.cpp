@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <stdint.h>
 #include <map>
+#include <set>
 #include <regex>
 #include "util.h"
 
@@ -45,6 +46,15 @@ struct unigram_tokenizer {
     
     void initialize_tokenizer();
     void tokenize(const std::string & text, std::vector<uint32_t> & tokens);
+};
+
+// While this functions like a tokenizer, no token ids are assigned as the token ids never need to be used in the context in which this is
+// currently being used. This tokenizer pattern is currently being used by the phonemizer to break up a word into its relevant graphemes. 
+// As such, only the graphemes need to be returned.
+struct single_pass_string_tokenizer {
+    single_pass_string_tokenizer(std::set<std::string> tokens): token_vocab(tokens) {}; 
+    std::set<std::string> token_vocab;
+    void tokenize(const std::string & text, std::vector<std::string> & tokens);
 };
 
 #endif

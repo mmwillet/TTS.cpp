@@ -125,3 +125,20 @@ void unigram_tokenizer::tokenize(const std::string & text, std::vector<uint32_t>
     // reverse the tokens since we added tokens starting from the end of the input
     std::reverse(tokens.begin(), tokens.end());
 }
+
+void single_pass_string_tokenizer::tokenize(const std::string & text, std::vector<std::string> & tokens) {
+    std::string remaining = text;
+    while (remaining.size() > 0) {
+        // String copying is much slower than using a std::string_view, but the former is simpler to implement for now.
+        std::string token = remaining.substr(0, 1);
+        for (int i = 1; i < remaining.size(); i++) {
+            std::string part = remaining.substr(0, i+1);
+            if (token_vocab.find(part) == token_vocab.end()) {
+                break;
+            }
+            token = part;
+        }
+        tokens.push_back(token);
+        remaining = remaining.substr(token.size(), remaining.size() - token.size());
+    }
+}

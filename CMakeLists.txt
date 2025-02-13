@@ -98,7 +98,8 @@ set(TTS_PUBLIC_HEADERS
     include/common.h
     include/parler.h
     include/audio_file.h
-    include/args.h)
+    include/args.h
+    include/phonemizer.h)
 
 set_target_properties(parler PROPERTIES PUBLIC_HEADER "${TTS_PUBLIC_HEADERS}")
 install(TARGETS parler LIBRARY PUBLIC_HEADER)

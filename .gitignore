@@ -35,7 +35,7 @@ nppBackup
 
 # python
 
-py-gguf/__pycache__
+*/__pycache__
 
 
 # Build Artifacts

@@ -1,0 +1,30 @@
+#!/usr/bin/env python3
+
+import argparse
+from phonemization_trainer import PhonemizationTrainer
+from os.path import isdir, dirname, isfile
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--export-path", type=str, required=True, help="the path to save the converted gguf tts model too.")
+    parser.add_argument("--persist", default=False, action='store_true', help="Whether or not to persist training checkpoints")
+    parser.add_argument("--checkpoint-directory", type=str, required=False, default=".", help="The directory to save the training checkpoints to.")
+    parser.add_argument("--espeak-dylib-path", required=True, type=str, help="The path to the espeak-ng dylib for phonemization training.")
+    parser.add_argument("--dictionary-path", required=False, type=str, default="./dictionary.json.gz", help="The path to the word dictionary.")
+    parser.add_argument("--stressed-and-composites-path", required=False, type=str, default="./stressed_and_composites.json", help="the path to phoneme modified words and expressions")
+    return parser.parse_known_args()
+
+
+if __name__ == '__main__':
+    args, _ = parse_arguments()
+    if not isfile(args.espeak_dylib_path):
+        raise ValueError(f"A valid path must be specified as the espeak dylib. {args.espeak_dylib_path} is not a valid path.")
+    if not isdir(dirname(args.export_path)):
+        raise ValueError(f"the directory of the export path, {args.export_path}, is not a valid directory.")
+    if not isdir(args.checkpoint_directory) and args.persist:
+        raise ValueError(f"checkpoint directory, {args.checkpoint_directory}. is not a valid directory.")
+    trainer = PhonemizationTrainer(args.checkpoint_directory, args.espeak_dylib_path)
+    #trainer.train(persist=args.persist)
+    trainer.load()
+    trainer.export_to_gguf(args.export_path, args.dictionary_path, args.stressed_and_composites_path)
