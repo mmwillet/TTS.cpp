@@ -4,15 +4,26 @@
 
 int main(int argc, const char ** argv) {
     arg_list args;
-    args.add_argument(string_arg("--phonemizer-path", "(REQUIRED) The local path of the gguf phonemiser file for TTS.cpp phonemizer.", "-mp", true));
+    args.add_argument(string_arg("--phonemizer-path", "(OPTIONAL) The local path of the gguf phonemiser file for TTS.cpp phonemizer. This is required if not using espeak.", "-mp"));
     args.add_argument(string_arg("--prompt", "(REQUIRED) The text prompt to phonemize.", "-p", true));
+    args.add_argument(bool_arg("--use-espeak", "(OPTIONAL) Whether to use espeak to generate phonems.", "-ue"));
     args.parse(argc, argv);
     if (args.for_help) {
         args.help();
         return 0;
     }
     args.validate();
-    phonemizer * ph = phonemizer_from_file(args.get_string_param("--phonemizer-path"));
+    if (!args.get_bool_param("--use-espeak") && args.get_string_param("--phonemizer-path") == "") {
+        fprintf(stderr, "The '--phonemizer-path' must be specified when '--use-espeak' is not true.\n");
+        exit(1);
+    }
+
+    phonemizer * ph;
+    if (args.get_bool_param("--use-espeak")) {
+        ph = espeak_phonemizer();
+    } else {
+        ph = phonemizer_from_file(args.get_string_param("--phonemizer-path"));
+    }
     std::string response = ph->text_to_phonemes(args.get_string_param("--prompt"));
     fprintf(stdout, "%s\n", response.c_str());
     return 0;

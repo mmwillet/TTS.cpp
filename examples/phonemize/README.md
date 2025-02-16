@@ -13,8 +13,10 @@ In order to get a detailed breakdown the functionality currently available you c
 ```commandline
 ./build/bin/phonemize --help
 
+--use-espeak (-ue):
+    (OPTIONAL) Whether to use espeak to generate phonems.
 --phonemizer-path (-mp):
-    (REQUIRED) The local path of the gguf phonemiser file for TTS.cpp phonemizer.
+    (OPTIONAL) The local path of the gguf phonemiser file for TTS.cpp phonemizer. This is required if not using espeak.
 --prompt (-p):
     (REQUIRED) The text prompt to phonemize.
 ```

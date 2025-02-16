@@ -2,7 +2,7 @@
 #define phonemizer_h
 
 #ifdef ESPEAK_INSTALL
-	#include "speak_lib.h"
+#include "speak_lib.h"
 #endif
 
 #include <unordered_map>
@@ -468,7 +468,7 @@ struct phonemizer {
 	std::string text_to_phonemes(const char * text, size_t size);
 
 #ifdef ESPEAK_INSTALL
-	bool espeak_text_to_phonemes(const char * text, size_t size, std::string * output);
+	std::string espeak_text_to_phonemes(const char * text);
 #endif
 
 	bool process_word(corpus* text, std::string* output, std::string word, conditions * flags, bool has_accent = false);
@@ -492,5 +492,6 @@ struct phonemizer {
 
 struct phonemizer * phonemizer_from_gguf(gguf_context * meta);
 struct phonemizer * phonemizer_from_file(const std::string fname);
+struct phonemizer * espeak_phonemizer(bool use_espeak_phonemes = false);
 
 #endif

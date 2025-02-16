@@ -1,11 +1,8 @@
 #include "phonemizer.h"
-#include <iostream>
-
 
 /*
  * Helper functions for string parsing
  */
-
 const std::unordered_set<std::string> inline_combine_sets(const std::vector<std::unordered_set<std::string>> sets) {
 	std::unordered_set<std::string> combined;
 	for (auto set : sets) {
@@ -146,7 +143,6 @@ bool is_all_upper(std::string word) {
 /* 
  * Text condition checks
  */
-
 bool is_roman_numeral(char letter) {
 	return ROMAN_NUMERAL_CHARACTERS.find(letter) != std::string::npos;
 }
@@ -906,11 +902,20 @@ bool phonemizer::route(corpus * text, std::string* output, conditions * flags) {
 	}
 }
 
+#ifdef ESPEAK_INSTALL
+std::string phonemizer::espeak_text_to_phonemes(const char * text) {
+	int mode = phoneme_mode == IPA ? (0 << 8 | 0x02) : (0 << 8 | 0x01);
+	const void ** txt_ptr = (const void**)&text;
+	const char * resp = espeak_TextToPhonemes(txt_ptr, espeakCHARS_UTF8, mode);
+	return strip(std::string(resp));
+}
+#endif
+
 std::string phonemizer::text_to_phonemes(const char * text, size_t size) {
 	std::string output = ""; 
 	if (mode == ESPEAK) {
 #ifdef ESPEAK_INSTALL
-		espeak_text_to_phonemes(text, size, &output);
+		return espeak_text_to_phonemes(text);
 #else
 		TTS_ABORT("%s attempted to run in espeak mode without espeak installed. \n", __func__);
 #endif
@@ -927,7 +932,8 @@ std::string phonemizer::text_to_phonemes(std::string text) {
 void phonemizer::text_to_phonemes(const char * text, size_t size, std::string* output) {
 	if (mode == ESPEAK) {
 #ifdef ESPEAK_INSTALL
-		espeak_text_to_phonemes(text, size, &output);
+		TTS_ABORT("%s attempted to run in espeak mode with output already defined. \n", __func__);
+
 #else
 		TTS_ABORT("%s attempted to run in espeak mode without espeak installed. \n", __func__);
 #endif
@@ -1037,6 +1043,8 @@ struct phonemizer * phonemizer_from_gguf(gguf_context * meta) {
     uint32_t phonemizer_type = gguf_get_val_u32(meta, mode_key);
     if (phonemizer_type == ESPEAK) {
 #ifdef ESPEAK_INSTALL
+    	espeak_Initialize(AUDIO_OUTPUT_SYNCHRONOUS, 0, ESPEAK_DATA_PATH, 0);
+		espeak_SetVoiceByName("gmw/en-US");
 		ph = new phonemizer(nullptr, nullptr);
 		ph->mode = ESPEAK;
 #else
@@ -1055,6 +1063,17 @@ struct phonemizer * phonemizer_from_gguf(gguf_context * meta) {
     struct phoneme_dictionary * dict =  phoneme_dictionary_from_gguf(meta);
     ph = new phonemizer(dict, phonetic_ph);
     return ph;
+}
+
+struct phonemizer * espeak_phonemizer(bool use_espeak_phonemes) {
+	espeak_Initialize(AUDIO_OUTPUT_SYNCHRONOUS, 0, ESPEAK_DATA_PATH, 0);
+	espeak_SetVoiceByName("gmw/en-US");
+	phonemizer * ph = new phonemizer(nullptr, nullptr);
+	ph->mode = ESPEAK;
+	if (use_espeak_phonemes) {
+		ph->phoneme_mode = ESPEAK_PHONEMES;
+	}
+	return ph;
 }
 
 struct phonemizer * phonemizer_from_file(const std::string fname) {
