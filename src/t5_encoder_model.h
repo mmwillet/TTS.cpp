@@ -5,7 +5,7 @@
  * DRY'd up if possible. This can be accomplished by implementing an extensible base model, context, and runner struct.
  */
 
-#include "util.h"
+#include "tts_model.h"
 #include "tokenizer.h"
 
 struct t5_layer {
@@ -25,8 +25,7 @@ struct t5_layer {
 // flan-t5-xl. Note this model is slightly different from a standard t5 encoder.
 // Specifically this model has a down projection which converts the text encoder's
 // hidden size to the hidden size of the parler decoder.
-struct t5_encoder {
-    struct model_tensor_meta tensor_meta;
+struct t5_encoder : tts_model {
     // These configs  are essentially built for the 44khZ 8kbps standard DAC model audio encoder and decoder
     uint32_t n_layers = 24;
     uint32_t n_attn_heads = 32;
@@ -39,9 +38,6 @@ struct t5_encoder {
     uint32_t output_size = 1536;
     uint32_t vocab_size;
 
-    // this is the current byte offset into the model's buffer.
-    size_t offset = 0;
-
     struct ggml_tensor * embd;
     struct ggml_tensor * relative_attn_bias;
     struct ggml_tensor * out_norm;
@@ -49,19 +45,13 @@ struct t5_encoder {
     struct ggml_tensor * down_proj_bias = nullptr;
     std::vector<t5_layer> layers;
     
-    ggml_backend_buffer_type_t buffer = nullptr;
-    ggml_backend_t backend = nullptr;
-    ggml_backend_buffer_t buf = nullptr;
-    
-    struct ggml_context * ctx;
-    
     void prep_layers(gguf_context * meta);
-    void prep_buffers_and_context(bool cpu_only);
     void prep_constants(gguf_context * meta);
-    void setup_from_file(gguf_context * meta_ctx, ggml_context * load_context, bool cpu_only = true);
-    void set_tensor(struct ggml_tensor * tensor, struct ggml_tensor * target);
-    size_t max_nodes();
-    void free();
+    void setup_from_file(gguf_context * meta_ctx, ggml_context * load_context, bool cpu_only = true) {
+        prep_constants(meta_ctx);
+        prep_layers(meta_ctx);
+        tts_model::setup_from_file(meta_ctx, load_context, cpu_only, "t5encoder", 1.25);
+    }
 };
 
 struct t5_context {

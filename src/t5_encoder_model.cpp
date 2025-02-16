@@ -7,31 +7,6 @@ void t5_encoder::prep_layers(gguf_context * meta) {
 	}
 }
 
-void t5_encoder::prep_buffers_and_context(bool cpu_only) {
-    if (cpu_only) {
-        backend = ggml_backend_cpu_init();
-        buffer = ggml_backend_cpu_buffer_type();
-    } else {
-#ifdef GGML_USE_METAL
-        backend = ggml_backend_metal_init();
-        buffer = ggml_backend_metal_buffer_type();
-#endif
-        // if use metal is not installed then we need to warn here
-        if (!backend || !buffer) {
-            TTS_ABORT("'GGML_USE_METAL' is not defined either set the model to use CPU only or install ggml with metal support.");
-        }
-    }
-    size_t ctx_size = ggml_tensor_overhead() * (size_t) (tensor_meta.n_tensors * 1.25);
-    struct ggml_init_params params = {
-        /*.mem_size   =*/ ctx_size,
-        /*.mem_buffer =*/ NULL,
-        /*.no_alloc   =*/ true,
-    };
-    ctx = ggml_init(params);
-    buf = ggml_backend_buft_alloc_buffer(buffer, tensor_meta.n_bytes);
-    return;
-}
-
 void t5_encoder::prep_constants(gguf_context * meta) {
 	int n_layers_key = gguf_find_key(meta, "t5encoder.block_count");
     if (n_layers_key != -1) {
@@ -72,38 +47,6 @@ void t5_encoder::prep_constants(gguf_context * meta) {
     int output_size_key = gguf_find_key(meta, "t5encoder.output_size");
     if (output_size_key != -1) {
         output_size = gguf_get_val_u32(meta, output_size_key);
-    }
-}
-
-void t5_encoder::setup_from_file(gguf_context * meta_ctx, ggml_context * load_context, bool cpu_only) {
-    prep_constants(meta_ctx);
-    prep_layers(meta_ctx);
-    tensor_meta = compute_tensor_meta("t5encoder", load_context);
-    prep_buffers_and_context(cpu_only);
-}
-
-void t5_encoder::set_tensor(struct ggml_tensor * tensor, struct ggml_tensor * target) {
-	tensor->buffer = buf;
-    tensor->data = (void *)((uint8_t *) ggml_backend_buffer_get_base(buf) + offset);
-    size_t size = ggml_nbytes(target);
-    ggml_backend_tensor_set(tensor, target->data, 0, size);
-    ggml_set_name(tensor, target->name);
-    offset += size;
-}
-
-size_t t5_encoder::max_nodes() {
-    return std::max<size_t>(8192, tensor_meta.n_tensors*5);
-}
-
-void t5_encoder::free() {
-    if (ctx) {
-        ggml_free(ctx);
-    }
-    if (buf) {
-        ggml_backend_buffer_free(buf);
-    }
-    if (backend) {
-        ggml_backend_free(backend);
     }
 }
 

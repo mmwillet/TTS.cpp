@@ -28,8 +28,7 @@ struct parler_layer {
     struct ggml_tensor * final_norm_bias;
 };
 
-struct parler_tts_model {
-    struct model_tensor_meta tensor_meta;
+struct parler_tts_model : tts_model {
     // These default configurations are based on the configuration of Parler TTS Mini (version 1.0)
     uint32_t n_output_heads = 9;
     uint32_t n_encode_length;
@@ -45,17 +44,8 @@ struct parler_tts_model {
     uint32_t bos_token_id = 1025;
     uint32_t max_cross_nodes = 32;
     uint32_t prompt_vocab_size;
-    
-    // this is the current byte offset into the model's buffer.
-    size_t offset = 0;
 
     bool use_cross_attn = true;
-    
-    ggml_backend_buffer_type_t buffer = nullptr;
-    ggml_backend_t backend = nullptr;
-    ggml_backend_buffer_t buf = nullptr;
-
-    struct ggml_context * ctx;
     
     std::vector<struct ggml_tensor*> embds;
     std::vector<parler_layer*> layers;
@@ -68,14 +58,14 @@ struct parler_tts_model {
     struct ggml_tensor * layer_norm_bias;
     struct ggml_tensor * prompt_embd;
     
+    void prep_constants(gguf_context * meta);
     void prep_layers(gguf_context * meta);
     void prep_cross_key_values(struct t5_response * conditional_prompt = nullptr);
-    void prep_buffers_and_context(bool cpu_only);
-    void prep_constants(gguf_context * meta);
-    void setup_from_file(gguf_context * meta_ctx, ggml_context * load_context, bool cpu_only);
-    void set_tensor(struct ggml_tensor * tensor, struct ggml_tensor * target);
-    size_t max_nodes();
-    void free();
+    void setup_from_file(gguf_context * meta_ctx, ggml_context * load_context, bool cpu_only) {
+        prep_constants(meta_ctx);
+        prep_layers(meta_ctx);
+        tts_model::setup_from_file(meta_ctx, load_context, cpu_only, "decoder", 1.25, n_encode_length*hidden_size*sizeof(float)*n_layers*2);
+    }
 };
 
 #endif

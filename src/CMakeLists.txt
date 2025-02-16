@@ -29,6 +29,7 @@ add_library(parler
             args.cpp
             t5_encoder_model.cpp
             phonemizer.cpp
+            tts_model.cpp
             )
 
 target_include_directories(parler PUBLIC . ../include ../ggml/src/)

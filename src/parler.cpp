@@ -605,15 +605,17 @@ struct parler_tts_runner * runner_from_file(const std::string & fname, int n_thr
     model->use_cross_attn = use_cross_attn;
     model->setup_from_file(meta_ctx, weight_ctx, cpu_only);
     audio_model->setup_from_file(meta_ctx, weight_ctx, cpu_only);
+
     
     // TODO: change this weight assignment pattern to mirror llama.cpp
     for (ggml_tensor * cur = ggml_get_first_tensor(weight_ctx); cur; cur = ggml_get_next_tensor(weight_ctx, cur)) {
         assign_weight(model, *audio_model, cur->name, cur);
     }
+
     if (use_cross_attn) {
         model->prep_cross_key_values();
     }
-    
+
     struct dac_context * dctx = build_new_dac_context(audio_model, n_threads, cpu_only);
     struct dac_runner * audio_decoder = new dac_runner(audio_model, dctx);
     audio_decoder->prepare_post_load();
