@@ -1,6 +1,6 @@
 
 cmake_minimum_required(VERSION 3.14)
-project("TTS.cpp" C CXX)
+project("tts.cpp" C CXX)
 include(CheckIncludeFileCXX)
 
 set(CMAKE_CXX_STANDARD 17)

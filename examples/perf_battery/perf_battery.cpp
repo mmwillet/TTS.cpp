@@ -107,8 +107,6 @@ int main(int argc, const char ** argv) {
     	double generation_ms = benchmark_ms(cb);
     	output_times.push_back((double)(response.n_outputs / 44.1));
     	generation_samples.push_back(generation_ms);
-    	fprintf(stdout, "%s", benchmark_printout(runner->arch, generation_samples, output_times).c_str());
-
     }
 
     fprintf(stdout, "%s", benchmark_printout(runner->arch, generation_samples, output_times).c_str());
