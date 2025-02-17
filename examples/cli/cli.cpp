@@ -1,4 +1,4 @@
-#include "parler.h"
+#include "tts.h"
 #include "audio_file.h"
 #include "args.h"
 #include "common.h"
@@ -48,16 +48,16 @@ int main(int argc, const char ** argv) {
         exit(1);
     }
 
-    struct parler_tts_runner * runner = runner_from_file(args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), !args.get_bool_param("--use-metal"), !args.get_bool_param("--no-cross-attn"));
-    runner->sampler->temperature = *args.get_float_param("--temperature");
-    runner->sampler->repetition_penalty = *args.get_float_param("--repetition-penalty");
-    runner->sampler->top_k = *args.get_int_param("--topk");
+    generation_configuration * config = new generation_configuration(*args.get_int_param("--topk"), *args.get_float_param("--temperature"), *args.get_float_param("--repetition-penalty"), !args.get_bool_param("--no-cross-attn"));
+
+    struct tts_runner * runner = runner_from_file(args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), config, !args.get_bool_param("--use-metal"));
+
     if (conditional_prompt.size() > 0) {
-        runner->update_conditional_prompt(text_encoder_path, conditional_prompt, *args.get_int_param("--n-threads"), true);
+        update_conditional_prompt(runner, text_encoder_path, conditional_prompt, true);
     }
     tts_response data;
     
-    runner->generate(args.get_string_param("--prompt"), &data);
+    generate(runner, args.get_string_param("--prompt"), &data, config);
     write_audio_file(args.get_string_param("--save-path"), &data);
     return 0;
 }

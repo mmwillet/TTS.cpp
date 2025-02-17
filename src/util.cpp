@@ -20,6 +20,37 @@ void tts_abort(const char * file, int line, const char * fmt, ...) {
     abort();
 }
 
+// Simple helper function for getting layer count from tensor name
+std::pair<int, std::string> parse_layer_count(std::string name, int skip) {
+    bool found = false;
+    bool after_layer = false;
+    std::string digit_chars = "";
+    std::string after_layer_name = "";
+    int count = 0;
+    for (char& c : name) {
+        if (count < skip) {
+            count += 1;
+            continue;
+        }
+        count += 1;
+        if (after_layer) {
+            after_layer_name += c;
+        } else if (std::isdigit(c)) {
+            found = true;
+            digit_chars += c;
+        } else if (!found) {
+            
+        } else {
+            after_layer = true;
+            after_layer_name += c;
+        }
+    }
+    if (digit_chars.size() == 0) {
+        return std::make_pair(-1, name);
+    }
+    return std::make_pair(std::stoi(digit_chars), after_layer_name);
+}
+
 int search_for_gguf_keys(gguf_context * meta, std::vector<std::string> possible_keys) {
     int gguf_key = -1;
     for (auto key : possible_keys) {

@@ -19,7 +19,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <chrono>
-#include "parler.h"
+#include "tts.h"
 #include "audio_file.h"
 #include "args.h"
 #include "common.h"
@@ -100,13 +100,6 @@ static void log_server_request(const httplib::Request & req, const httplib::Resp
     fprintf(stdout, "request: %s %s %s %d\n", req.method.c_str(), req.path.c_str(), req.remote_addr.c_str(), res.status);
 }
 
-struct generation_config {
-    float * temperature = nullptr;
-    float * repetition_penalty = nullptr;
-    int * top_k = nullptr;
-    bool sample = true;
-};
-
 struct simple_text_prompt_task {
     simple_text_prompt_task(task_type task, std::string prompt): task(task), prompt(prompt) {
         id = rand();
@@ -116,7 +109,7 @@ struct simple_text_prompt_task {
     task_type task;
     int id;
     std::string prompt;
-    generation_config * gen_config;
+    generation_configuration * gen_config;
     void * response;
     size_t length;
     bool success = false;
@@ -230,15 +223,14 @@ void init_response_map(simple_response_map * rmap) {
 }
 
 struct worker {
-    worker(struct simple_task_queue * task_queue, struct simple_response_map * response_map, struct generation_config * default_generation_config, std::string text_encoder_path = "", int task_timeout = 300): task_queue(task_queue), default_generation_config(default_generation_config), response_map(response_map), text_encoder_path(text_encoder_path), task_timeout(task_timeout) {};
+    worker(struct simple_task_queue * task_queue, struct simple_response_map * response_map, std::string text_encoder_path = "", int task_timeout = 300): task_queue(task_queue), response_map(response_map), text_encoder_path(text_encoder_path), task_timeout(task_timeout) {};
     ~worker() {
         delete runner;
     }
-    struct generation_config * default_generation_config;
     struct simple_task_queue * task_queue;
     struct simple_response_map * response_map;
 
-    struct parler_tts_runner * runner = nullptr;
+    struct tts_runner * runner = nullptr;
     std::string text_encoder_path;
     std::atomic<bool> running = true;
     std::thread * thread = nullptr;
@@ -258,27 +250,6 @@ struct worker {
         }
     }
 
-    void update_generation_config(struct simple_text_prompt_task * task) {
-        runner->sampler->temperature = *default_generation_config->temperature;
-        runner->sampler->top_k = *default_generation_config->top_k;
-        runner->sampler->do_sample = default_generation_config->sample;
-        runner->sampler->repetition_penalty = *default_generation_config->repetition_penalty;
-        if (!task->gen_config) {
-            return;
-        }
-        runner->sampler->do_sample = task->gen_config->sample;
-        if (task->gen_config->temperature) {
-            runner->sampler->temperature = *task->gen_config->temperature;
-
-        }
-        if (task->gen_config->repetition_penalty) {
-            runner->sampler->top_k = *task->gen_config->repetition_penalty;
-        }
-        if (task->gen_config->top_k) {
-            runner->sampler->top_k = *task->gen_config->top_k;
-        }
-    }
-
     void process_task(struct simple_text_prompt_task * task) {
         if (task->timed_out(task_timeout)) {
             return;
@@ -287,9 +258,8 @@ struct worker {
         tts_response * data = nullptr;
         switch(task->task) {
             case TTS:
-                update_generation_config(task);
                 data = new tts_response;
-                outcome = runner->generate(task->prompt, data);
+                outcome = generate(runner, task->prompt, data, task->gen_config);
                 task->response = (void*) data->data;
                 task->length = data->n_outputs;
                 task->success = outcome == 0;
@@ -301,7 +271,7 @@ struct worker {
                     response_map->push(task);
                     break;
                 }
-                runner->update_conditional_prompt(text_encoder_path, task->prompt, runner->pctx->n_threads);
+                update_conditional_prompt(runner, text_encoder_path, task->prompt);
                 task->success = true;
                 response_map->push(task);
                 break;
@@ -309,8 +279,8 @@ struct worker {
     }
 };
 
-void init_worker(std::string model_path, int n_threads, bool cpu_only, bool use_cross_attn, worker * w) {
-    w->runner = runner_from_file(model_path, n_threads, cpu_only, use_cross_attn);
+void init_worker(std::string model_path, int n_threads, bool cpu_only, generation_configuration * config, worker * w) {
+    w->runner = runner_from_file(model_path, n_threads, config, cpu_only);
     w->loop();
 }
 
@@ -330,16 +300,6 @@ void terminate(worker_pool * pool) {
         }
         delete w;
     }
-}
-
-worker_pool * initialize_workers(arg_list& args, struct simple_task_queue * task_queue, struct simple_response_map * response_map, generation_config * default_generation_config) {
-    worker_pool * pool = new worker_pool;
-    for (int i = 0; i < *args.get_int_param("--n-parallelism"); i++) {
-        worker * w = new worker(task_queue, response_map, default_generation_config, args.get_string_param("--text-encoder-path"), *args.get_int_param("--timeout"));
-        w->thread = new std::thread(init_worker, args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), !args.get_bool_param("--use-metal"), !args.get_bool_param("--no-cross-attn"), w);
-        pool->push_back(w);
-    }
-    return pool;
 }
 
 static std::string safe_json_to_str(json data) {
@@ -435,10 +395,7 @@ int main(int argc, const char ** argv) {
     }
     args.validate();
 
-    generation_config * default_generation_config = new generation_config;
-    default_generation_config->temperature = args.get_float_param("--temperature");
-    default_generation_config->top_k = args.get_int_param("--top-k");
-    default_generation_config->repetition_penalty = args.get_float_param("--repetition-penalty");
+    generation_configuration * default_generation_config = new generation_configuration(*args.get_int_param("--topk"), *args.get_float_param("--temperature"), *args.get_float_param("--repetition-penalty"), !args.get_bool_param("--no-cross-attn"));
 
     worker_pool * pool = nullptr;
     struct simple_task_queue * tqueue = new simple_task_queue;
@@ -539,7 +496,7 @@ int main(int argc, const char ** argv) {
         res_ok_json(res, health);
     };
 
-    const auto handle_tts = [&tqueue, &rmap, &res_error, &res_ok_audio](const httplib::Request &req, httplib::Response & res) {
+    const auto handle_tts = [&tqueue, &rmap, &res_error, &res_ok_audio, &default_generation_config](const httplib::Request &req, httplib::Response & res) {
         json data = json::parse(req.body);
         if (!data.contains("input") || !data.at("input").is_string()) {
             json formatted_error = format_error_response("the 'input' field is required for tts generation and must be passed as a string.", ERROR_TYPE_INVALID_REQUEST);
@@ -564,23 +521,24 @@ int main(int argc, const char ** argv) {
         std::string prompt = data.at("input").get<std::string>();
         struct simple_text_prompt_task * task = new simple_text_prompt_task(TTS, prompt);
         int id = task->id;
-        generation_config * conf = new generation_config;
+        generation_configuration * conf = new generation_configuration();
+        std::memcpy(conf, default_generation_config, sizeof(generation_configuration));
         float temp;
         float rep_pen;
         int top_k;
         if (data.contains("temperature") && data.at("temperature").is_number()) {
-            temp = data.at("termperature").get<float>();
-            conf->temperature = &temp;
+            temp = data.at("temperature").get<float>();
+            conf->temperature = temp;
         }
 
         if (data.contains("top_k") && data.at("top_k").is_number()) {
             top_k = data.at("top_k").get<int>();
-            conf->top_k = &top_k;
+            conf->top_k = top_k;
         }
 
         if (data.contains("repetition_penalty") && data.at("repetition_penalty").is_number()) {
             rep_pen = data.at("repetition_penalty").get<float>();
-            conf->repetition_penalty = &rep_pen;
+            conf->repetition_penalty = rep_pen;
         }
 
         task->gen_config = conf;
@@ -670,18 +628,18 @@ int main(int argc, const char ** argv) {
     fprintf(stdout, "%s: loading model and initializing main loop\n", __func__);
 
     // It might make sense in the long run to have the primary thread run clean up on the response map and keep the model workers parallel.
-    // pool = initialize_workers(args, tqueue, rmap, default_generation_config);
+    // pool = initialize_workers(args, tqueue, rmap);
     pool = new worker_pool;
     for (int i = *args.get_int_param("--n-parallelism"); i > 0; i--) {
         if (i == 1) {
             fprintf(stdout, "%s: server is listening on http://%s:%d\n", __func__, args.get_string_param("--host").c_str(), *args.get_int_param("--port"));
-            worker * w = new worker(tqueue, rmap, default_generation_config, args.get_string_param("--text-encoder-path"), *args.get_int_param("--timeout"));
+            worker * w = new worker(tqueue, rmap, args.get_string_param("--text-encoder-path"), *args.get_int_param("--timeout"));
             state.store(READY);
             pool->push_back(w);
-            init_worker(args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), !args.get_bool_param("--use-metal"), !args.get_bool_param("--no-cross-attn"), w);
+            init_worker(args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), !args.get_bool_param("--use-metal"), default_generation_config, w);
         } else {
-            worker * w = new worker(tqueue, rmap, default_generation_config, args.get_string_param("--text-encoder-path"), *args.get_int_param("--timeout"));
-            w->thread = new std::thread(init_worker, args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), !args.get_bool_param("--use-metal"), !args.get_bool_param("--no-cross-attn"), w);
+            worker * w = new worker(tqueue, rmap, args.get_string_param("--text-encoder-path"), *args.get_int_param("--timeout"));
+            w->thread = new std::thread(init_worker, args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), !args.get_bool_param("--use-metal"), default_generation_config, w);
             pool->push_back(w);
         }
     }

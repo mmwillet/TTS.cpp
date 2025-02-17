@@ -35,8 +35,8 @@ class PhonemizationTrainer:
     >>> trainer = PhonemizationTrainer(save_directory="/some/existing/directory")
     >>> trainer.train()
     """
-    def __init__(self, save_directory=".", espeak_path='/opt/homebrew/Cellar/espeak-ng/1.52.0/lib/libespeak-ng.1.dylib'):
-        EspeakWrapper.set_library("/opt/homebrew/Cellar/espeak-ng/1.52.0/lib/libespeak-ng.1.dylib")
+    def __init__(self, save_directory=".", espeak_path='./libespeak-ng.1.dylib'):
+        EspeakWrapper.set_library(espeak_path)
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.DEBUG)
         output_handler = logging.StreamHandler()

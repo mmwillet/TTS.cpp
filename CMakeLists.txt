@@ -1,6 +1,6 @@
 
 cmake_minimum_required(VERSION 3.14)
-project("parler.cpp" C CXX)
+project("TTS.cpp" C CXX)
 include(CheckIncludeFileCXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -103,36 +103,36 @@ get_target_property(GGML_LINK_LIBRARIES ggml LINK_LIBRARIES)
 # all public headers
 set(TTS_PUBLIC_HEADERS
     include/common.h
-    include/parler.h
+    include/tts.h
     include/audio_file.h
     include/args.h
     include/phonemizer.h)
 
-set_target_properties(parler PROPERTIES PUBLIC_HEADER "${TTS_PUBLIC_HEADERS}")
-install(TARGETS parler LIBRARY PUBLIC_HEADER)
+set_target_properties(tts PROPERTIES PUBLIC_HEADER "${TTS_PUBLIC_HEADERS}")
+install(TARGETS tts LIBRARY PUBLIC_HEADER)
 
 configure_package_config_file(
-        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/parler-config.cmake.in
-        ${CMAKE_CURRENT_BINARY_DIR}/parler-config.cmake
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/tts-config.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/tts-config.cmake
     INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/tts
     PATH_VARS TTS_INCLUDE_INSTALL_DIR
               TTS_LIB_INSTALL_DIR
               TTS_BIN_INSTALL_DIR )
 
 write_basic_package_version_file(
-        ${CMAKE_CURRENT_BINARY_DIR}/parler-version.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/tts-version.cmake
     VERSION ${TTS_INSTALL_VERSION}
     COMPATIBILITY SameMajorVersion)
 
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/parler-config.cmake
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/tts-config.cmake
               ${CMAKE_CURRENT_BINARY_DIR}/parer-version.cmake
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/parler)
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/tts)
 
-configure_file(cmake/parler.pc.in
-        "${CMAKE_CURRENT_BINARY_DIR}/parler.pc"
+configure_file(cmake/tts.pc.in
+        "${CMAKE_CURRENT_BINARY_DIR}/tts.pc"
         @ONLY)
 
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/parler.pc"
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/tts.pc"
         DESTINATION lib/pkgconfig)
 
 # examples

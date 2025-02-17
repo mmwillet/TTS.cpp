@@ -26,21 +26,20 @@ In order to get a detailed breakdown the functionality currently available you c
 General usage should follow from these possible parameters. E.G. The following command will save generated speech to the `/tmp/test.wav` file.
 
 ```commandline
-./perf_batter --model-path /model/path/to/gguf_file.gguf --use-metal
+./perf_battery --model-path /model/path/to/gguf_file.gguf --use-metal
 ```
 the output will look like the following:
 ```
-Mean Stats:
+Mean Stats for arch Parler-TTS:
 
-  Generation Time (ms):             8599.550347
-  Decode Time (ms):                 4228.528055
-  Generation TPS:                   1134.453434
-  Decode TPS:                       1808.758339
-  Generation Real Time Factor (ms): 0.695635
-  Decode Real Time Factor (ms):     0.432398
+  Generation Time (ms):             12439.43255
+  Generation Real Time Factor (ms): 1.15635
+
 ```
 
 ### Latest Results
+
+*Please note that the results listed below are for Parler TTS mini*
 
 The currently measured performance breakdown for Parler Mini v1.0 with Q5_0 quantization without cross attention (i.e. the fastest stable generation with the Parler model) and 32bit floating point weights in the audio decoder:
 

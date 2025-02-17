@@ -21,8 +21,16 @@ In order to get a detailed breakdown the functionality currently available you c
     (REQUIRED) The text prompt to phonemize.
 ```
 
-General usage should follow from these possible parameters. E.G. The following command will return the phonemized IPA text for the prompt.
+General usage should follow from these possible parameters. E.G. The following command will return the phonemized IPA text for the prompt via the TTS.cpp phonemizer.
 
 ```commandline
 ./build/bin/phonemize --phonemizer-path "/path/to/tts_phonemizer.gguf" --prompt "this is a test."
+```
+
+#### Espeak
+
+To use espeak phonemization you must first install the TTS with espeak linked. Phonemization can then be accomplished via the following:
+
+```commandlinecommandline
+./build/bin/phonemize --prompt "this is a test." --use-espeak
 ```

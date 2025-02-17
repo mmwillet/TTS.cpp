@@ -18,7 +18,7 @@ add_executable(${TARGET} ${TARGET_SRCS})
 install(TARGETS ${TARGET} RUNTIME)
 
 target_include_directories(${TARGET} PRIVATE ${CMAKE_SOURCE_DIR})
-target_link_libraries(${TARGET} PRIVATE ggml parler)
+target_link_libraries(${TARGET} PRIVATE ggml tts)
 
 
 if (LLAMA_SERVER_SSL)

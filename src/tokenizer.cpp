@@ -126,6 +126,37 @@ void unigram_tokenizer::tokenize(const std::string & text, std::vector<uint32_t>
     std::reverse(tokens.begin(), tokens.end());
 }
 
+// loading the vocab to the tokenizer from gguf file.
+unigram_tokenizer * tokenizer_from_gguf(gguf_context * meta) {
+    std::unordered_map<std::string, uint32_t> vocab;
+    std::vector<float> scores;
+    int vocab_key = gguf_find_key(meta, "tokenizer.ggml.tokens");
+    int vocab_size = gguf_get_arr_n(meta, vocab_key);
+    scores.reserve(vocab_size);
+    for (int i = 0; i < vocab_size; i++) {
+        std::string val = gguf_get_arr_str(meta, vocab_key, i);
+        vocab[val] = (uint32_t) i;
+    }
+    int scores_key = gguf_find_key(meta, "tokenizer.ggml.scores");
+    int scores_size = gguf_get_arr_n(meta, scores_key);
+    assert(scores_size == vocab_size);
+    float * data = (float*) gguf_get_arr_data(meta, scores_key);
+    for (int i = 0; i < scores_size; i++) {
+        scores.push_back(data[i]);
+    }
+    int unkown_token_key = gguf_find_key(meta, "tokenizer.ggml.unknown_token_id");
+    uint32_t token = gguf_get_val_u32(meta, unkown_token_key);
+
+    auto tokenizer =  new unigram_tokenizer(vocab, token, scores[token], scores);
+
+    uint32_t eos_token_key = gguf_find_key(meta, "tokenizer.ggml.eos_token_id");
+    if (eos_token_key != -1) {
+        tokenizer->eos_token = gguf_get_val_u32(meta, eos_token_key);
+    }
+    return tokenizer;
+}
+
+
 void single_pass_string_tokenizer::tokenize(const std::string & text, std::vector<std::string> & tokens) {
     std::string remaining = text;
     while (remaining.size() > 0) {

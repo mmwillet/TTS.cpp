@@ -3,8 +3,8 @@ exec_prefix=${prefix}
 libdir=${exec_prefix}/lib
 includedir=${prefix}/include
 
-Name: llama
-Description: Port of Hugging Face Parler TTS model in C/C++ via GGML
+Name: tts.cpp
+Description: Port of Common Hugging Face TTS model in C/C++ via GGML
 Version: @PROJECT_VERSION@
-Libs: -L${libdir} -lparler
+Libs: -L${libdir} -ltts
 Cflags: -I${includedir}

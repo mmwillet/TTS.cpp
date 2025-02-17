@@ -1,2 +1,2 @@
-add_executable(cli parler_cli.cpp)
-target_link_libraries(cli PRIVATE ggml parler)
+add_executable(cli cli.cpp)
+target_link_libraries(cli PRIVATE ggml tts)

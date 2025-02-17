@@ -1,5 +1,113 @@
 #include "t5_encoder_model.h"
 
+static const std::map<std::string, t5_tensor> T5_TENSOR_GGUF_LOOKUP = {
+    {"t5encoder.token_embd", T5_EMBD},
+    {"t5encoder.enc.final_layer_norm", T5_NORM},
+    {"t5encoder.down_proj", T5_DOWN_PROJ},
+    {"t5encoder.down_proj_bias", T5_DOWN_PROJ_BIAS},
+    {".attn_norm", T5_LAYER_ATTN_NORM},
+    {".attn_q", T5_LAYER_ATTN_Q},
+    {".attn_k", T5_LAYER_ATTN_K},
+    {".attn_v", T5_LAYER_ATTN_V},
+    {".attn_o", T5_LAYER_ATTN_O},
+    {".attn_rel_b", T5_RELATIVE_BIAS},
+    {".ffn_norm", T5_LAYER_OUT_NORM},
+    {".ffn_gate", T5_LAYER_WI_1},
+    {".ffn_down", T5_LAYER_WO},
+    {".ffn_up", T5_LAYER_WI_0},
+};
+
+void assign_to_t5_layer(t5_encoder * model, t5_layer & layer, std::string name, ggml_tensor * tensor) {
+    try {
+        switch(T5_TENSOR_GGUF_LOOKUP.at(name)) {
+            case T5_LAYER_ATTN_NORM:
+                layer.attn_norm = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(layer.attn_norm, tensor);
+                break;
+            case T5_LAYER_ATTN_Q:
+                layer.q = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(layer.q, tensor);
+                break;
+            case T5_LAYER_ATTN_K:
+                layer.k = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(layer.k, tensor);
+                break;
+            case T5_LAYER_ATTN_V:
+                layer.v = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(layer.v, tensor);
+                break;
+            case T5_LAYER_ATTN_O:
+                layer.o = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(layer.o, tensor);
+                break;
+            case T5_LAYER_OUT_NORM:
+                layer.mlp_norm = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(layer.mlp_norm, tensor);
+                break;
+            case T5_LAYER_WI_1:
+                layer.wi_1 = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(layer.wi_1, tensor);
+                break;
+            case T5_LAYER_WI_0:
+                layer.wi_0 = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(layer.wi_0, tensor);
+                break;
+            case T5_LAYER_WO:
+                layer.wo = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(layer.wo, tensor);
+                break;
+            case T5_RELATIVE_BIAS:
+                model->relative_attn_bias = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(model->relative_attn_bias, tensor);
+                break;
+            default:
+                fprintf(stdout, "unassigned tensor %s\n", name.c_str());
+                break;
+        }
+    } catch (const std::out_of_range& e) {
+        TTS_ABORT("Error: %s\nTensor, '%s', is not a valid tensor.", e.what(), name.c_str());
+    }
+}
+
+void assign_to_t5_encoder(t5_encoder * model, const std::string name, ggml_tensor * tensor) {
+    if (tensor->data == NULL) {
+        return;
+    }
+    std::string::size_type pos = name.find(".", 0);
+    std::string top_level(name.substr(0, pos));
+    if (T5_TENSOR_GGUF_LOOKUP.find(name) != T5_TENSOR_GGUF_LOOKUP.end()) {
+        switch (T5_TENSOR_GGUF_LOOKUP.at(name)) {
+            case T5_EMBD:
+                model->embd = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(model->embd, tensor);
+                break;
+            case T5_NORM:
+                model->out_norm = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(model->out_norm, tensor);
+                break;
+            case T5_DOWN_PROJ:
+                model->down_proj = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(model->down_proj, tensor);
+                break;
+            case T5_DOWN_PROJ_BIAS:
+                model->down_proj_bias = ggml_dup_tensor(model->ctx, tensor);
+                model->set_tensor(model->down_proj_bias, tensor);
+                break;
+            default:
+                fprintf(stdout, "unassigned tensor %s\n", name.c_str());
+                break;
+        }
+    } else if (top_level == "t5encoder") {
+        auto pair = parse_layer_count(name, 2);
+        int l = pair.first;
+        std::string lt_name = pair.second;
+
+        assign_to_t5_layer(model, model->layers[l], lt_name, tensor);
+    } else {
+        return;
+    }
+}
+
 void t5_encoder::prep_layers(gguf_context * meta) {
 	for (uint32_t i = 0; i < n_layers; i++) {
 		t5_layer l;
@@ -50,37 +158,8 @@ void t5_encoder::prep_constants(gguf_context * meta) {
     }
 }
 
-void t5_context::set_threads() {
-    if (backend != nullptr) {
-#ifdef GGML_USE_METAL
-        // this is form copied from llama.cpp, but has since been removed. I don't know if this should be tuned.
-        ggml_backend_metal_set_n_cb(backend, 1);
-#endif
-    }
-    if (backend_cpu != nullptr) {
-        ggml_backend_cpu_set_n_threads(backend_cpu, n_threads);
-        ggml_backend_cpu_set_threadpool(backend_cpu, threadpool);
-    }
-}
-
-void t5_context::build_schedule() {
-    backend_cpu_buffer = ggml_backend_cpu_buffer_type();
-    if (backend != nullptr) {
-#ifdef GGML_USE_METAL
-        backend_buffer = ggml_backend_metal_buffer_type();
-#endif
-        std::vector<ggml_backend_buffer_type_t> bufs = {backend_buffer, backend_cpu_buffer};
-        std::vector<ggml_backend_t> backs = {backend, backend_cpu};
-        sched = ggml_backend_sched_new(backs.data(), bufs.data(), 2, model->max_nodes(), false);
-    } else {
-        std::vector<ggml_backend_buffer_type_t> bufs = {backend_cpu_buffer};
-        std::vector<ggml_backend_t> backs = {backend_cpu};
-        sched = ggml_backend_sched_new(backs.data(), bufs.data(), 1, model->max_nodes(), false);
-    }
-}
-
-bool t5_context::prep_schedule(ggml_cgraph * gf) {
-    return ggml_backend_sched_reserve(sched, gf);
+void t5_encoder::assign_weight(std::string name, ggml_tensor * tensor) {
+    assign_to_t5_encoder(this, name, tensor);
 }
 
 struct t5_context * build_new_t5_context(struct t5_encoder * model, int n_threads, bool use_cpu) {
@@ -120,23 +199,6 @@ static struct ggml_tensor * build_t5_pos_bias(ggml_context * ctx, struct ggml_te
     pos_bias = ggml_permute(ctx, pos_bias, 2, 1, 0, 3);
     pos_bias = ggml_cont(ctx, pos_bias);
     return pos_bias;
-}
-
-void t5_runner::init_build() {
-    struct ggml_init_params params = {
-        /*.mem_size   =*/ t5ctx->buf_compute_meta.size(),
-        /*.mem_buffer =*/ t5ctx->buf_compute_meta.data(),
-        /*.no_alloc   =*/ true,
-    };
-
-    ctx = ggml_init(params);
-}
-
-void t5_runner::free_build() {
-    if (ctx) {
-        ggml_free(ctx);
-        ctx = nullptr;
-    }
 }
 
 t5_ubatch t5_runner::build_worst_case_batch()  {
@@ -257,7 +319,7 @@ void t5_runner::set_inputs(t5_ubatch & batch) {
 
 }
 
-void t5_runner::run(uint32_t * input_tokens, uint32_t sequence_length, struct t5_response * outputs) {
+void t5_runner::run(uint32_t * input_tokens, uint32_t sequence_length, struct tts_response * outputs) {
 	t5_ubatch batch;
     batch.input_tokens = input_tokens;
     batch.n_tokens = sequence_length;
@@ -276,7 +338,7 @@ void t5_runner::run(uint32_t * input_tokens, uint32_t sequence_length, struct t5
         t5ctx->buf_output = ggml_backend_buft_alloc_buffer(t5ctx->backend_cpu_buffer, new_size);
     }
     
-    outputs->encoded_states = (float *) ggml_backend_buffer_get_base(t5ctx->buf_output);
+    outputs->data = (float *) ggml_backend_buffer_get_base(t5ctx->buf_output);
     ggml_backend_buffer_clear(t5ctx->buf_output, 0);
     struct ggml_cgraph * gf = NULL;
     gf = build_t5_graph(batch);
@@ -289,22 +351,54 @@ void t5_runner::run(uint32_t * input_tokens, uint32_t sequence_length, struct t5
 
     ggml_backend_t backend_res = ggml_backend_sched_get_tensor_backend(t5ctx->sched, result);
 
-    ggml_backend_tensor_get_async(backend_res, result, outputs->encoded_states, 0, batch.n_tokens*sizeof(float)*model->output_size);
+    ggml_backend_tensor_get_async(backend_res, result, outputs->data, 0, batch.n_tokens*sizeof(float)*model->output_size);
 
     // Reset state for the next token before backend sync, to allow the CPU activities in the reset to
     // overlap with device computation.
     ggml_backend_sched_reset(t5ctx->sched);
-    outputs->sequence_length = sequence_length;
+    outputs->n_outputs = sequence_length;
     outputs->hidden_size = model->output_size;
     return;
 }
 
-struct t5_response * t5_runner::generate(const std::string prompt) {
+int t5_runner::generate(std::string prompt, tts_response *response) {
 	std::vector<uint32_t> tokens;
 	tokenizer->tokenize(prompt, tokens);
-	t5_response * resp = new t5_response;
     tokens.push_back(model->eos_token_id);
+	run(tokens.data(), (uint32_t) tokens.size(), response);
+	return 0;
+}
 
-	run(tokens.data(), (uint32_t) tokens.size(), resp);
-	return resp;
+struct t5_runner * text_encoder_from_file(std::string file_path, int n_threads, unigram_tokenizer * tokenizer, bool cpu_only) {
+    t5_encoder * model = new t5_encoder;
+    ggml_context * weight_ctx = NULL;
+
+    struct gguf_init_params params = {
+        /*.no_alloc   =*/ false,
+        /*.ctx        =*/ &weight_ctx,
+    };
+    gguf_context * meta_ctx = gguf_init_from_file(file_path.c_str(), params);
+    if (!meta_ctx) {
+        TTS_ABORT("%s failed for file %s\n", __func__, file_path.c_str());
+    }
+    if (!tokenizer) {
+        tokenizer = tokenizer_from_gguf(meta_ctx);
+    }
+    if (!tokenizer->init) {
+        tokenizer->initialize_tokenizer();
+    }
+    model->setup_from_file(meta_ctx, weight_ctx, cpu_only);
+
+    // TODO: change this weight assignment pattern to mirror llama.cpp
+    for (ggml_tensor * cur = ggml_get_first_tensor(weight_ctx); cur; cur = ggml_get_next_tensor(weight_ctx, cur)) {
+        model->assign_weight(cur->name, cur);
+    }
+
+    struct t5_context * t5ctx = build_new_t5_context(model, n_threads, cpu_only);
+    struct t5_runner * runner = new t5_runner(model, t5ctx, tokenizer);
+    runner->prepare_post_load();
+    gguf_free(meta_ctx);
+    ggml_free(weight_ctx);
+
+    return runner;
 }

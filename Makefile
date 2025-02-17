@@ -723,11 +723,10 @@ OBJ_GGML = \
 	$(OBJ_GGML_EXT)
 
 OBJ_TTS = \
-	$(DIR_TTS)/parler.o \
+	$(DIR_TTS)/tts.o \
 	$(DIR_TTS)/tokenizer.o \
 	$(DIR_TTS)/sampler.o \
-	$(DIR_TTS)/dac_runner.o \
-	$(DIR_TTS)/parler_gguf.o \
+	$(DIR_TTS)/tts_model.o \
 	$(DIR_TTS)/parler_model.o \
 	$(DIR_TTS)/dac_model.o \
 	$(DIR_TTS)/util.o
@@ -737,8 +736,8 @@ OBJ_ALL = $(OBJ_GGML) $(OBJ_TTS)
 LIB_GGML   = $(LIB_PRE)ggml$(DSO_EXT)
 LIB_GGML_S = $(LIB_PRE)ggml.a
 
-LIB_TTS   = $(LIB_PRE)parler$(DSO_EXT)
-LIB_TTS_S = $(LIB_PRE)parler.a
+LIB_TTS   = $(LIB_PRE)tts$(DSO_EXT)
+LIB_TTS_S = $(LIB_PRE)tts.a
 
 LIB_ALL   = $(LIB_GGML)   $(LIB_TTS)
 LIB_ALL_S = $(LIB_GGML_S) $(LIB_TTS_S)
@@ -798,8 +797,8 @@ $(info )
 LIB_GGML   = libggml.so
 LIB_GGML_S = libggml.a
 
-LIB_TTS   = libparler.so
-LIB_TTS_S = libparler.a
+LIB_TTS   = libtts.so
+LIB_TTS_S = libtts.a
 
 
 # Targets
@@ -867,7 +866,7 @@ clean:
 # Helper function that replaces .c, .cpp, and .cu file endings with .o:
 GET_OBJ_FILE = $(patsubst %.c,%.o,$(patsubst %.cpp,%.o,$(patsubst %.cu,%.o,$(1))))
 
-cli: examples/cli/parler_cli.cpp \
+cli: examples/cli/cli.cpp \
 	$(OBJ_ALL)
 	$(CXX) $(CXXFLAGS) -c $< -o $(call GET_OBJ_FILE, $<)
 	$(CXX) $(CXXFLAGS) $(filter-out %.h $<,$^) $(call GET_OBJ_FILE, $<) -o $@ $(LDFLAGS)

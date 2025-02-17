@@ -12,17 +12,15 @@ if (ESPEAK_INSTALL_DIR)
     set(ESPEAK_INCLUDE_DIR ${ESPEAK_INSTALL_DIR}/include/espeak-ng)
 endif()
 
-# parler
+# TTS
 
-add_library(parler
-            ../include/parler.h
+add_library(tts
+            ../include/tts.h
             ../include/args.h
             ../include/phonemizer.h
-            parler.cpp
+            tts.cpp
             tokenizer.cpp
             sampler.cpp
-            dac_runner.cpp
-            parler_gguf.cpp
             parler_model.cpp
             dac_model.cpp
             util.cpp
@@ -32,29 +30,29 @@ add_library(parler
             tts_model.cpp
             )
 
-target_include_directories(parler PUBLIC . ../include ../ggml/src/)
+target_include_directories(tts PUBLIC . ../include ../ggml/src/)
 
 if (ESPEAK_INSTALL_DIR)
-    target_include_directories(parler PUBLIC . "${ESPEAK_INCLUDE_DIR}")
+    target_include_directories(tts PUBLIC . "${ESPEAK_INCLUDE_DIR}")
     add_definitions(-DESPEAK_DATA_PATH=\"${ESPEAK_INSTALL_DIR}/share\")
 endif()
 
-target_compile_features   (parler PUBLIC cxx_std_11) # don't bump
+target_compile_features   (tts PUBLIC cxx_std_11) # don't bump
 
-target_link_libraries(parler PUBLIC ggml)
+target_link_libraries(tts PUBLIC ggml)
 
 if (ESPEAK_INSTALL_DIR)
     if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-        target_link_libraries(parler PUBLIC "${ESPEAK_LIB_DIR}/libespeak-ng.dylib")
+        target_link_libraries(tts PUBLIC "${ESPEAK_LIB_DIR}/libespeak-ng.dylib")
     elseif(WIN32)
-        target_link_libraries(parler PUBLIC "${ESPEAK_LIB_DIR}/libespeak-ng.dll")
+        target_link_libraries(tts PUBLIC "${ESPEAK_LIB_DIR}/libespeak-ng.dll")
     else()
-        target_link_libraries(parler PUBLIC "${ESPEAK_LIB_DIR}/libespeak-ng.o")
+        target_link_libraries(tts PUBLIC "${ESPEAK_LIB_DIR}/libespeak-ng.o")
     endif()
 endif()
 
 if (BUILD_SHARED_LIBS)
-    set_target_properties(parler PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    target_compile_definitions(parler PRIVATE LLAMA_BUILD)
-    target_compile_definitions(parler PUBLIC  LLAMA_SHARED)
+    set_target_properties(tts PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    target_compile_definitions(tts PRIVATE LLAMA_BUILD)
+    target_compile_definitions(tts PUBLIC  LLAMA_SHARED)
 endif()

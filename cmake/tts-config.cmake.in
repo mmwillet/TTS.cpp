@@ -157,22 +157,22 @@ if (NOT TTS_SHARED_LIB)
     endif()
 endif()
 
-find_library(tts_LIBRARY parler
+find_library(tts_LIBRARY tts
     REQUIRED
     HINTS ${TTS_LIB_DIR}
     NO_CMAKE_FIND_ROOT_PATH
 )
 
-add_library(parler UNKNOWN IMPORTED)
-set_target_properties(parler
+add_library(tts UNKNOWN IMPORTED)
+set_target_properties(tts
     PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES "${LLAMA_INCLUDE_DIR}"
         INTERFACE_LINK_LIBRARIES "${_tts_link_deps}"
         INTERFACE_LINK_OPTIONS   "${_tts_link_opts}"
         INTERFACE_COMPILE_DEFINITIONS "${_tts_transient_defines}"
         IMPORTED_LINK_INTERFACE_LANGUAGES "CXX"
-        IMPORTED_LOCATION "${parler_LIBRARY}"
+        IMPORTED_LOCATION "${tts_LIBRARY}"
         INTERFACE_COMPILE_FEATURES cxx_std_11
         POSITION_INDEPENDENT_CODE ON )
 
-check_required_components(Parler)
+check_required_components(tts)

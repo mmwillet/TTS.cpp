@@ -42,7 +42,7 @@ nppBackup
 
 .build/
 build/*
-/liblparler.so
+/libltts.so
 cmake-build-*
 CMakeSettings.json
 ggml-metal-embed.metal

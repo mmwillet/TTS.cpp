@@ -48,6 +48,9 @@ struct unigram_tokenizer {
     void tokenize(const std::string & text, std::vector<uint32_t> & tokens);
 };
 
+// For intializing a new tokenizer from a gguf file meta
+unigram_tokenizer * tokenizer_from_gguf(gguf_context * meta);
+
 // While this functions like a tokenizer, no token ids are assigned as the token ids never need to be used in the context in which this is
 // currently being used. This tokenizer pattern is currently being used by the phonemizer to break up a word into its relevant graphemes. 
 // As such, only the graphemes need to be returned.
