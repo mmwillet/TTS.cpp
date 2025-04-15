@@ -1,4 +1,6 @@
 #include "dac_model.h"
+#include <algorithm>
+#include <stdexcept>
 
 // For loading DAC model from gguf file.
 static const std::map<std::string, dac_tensor> DAC_TENSOR_GGUF_LOOKUP = {
