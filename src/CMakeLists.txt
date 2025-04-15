@@ -5,13 +5,6 @@ if (WIN32)
     endif()
 endif()
 
-set(ESPEAK_INSTALL_DIR "$ENV{ESPEAK_INSTALL_DIR}")
-
-if (ESPEAK_INSTALL_DIR)
-    set(ESPEAK_LIB_DIR ${ESPEAK_INSTALL_DIR}/lib)
-    set(ESPEAK_INCLUDE_DIR ${ESPEAK_INSTALL_DIR}/include/espeak-ng)
-endif()
-
 # TTS
 
 add_library(tts
@@ -32,24 +25,14 @@ add_library(tts
 
 target_include_directories(tts PUBLIC . ../include ../ggml/src/)
 
-if (ESPEAK_INSTALL_DIR)
-    target_include_directories(tts PUBLIC . "${ESPEAK_INCLUDE_DIR}")
-    add_definitions(-DESPEAK_DATA_PATH=\"${ESPEAK_INSTALL_DIR}/share\")
-endif()
-
 target_compile_features   (tts PUBLIC cxx_std_11) # don't bump
 
-target_link_libraries(tts PUBLIC ggml)
-
-if (ESPEAK_INSTALL_DIR)
-    if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-        target_link_libraries(tts PUBLIC "${ESPEAK_LIB_DIR}/libespeak-ng.dylib")
-    elseif(WIN32)
-        target_link_libraries(tts PUBLIC "${ESPEAK_LIB_DIR}/libespeak-ng.dll")
-    else()
-        target_link_libraries(tts PUBLIC "${ESPEAK_LIB_DIR}/libespeak-ng.o")
-    endif()
+if (ESPEAK_INCLUDE_DIRS)
+    set_source_files_properties(phonemizer.cpp PROPERTIES COMPILE_FLAGS "${ESPEAK_CFLAGS_OTHER}")
+    set_source_files_properties(phonemizer.cpp PROPERTIES INCLUDE_DIRECTORIES "${ESPEAK_INCLUDE_DIRS}")
+    target_link_libraries(tts PUBLIC ${ESPEAK_LIBRARIES})
 endif()
+target_link_libraries(tts PUBLIC ggml)
 
 if (BUILD_SHARED_LIBS)
     set_target_properties(tts PROPERTIES POSITION_INDEPENDENT_CODE ON)

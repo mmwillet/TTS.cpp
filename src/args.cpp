@@ -132,6 +132,7 @@ std::string arg_list::get_string_param(std::string full_name) {
             return arg.value;
         }
     }
+    return "";
 }
 
 int * arg_list::get_int_param(std::string full_name) {
@@ -140,6 +141,7 @@ int * arg_list::get_int_param(std::string full_name) {
             return arg.value;
         }
     }
+    return nullptr;
 }
 
 float * arg_list::get_float_param(std::string full_name) {
@@ -148,6 +150,7 @@ float * arg_list::get_float_param(std::string full_name) {
             return arg.value;
         }
     }
+    return nullptr;
 }
 
 bool arg_list::get_bool_param(std::string full_name) {
@@ -156,5 +159,6 @@ bool arg_list::get_bool_param(std::string full_name) {
             return arg.value;
         }
     }
+    return false;
 }
 
