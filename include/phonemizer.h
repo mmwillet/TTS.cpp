@@ -2,7 +2,11 @@
 #define phonemizer_h
 
 #ifdef ESPEAK_INSTALL
-#include "speak_lib.h"
+# ifdef ESPEAK_INSTALL_LOCAL
+#  include "speak_lib.h"
+# else
+#  include <espeak-ng/speak_lib.h>
+# endif
 #endif
 
 #include <unordered_map>
