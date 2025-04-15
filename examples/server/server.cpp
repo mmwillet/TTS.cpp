@@ -388,6 +388,7 @@ int main(int argc, const char ** argv) {
     args.add_argument(int_arg("--n-http-threads", "(OPTIONAL) The number of http threads to use. Defaults to hardware concurrency minus 1.", "-ht", false, &default_http_threads));
     args.add_argument(int_arg("--timeout", "(OPTIONAL) The server side timeout on http calls in seconds. Defaults to 300 seconds.", "-t", false, &default_timeout));
     args.add_argument(int_arg("--n-parallelism", "(OPTIONAL) the number of parallel models to run asynchronously. Deafults to 1.", "-np", false, &default_n_parallel));
+    args.add_argument(string_arg("--voice", "(OPTIONAL) the default voice to use when generating audio. Only used with applicable models.", "-v", false, "af_alloy"));
     args.parse(argc, argv);
     if (args.for_help) {
         args.help();
@@ -395,7 +396,7 @@ int main(int argc, const char ** argv) {
     }
     args.validate();
 
-    generation_configuration * default_generation_config = new generation_configuration(*args.get_int_param("--topk"), *args.get_float_param("--temperature"), *args.get_float_param("--repetition-penalty"), !args.get_bool_param("--no-cross-attn"));
+    generation_configuration * default_generation_config = new generation_configuration(args.get_string_param("--voice"), *args.get_int_param("--topk"), *args.get_float_param("--temperature"), *args.get_float_param("--repetition-penalty"), !args.get_bool_param("--no-cross-attn"));
 
     worker_pool * pool = nullptr;
     struct simple_task_queue * tqueue = new simple_task_queue;
@@ -521,7 +522,7 @@ int main(int argc, const char ** argv) {
         std::string prompt = data.at("input").get<std::string>();
         struct simple_text_prompt_task * task = new simple_text_prompt_task(TTS, prompt);
         int id = task->id;
-        generation_configuration * conf = new generation_configuration();
+        generation_configuration * conf = new generation_configuration("af_alloy");
         std::memcpy(conf, default_generation_config, sizeof(generation_configuration));
         float temp;
         float rep_pen;

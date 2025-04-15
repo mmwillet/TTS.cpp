@@ -1,6 +1,8 @@
 #ifndef util_h
 #define util_h
 
+#include <math.h>
+#include <random>
 #include <stdio.h>
 #include <string>
 #include <vector>
@@ -16,18 +18,42 @@
 
 #define TTS_ABORT(...) tts_abort(__FILE__, __LINE__, __VA_ARGS__)
 
+/*#ifndef CONSTANT_MATH
+#define CONSTANT_MATH
+float PI = 3.141592653589793f;
+float TWO_PI = 6.283185307179586f;
+#endif*/
 
 struct model_tensor_meta {
 	uint32_t n_tensors = 0;
 	size_t n_bytes = 0;
 };
 
+void random_gen(int count, float * tgt, float min = 0.0f, float max = 1.0);
+
 std::pair<int, std::string> parse_layer_count(std::string name, int skip = 0);
 
-struct model_tensor_meta compute_tensor_meta(std::string name_prefix, ggml_context * weight_ctx);
-struct ggml_tensor * dac_snake_1d(ggml_context * ctx, struct ggml_tensor * alpha, struct ggml_tensor * a);
+struct model_tensor_meta compute_tensor_meta(std::string name_prefix, ggml_context * weight_ctx, std::function<void(ggml_tensor*)>* callback = nullptr);
+struct ggml_tensor * snake_1d(ggml_context * ctx, struct ggml_tensor * alpha, struct ggml_tensor * a);
 uint64_t get_cpu_count();
 int search_for_gguf_keys(gguf_context * meta, std::vector<std::string> possible_keys);
+
+// a simple window function for stft
+void hann_window(size_t n_fft, float * tgt);
+
+// currently this assumes a center view in which the output vector is reflectively padded by n_fft / 2 on each side.
+void compute_window_squared_sum(size_t n_fft, size_t hop, size_t n_frames, float * tgt, float * window);
+
+struct ggml_tensor * stft(ggml_context * ctx, struct ggml_tensor * a, struct ggml_tensor * window, size_t n_fft, size_t hop, bool abs_and_angle, bool one_sided);
+struct ggml_tensor * istft(ggml_context * ctx, struct ggml_tensor * a, struct ggml_tensor * window_squared_sum, struct ggml_tensor * window, size_t n_fft, size_t hop, bool abs_and_angle, bool one_sided);
+
+// These are custom ops for sin_gen below
+void phase(struct ggml_tensor * dst, const struct ggml_tensor * a, const struct ggml_tensor * b, int ith, int nth, void * userdata);
+//void sine_wave(struct ggml_tensor * dst, const struct ggml_tensor * a, const struct ggml_tensor * b, int ith, int nth, void * userdata);
+void uv_noise_compute(struct ggml_tensor * dst, const struct ggml_tensor * a, const struct ggml_tensor * b, int ith, int nth, void * userdata);
+
+// used by Kokoro for producing sine waveforms
+struct ggml_tensor * sin_gen(ggml_context * ctx, ggml_tensor * a, int harmonic_num, int sequence_length, float sample_rate, float noise_std, float sin_amp, float voice_threshold, ggml_cgraph * gf);
 
 bool has_suffix(std::string value, std::string suffix);
 bool has_prefix(std::string value, std::string prefix);

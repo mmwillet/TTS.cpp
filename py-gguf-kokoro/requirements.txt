@@ -1,0 +1,5 @@
+torch>=2.4.0
+torchaudio>=2.4.0
+gguf==0.10.0
+kokoro==0.8.4
+huggingface-hub>=0.26.5

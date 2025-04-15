@@ -1,4 +1,5 @@
 #include "tokenizer.h"
+#include <iostream>
 
 void token_trie::add(const std::string & gram, uint32_t token) {
     _add(gram, token, 0);
@@ -127,7 +128,7 @@ void unigram_tokenizer::tokenize(const std::string & text, std::vector<uint32_t>
 }
 
 // loading the vocab to the tokenizer from gguf file.
-unigram_tokenizer * tokenizer_from_gguf(gguf_context * meta) {
+unigram_tokenizer * unigram_tokenizer_from_gguf(gguf_context * meta) {
     std::unordered_map<std::string, uint32_t> vocab;
     std::vector<float> scores;
     int vocab_key = gguf_find_key(meta, "tokenizer.ggml.tokens");
@@ -156,8 +157,27 @@ unigram_tokenizer * tokenizer_from_gguf(gguf_context * meta) {
     return tokenizer;
 }
 
+void single_pass_tokenizer::tokenize(const std::string & text, std::vector<uint32_t> & token_ids) {
+    std::string remaining = text;
+    while (remaining.size() > 0) {
+        uint32_t token_id = unknown_id;
+        for (int i = 1; i < std::min(remaining.size()+1, max_size); i++) {
+            std::string part = remaining.substr(0, i);
+            ptrdiff_t pos = std::distance(tokens.begin(), std::find(tokens.begin(), tokens.end(), part));
+            if (pos < tokens.size()) {
+                token_id = (uint32_t) pos;
+                remaining = remaining.substr(part.size(), remaining.size() - part.size());
+                break;
+            }
+        }
+        if (token_id == unknown_id) {
+            remaining = remaining.substr(1, remaining.size() - 1);
+        }
+        token_ids.push_back(token_id);
+    }
+}
 
-void single_pass_string_tokenizer::tokenize(const std::string & text, std::vector<std::string> & tokens) {
+void single_pass_tokenizer::token_split(const std::string & text, std::vector<std::string> & tokens) {
     std::string remaining = text;
     while (remaining.size() > 0) {
         // String copying is much slower than using a std::string_view, but the former is simpler to implement for now.
@@ -173,3 +193,17 @@ void single_pass_string_tokenizer::tokenize(const std::string & text, std::vecto
         remaining = remaining.substr(token.size(), remaining.size() - token.size());
     }
 }
+
+struct single_pass_tokenizer * single_pass_tokenizer_from_gguf(gguf_context * meta, std::string key_name) {
+    int tokens_key = gguf_find_key(meta, key_name.c_str());
+    if (tokens_key == -1) {
+        TTS_ABORT("The '%s' key must be set in order to support single pass tokenization.", key_name.c_str());
+    }
+    std::vector<std::string> tokens;
+    int token_count = gguf_get_arr_n(meta, tokens_key);
+    for (int i = 0; i < token_count; i++) {
+        tokens.push_back(gguf_get_arr_str(meta, tokens_key, i));
+    }
+    return new single_pass_tokenizer(tokens);
+}
+

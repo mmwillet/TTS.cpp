@@ -315,9 +315,6 @@ std::string replace_accents(std::string word);
 std::string build_subthousand_phoneme(int value);
 std::string build_number_phoneme(long long int remainder);
 
-
-struct single_pass_string_tokenizer * single_pass_tokenizer_from_gguf(gguf_context * meta);
-
 // The conditions struct is used to track and describe stateful criteria while converting text to phonemes.
 struct conditions {
 	bool hyphenated = false;
@@ -380,7 +377,7 @@ struct phonemizer_rule {
 typedef std::unordered_map<std::string, phonemizer_rule*> rules_lookup;
 
 struct word_phonemizer {
-	word_phonemizer(struct single_pass_string_tokenizer * tokenizer): tokenizer(tokenizer) {};
+	word_phonemizer(struct single_pass_tokenizer * tokenizer): tokenizer(tokenizer) {};
 	~word_phonemizer() {
 		for (auto it : rules) {
 			delete it.second;
@@ -388,7 +385,7 @@ struct word_phonemizer {
 		delete tokenizer;
 	}
 
-	struct single_pass_string_tokenizer * tokenizer;
+	struct single_pass_tokenizer * tokenizer;
 	rules_lookup rules;
 
 	std::string phonemize(std::string word);
@@ -490,7 +487,7 @@ struct phonemizer {
 	bool handle_unknown(corpus* text);
 };
 
-struct phonemizer * phonemizer_from_gguf(gguf_context * meta);
+struct phonemizer * phonemizer_from_gguf(gguf_context * meta, bool force_espeak = true);
 struct phonemizer * phonemizer_from_file(const std::string fname);
 struct phonemizer * espeak_phonemizer(bool use_espeak_phonemes = false);
 
