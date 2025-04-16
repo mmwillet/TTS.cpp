@@ -1,22 +1,7 @@
 #include "tts.h"
-#include "audio_file.h"
+#include "write_file.h"
 #include "args.h"
 #include "common.h"
-
-void write_audio_file(std::string path, struct tts_response * data, float sample_rate = 44100.f, int channels = 1) {
-    AudioFile<float> file;
-    file.setBitDepth(16);
-    file.setSampleRate(sample_rate);
-    file.setNumChannels(channels);
-    int samples = (int) (data->n_outputs / channels);
-    file.setNumSamplesPerChannel(samples);
-    for (int channel = 0; channel < channels; channel++) {
-        for (int i = 0; i < samples; i++) {
-            file.samples[channel][i] = data->data[i];
-        }
-    }
-    file.save(path, AudioFileFormat::Wave);
-}
 
 int main(int argc, const char ** argv) {
     float default_temperature = 0.9f;
