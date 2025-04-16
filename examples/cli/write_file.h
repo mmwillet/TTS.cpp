@@ -2,4 +2,4 @@
 
 #include "common.h"
 
-void write_audio_file(std::string path, struct tts_response * data, float sample_rate = 44100.f, int channels = 1);
+void write_audio_file(const tts_response & data, std::string path, float sample_rate = 44100.0f);

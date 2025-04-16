@@ -45,6 +45,6 @@ int main(int argc, const char ** argv) {
     tts_response data;
     
     generate(runner, args.get_string_param("--prompt"), &data, config);
-    write_audio_file(args.get_string_param("--save-path"), &data, runner->sampling_rate);
+    write_audio_file(data, args.get_string_param("--save-path"), runner->sampling_rate);
     return 0;
 }
