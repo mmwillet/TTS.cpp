@@ -15,7 +15,7 @@ In this endeavor, MacOS and metal support will be treated as the primary platfor
 #### Model Support
 
 | Models | CPU | Metal Acceleration | Quantization | GGUF files |
-|--------------------------------------------------------------------------|-------|-------|-------|
+|--------------------------------------------------------------------------|-------|-------|-------|--------------------------------------------------------|
 | [Parler TTS Mini](https://huggingface.co/parler-tts/parler-tts-mini-v1)  |&check;|&check;|&check;|[here](https://huggingface.co/mmwillet2/Parler_TTS_GGUF)|
 | [Parler TTS Large](https://huggingface.co/parler-tts/parler-tts-large-v1)|&check;|&check;|&check;|[here](https://huggingface.co/mmwillet2/Parler_TTS_GGUF)|
 | [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M)                      |&check;|&cross;|&cross;|[here](https://huggingface.co/mmwillet2/Kokoro_GGUF)    |
