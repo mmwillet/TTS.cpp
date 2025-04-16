@@ -1,22 +1,8 @@
 #include "tts.h"
-#include "audio_file.h"
 #include "args.h"
 #include "common.h"
-
-void write_audio_file(std::string path, struct tts_response * data, float sample_rate = 44100.f, int channels = 1) {
-    AudioFile<float> file;
-    file.setBitDepth(16);
-    file.setSampleRate(sample_rate);
-    file.setNumChannels(channels);
-    int samples = (int) (data->n_outputs / channels);
-    file.setNumSamplesPerChannel(samples);
-    for (int channel = 0; channel < channels; channel++) {
-        for (int i = 0; i < samples; i++) {
-            file.samples[channel][i] = data->data[i];
-        }
-    }
-    file.save(path, AudioFileFormat::Wave);
-}
+#include "playback.h"
+#include "write_file.h"
 
 int main(int argc, const char ** argv) {
     float default_temperature = 0.9f;
@@ -26,7 +12,7 @@ int main(int argc, const char ** argv) {
     arg_list args;
     args.add_argument(string_arg("--model-path", "(REQUIRED) The local path of the gguf model file for Parler TTS mini or large v1.", "-mp", true));
     args.add_argument(string_arg("--prompt", "(REQUIRED) The text prompt for which to generate audio in quotation markers.", "-p", true));
-    args.add_argument(string_arg("--save-path", "(REQUIRED) The path to save the audio output to in a .wav format.", "-sp", true));
+    args.add_argument(string_arg("--save-path", "(OPTIONAL) The path to save the audio output to in a .wav format. Defaults to TTS.cpp.wav", "-sp", false, "TTS.cpp.wav"));
     args.add_argument(float_arg("--temperature", "The temperature to use when generating outputs. Defaults to 0.9.", "-t", false, &default_temperature));
     args.add_argument(int_arg("--n-threads", "The number of cpu threads to run generation with. Defaults to 10.", "-nt", false, &default_n_threads));
     args.add_argument(int_arg("--topk", "(OPTIONAL) When set to an integer value greater than 0 generation uses nucleus sampling over topk nucleaus size. Defaults to 50.", "-tk", false, &default_top_k));
@@ -36,6 +22,7 @@ int main(int argc, const char ** argv) {
     args.add_argument(string_arg("--conditional-prompt", "(OPTIONAL) A distinct conditional prompt to use for generating. If none is provided the preencoded prompt is used. '--text-encoder-path' must be set to use conditional generation.", "-cp", false));
     args.add_argument(string_arg("--text-encoder-path", "(OPTIONAL) The local path of the text encoder gguf model for conditional generaiton.", "-tep", false));
     args.add_argument(string_arg("--voice", "(OPTIONAL) The voice to use to generate the audio. This is only used for models with voice packs.", "-v", false, "af_alloy"));
+    register_play_tts_response_args(args);
     args.parse(argc, argv);
     if (args.for_help) {
         args.help();
@@ -58,8 +45,10 @@ int main(int argc, const char ** argv) {
         update_conditional_prompt(runner, text_encoder_path, conditional_prompt, true);
     }
     tts_response data;
-    
+
     generate(runner, args.get_string_param("--prompt"), &data, config);
-    write_audio_file(args.get_string_param("--save-path"), &data, runner->sampling_rate);
+    if (!play_tts_response(args, data, runner->sampling_rate)) {
+        write_audio_file(data, args.get_string_param("--save-path"), runner->sampling_rate);
+    }
     return 0;
 }
