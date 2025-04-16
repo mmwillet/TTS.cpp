@@ -38,6 +38,8 @@ struct tts_model {
     ggml_backend_t backend = nullptr;
     ggml_backend_buffer_t buf = nullptr;
 
+    // it is quite common for implementations of tts_model to need to update attributes or perform distinct operations
+    // when computing the tensor meta of the loaded model. This callback allows this as it will receive each processed tensor.
     tensor_meta_callback compute_tensor_meta_cb = nullptr;
 
     struct ggml_context * ctx;

@@ -39,6 +39,8 @@ In order to get a detailed breakdown of the functionality currently available yo
     (OPTIONAL) The local path to the PEM encoded ssl private key.
 --host (-h):
     (OPTIONAL) the hostname of the server. Defaults to '127.0.0.1'.
+--voice (-v):
+    (OPTIONAL) the default voice to use when generating audio. Only used with applicable models.
 ```
 
 Important configuration here includes `--n-parallelism` which describes how may models for asynchronous processing and `--model-path` which describes from where to load the model locally.

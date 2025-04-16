@@ -294,8 +294,8 @@ enum lookup_code {
 };
 
 enum phoneme_type {
-	IPA,
-	ESPEAK_PHONEMES,
+	IPA = 1,
+	ESPEAK_PHONEMES = 2,
 };
 
 enum phonemizer_type {
@@ -491,7 +491,7 @@ struct phonemizer {
 	bool handle_unknown(corpus* text);
 };
 
-struct phonemizer * phonemizer_from_gguf(gguf_context * meta, bool force_espeak = true);
+struct phonemizer * phonemizer_from_gguf(gguf_context * meta);
 struct phonemizer * phonemizer_from_file(const std::string fname);
 struct phonemizer * espeak_phonemizer(bool use_espeak_phonemes = false);
 

@@ -214,6 +214,15 @@ void quantize_gguf(const std::string & ifile, const std::string & ofile, struct 
         /*.ctx        =*/ &weight_ctx,
     };
     gguf_context * meta_ctx = gguf_init_from_file(ifile.c_str(), gguf_params);
+    std::string arch = "parler-tts"; // only parler-tts gguf files should lack an explicit architecture.
+
+    int arch_key = gguf_find_key(meta_ctx, "general.architecture");
+    if (arch_key != -1) {
+        arch = std::string(gguf_get_val_str(meta_ctx, arch_key));
+    }
+    if (arch != "parler-tts") {
+        TTS_ABORT("ERROR: quantization for arch '%s' is not currently support\n", arch.c_str());
+    }
 
     const size_t align = GGUF_DEFAULT_ALIGNMENT;
     gguf_context_ptr ctx_out { gguf_init_empty() };

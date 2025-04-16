@@ -35,6 +35,8 @@ In order to get a detailed breakdown the functionality currently available you c
     (OPTIONAL) A distinct conditional prompt to use for generating. If none is provided the preencoded prompt is used. '--text-encoder-path' must be set to use conditional generation.
 --text-encoder-path (-tep):
     (OPTIONAL) The local path of the text encoder gguf model for conditional generaiton.
+--voice (-v):
+    (OPTIONAL) The voice to use to generate the audio. This is only used for models with voice packs.
 ```
 
 General usage should follow from these possible parameters. E.G. The following command will save generated speech to the `/tmp/test.wav` file.

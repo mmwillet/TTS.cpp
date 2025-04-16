@@ -933,7 +933,6 @@ void phonemizer::text_to_phonemes(const char * text, size_t size, std::string* o
 	if (mode == ESPEAK) {
 #ifdef ESPEAK_INSTALL
 		TTS_ABORT("%s attempted to run in espeak mode with output already defined. \n", __func__);
-
 #else
 		TTS_ABORT("%s attempted to run in espeak mode without espeak installed. \n", __func__);
 #endif
@@ -1021,17 +1020,18 @@ struct phoneme_dictionary * phoneme_dictionary_from_gguf(gguf_context * meta) {
     return dict;
 }
 
-struct phonemizer * phonemizer_from_gguf(gguf_context * meta, bool force_espeak) {
+struct phonemizer * phonemizer_from_gguf(gguf_context * meta) {
 	int mode_key = gguf_find_key(meta, "phonemizer.type");
 	phonemizer * ph;
     if (mode_key == -1) {
         TTS_ABORT("Key 'phonemizer.type' must be specified in gguf file for all models using a phonemizer.");
     }
-    uint32_t phonemizer_type = gguf_get_val_u32(meta, mode_key);
-    if (phonemizer_type == ESPEAK || force_espeak) {
+    uint32_t ph_type = gguf_get_val_u32(meta, mode_key);
+
+    if ((phonemizer_type) ph_type == ESPEAK) {
 #ifdef ESPEAK_INSTALL
     	espeak_Initialize(AUDIO_OUTPUT_SYNCHRONOUS, 0, ESPEAK_DATA_PATH, 0);
-		espeak_SetVoiceByName("gmw/en-US");
+    	espeak_SetVoiceByName("gmw/en-US");
 		ph = new phonemizer(nullptr, nullptr);
 		ph->mode = ESPEAK;
 #else
@@ -1039,8 +1039,8 @@ struct phonemizer * phonemizer_from_gguf(gguf_context * meta, bool force_espeak)
 #endif
 		int phoneme_type_key = gguf_find_key(meta, "phonemizer.phoneme_type");
 		if (phoneme_type_key != -1) {
-			uint32_t phonemizer_type = gguf_get_val_u32(meta, mode_key);
-			if (phonemizer_type == ESPEAK_PHONEMES) {
+			uint32_t phoneme_typing = gguf_get_val_u32(meta, mode_key);
+			if ((phoneme_type)phoneme_typing == ESPEAK_PHONEMES) {
 				ph->phoneme_mode = ESPEAK_PHONEMES;
 			}
 		}
@@ -1055,7 +1055,9 @@ struct phonemizer * phonemizer_from_gguf(gguf_context * meta, bool force_espeak)
 struct phonemizer * espeak_phonemizer(bool use_espeak_phonemes) {
 #ifdef ESPEAK_INSTALL
 	espeak_Initialize(AUDIO_OUTPUT_SYNCHRONOUS, 0, ESPEAK_DATA_PATH, 0);
+	
 	espeak_SetVoiceByName("gmw/en-US");
+
 	phonemizer * ph = new phonemizer(nullptr, nullptr);
 	ph->mode = ESPEAK;
 	if (use_espeak_phonemes) {

@@ -1,5 +1,4 @@
 #include "kokoro_model.h"
-#include <iostream>
 
 static struct ggml_tensor * build_albert_attn_mask(ggml_context * ctx, struct kokoro_duration_context *kctx, const kokoro_ubatch & batch) {
     kctx->attn_mask = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, (int64_t) batch.n_tokens, (int64_t) batch.n_tokens);
@@ -87,7 +86,7 @@ static struct ggml_tensor * build_ada_residual_conv(ggml_context * ctx, struct g
 	struct ggml_tensor * gamma;
 	struct ggml_tensor * beta;
 
-	gamma = ggml_add(ctx, ggml_mul_mat(ctx, block->norm1_gamma, style), block->norm1_gamma_bias); // gamma needs to be incremented by 1 extra (for gguf parsing!!)
+	gamma = ggml_add(ctx, ggml_mul_mat(ctx, block->norm1_gamma, style), block->norm1_gamma_bias);
 	beta  = ggml_add(ctx, ggml_mul_mat(ctx, block->norm1_beta, style), block->norm1_beta_bias);
 	cur   = ggml_cont(ctx, ggml_transpose(ctx, ggml_norm(ctx, ggml_cont(ctx, ggml_transpose(ctx, cur)), 0.00001)));
 
@@ -105,7 +104,7 @@ static struct ggml_tensor * build_ada_residual_conv(ggml_context * ctx, struct g
  	cur = ggml_conv_1d(ctx, block->conv1, ggml_cont(ctx, ggml_transpose(ctx, cur)), 1, 1, 1);
 
 	cur   = ggml_add(ctx, cur, block->conv1_bias);
-	gamma = ggml_add(ctx, ggml_mul_mat(ctx, block->norm2_gamma, style), block->norm2_gamma_bias); // gamma needs to be incremented by 1 extra (for gguf parsing!!)
+	gamma = ggml_add(ctx, ggml_mul_mat(ctx, block->norm2_gamma, style), block->norm2_gamma_bias);
 	beta  = ggml_add(ctx, ggml_mul_mat(ctx, block->norm2_beta, style), block->norm2_beta_bias);
 	cur   = ggml_cont(ctx, ggml_transpose(ctx, ggml_norm(ctx, cur, 0.00001)));
 
@@ -1312,7 +1311,10 @@ int kokoro_runner::generate(std::string prompt, struct tts_response * response, 
         kctx->voice = voice;
         drunner->kctx->voice = voice;
     }
-	std::string phonemized_prompt = phmzr->text_to_phonemes(prompt);
+    if (phmzr->mode == ESPEAK) {
+    	prompt = replace_any(prompt, ".,;:?!", "--");
+    }
+  	std::string phonemized_prompt = phmzr->text_to_phonemes(prompt);
 	std::vector<uint32_t> tokens;
 	tokens.push_back(model->bos_token_id);
 	tokenizer->tokenize(phonemized_prompt, tokens);

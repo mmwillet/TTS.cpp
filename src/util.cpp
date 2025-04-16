@@ -1,6 +1,5 @@
 #include "util.h"
 
-#include <iostream>
 #include <cstdio>
 #include <stdarg.h>
 #ifdef __APPLE__
@@ -186,6 +185,16 @@ void compute_window_squared_sum(size_t n_fft, size_t hop, size_t n_frames, float
             tgt[index] += powf(window[ii], 2);
         }
     }
+}
+
+std::string replace_any(std::string target, std::string to_replace, std::string replacement) {
+    for (int i = 0; i < to_replace.size(); i++) {
+        size_t position = target.find(to_replace[i]);
+        if (position != std::string::npos) {
+            target.replace(position, 1, replacement);
+        }
+    }
+    return target;
 }
 
 struct model_tensor_meta compute_tensor_meta(std::string name_prefix, ggml_context * weight_ctx, std::function<void(ggml_tensor*)>* callback) {

@@ -83,7 +83,7 @@ struct kokoro_generator_residual_block {
 
 	std::vector<ggml_tensor*> adain1d_1_gamma_weights;
 	std::vector<ggml_tensor*> adain1d_2_gamma_weights;
-	std::vector<ggml_tensor*> adain1d_1_gamma_biases; // need to be incremented by 1 during encoding
+	std::vector<ggml_tensor*> adain1d_1_gamma_biases;
 	std::vector<ggml_tensor*> adain1d_2_gamma_biases;
 	std::vector<ggml_tensor*> adain1d_1_beta_weights;
 	std::vector<ggml_tensor*> adain1d_2_beta_weights;
@@ -174,7 +174,6 @@ struct kokoro_model : tts_model {
 	uint32_t n_recurrence = 12;
 	uint32_t head_size = 64;
 	uint32_t duration_hidden_size = 512;
-	//uint32_t duration_sample_upsample_factor;
 	uint32_t up_sampling_factor;
 	float upsample_scale = 300.0f;
 	float scale = 0.125f;

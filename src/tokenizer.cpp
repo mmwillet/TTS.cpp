@@ -1,5 +1,4 @@
 #include "tokenizer.h"
-#include <iostream>
 
 void token_trie::add(const std::string & gram, uint32_t token) {
     _add(gram, token, 0);

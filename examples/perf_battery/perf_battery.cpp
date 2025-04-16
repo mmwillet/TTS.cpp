@@ -100,7 +100,7 @@ int main(int argc, const char ** argv) {
     }
     args.validate();
 
-    generation_configuration * config = new generation_configuration("af_heart", *args.get_int_param("--topk"), *args.get_float_param("--temperature"), *args.get_float_param("--repetition-penalty"), !args.get_bool_param("--no-cross-attn"));
+    generation_configuration * config = new generation_configuration("", *args.get_int_param("--topk"), *args.get_float_param("--temperature"), *args.get_float_param("--repetition-penalty"), !args.get_bool_param("--no-cross-attn"));
 
     struct tts_runner * runner = runner_from_file(args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), config, !args.get_bool_param("--use-metal"));
     std::vector<double> generation_samples;

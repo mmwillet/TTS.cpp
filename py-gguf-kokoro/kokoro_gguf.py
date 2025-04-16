@@ -46,8 +46,9 @@ DURATION_PREDICTOR_PARTS = {
 
 LSTM_WEIGHTS = ['weight_ih_l0', 'weight_hh_l0', 'bias_ih_l0', 'bias_hh_l0', 'weight_ih_l0_reverse', 'weight_hh_l0_reverse', 'bias_ih_l0_reverse', 'bias_hh_l0_reverse']
 TTS_PHONEMIZER = 0
-ESPEAK = 1
-IPA = 0
+ESPEAK_PHONEMIZER = 1
+ESPEAK = 2
+IPA = 1
 
 TTS_PHONEMIZATIION_KEYS = [
     "phonemizer.graphemes",
@@ -57,7 +58,7 @@ TTS_PHONEMIZATIION_KEYS = [
     "phonemizer.dictionary.values",
 ]
 
-VOICES = ['af_alloy', 'af_aoede', 'af_bella', 'af_heart', 'af_heart', 'af_jessica', 'af_kore', 'af_nicole', 'af_nova', 'af_river', 'af_sarah', 'af_sky', 'am_adam', 'am_echo', 'am_eric', 'am_fenrir', 'am_liam', 'am_michael', 'am_onyx', 'am_puck', 'am_santa', 'am_santa', 'bf_alice', 'bf_emma', 'bf_isabella', 'bf_lily', 'bm_daniel', 'bm_fable', 'bm_george', 'bm_lewis']
+VOICES = ['af_alloy', 'af_aoede', 'af_bella', 'af_heart', 'af_jessica', 'af_kore', 'af_nicole', 'af_nova', 'af_river', 'af_sarah', 'af_sky', 'am_adam', 'am_echo', 'am_eric', 'am_fenrir', 'am_liam', 'am_michael', 'am_onyx', 'am_puck', 'am_santa', 'bf_alice', 'bf_emma', 'bf_isabella', 'bf_lily', 'bm_daniel', 'bm_fable', 'bm_george', 'bm_lewis']
 
 
 class KokoroEncoder:
@@ -96,13 +97,10 @@ class KokoroEncoder:
 
     def prepare_voices(self):
         self.gguf_writer.add_array("kokoro.voices", self.voices)
-        vtensors = []
         for voice in self.voices:
             f = hf_hub_download(repo_id=self.repo_id, filename=f'voices/{voice}.pt')
-            pack = torch.load(f, weights_only=True)
-            vtensors.append(pack.squeeze(1))
-        data = torch.stack(tuple(vtensors)).numpy()
-        self.gguf_writer.add_tensor(f"kokoro.voice_tensors.{voice}", data, raw_dtype=gguf.GGMLQuantizationType.F32)
+            pack = torch.load(f, weights_only=True).squeeze(1).numpy()
+            self.gguf_writer.add_tensor(f"kokoro.voice_tensors.{voice}", pack, raw_dtype=gguf.GGMLQuantizationType.F32)
 
     def get_regularized_weight(self, modules, name):
         mname = ".".join(name.split(".")[:-1])
@@ -369,8 +367,8 @@ class KokoroEncoder:
             self.gguf_writer.add_uint32(f"{self.gguf_writer.arch}.up_convs.{i}.stride", up.stride[0])
 
         # phonemizer
-        self.gguf_writer.add_uint32("phonemizer.type", ESPEAK if self.use_espeak else TTS_PHONEMIZER)
-        self.gguf_writer.add_uint32("phonemizer.phoneme_type", IPA)
+        self.gguf_writer.add_uint32("phonemizer.type", ESPEAK_PHONEMIZER if self.use_espeak else TTS_PHONEMIZER)
+        self.gguf_writer.add_uint32("phonemizer.phoneme_type", IPA);
         if (not self.use_espeak):
             self.encode_tts_phonemizer()
 

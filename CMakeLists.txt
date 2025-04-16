@@ -21,7 +21,6 @@ if (DEFINED ENV{ESPEAK_INSTALL_DIR})
         set(ESPEAK_LIBRARIES "$ENV{ESPEAK_INSTALL_DIR}/lib/libespeak-ng.o")
     endif()
     set(ESPEAK_CFLAGS_OTHER "${ESPEAK_CFLAGS_OTHER} -DESPEAK_INSTALL=1 -DESPEAK_INSTALL_LOCAL=1 -DESPEAK_DATA_PATH=\\\"$ENV{ESPEAK_INSTALL_DIR}/share\\\"")
-    unset(ESPEAK_INSTALL_DIR)
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # Tested with libespeak-ng-dev=1.51+dfsg-12build1
     find_package(PkgConfig REQUIRED)
