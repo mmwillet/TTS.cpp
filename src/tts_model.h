@@ -1,6 +1,7 @@
 #ifndef tts_model_h
 #define tts_model_h
 
+#include <functional>
 #include "util.h"
 #include "common.h"
 

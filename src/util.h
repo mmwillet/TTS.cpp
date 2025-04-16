@@ -1,6 +1,7 @@
 #ifndef util_h
 #define util_h
 
+#include <functional>
 #include <math.h>
 #include <random>
 #include <stdio.h>
