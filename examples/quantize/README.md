@@ -11,6 +11,8 @@ This script converts a 32bit floating point TTS.cpp GGUF model file to a quantiz
 
 ### Usage
 
+**Please note** Quantization and lower precision conversion is currently only supported for Parler TTS models. 
+
 In order to get a detailed breakdown of the functionality currently available you can call the cli with the `--help` parameter. This will return a breakdown of all parameters:
 ```commandline
 ./quantize --help

@@ -359,7 +359,7 @@ int main(int argc, const char ** argv) {
     std::string default_host = "127.0.0.1";
     float default_temperature = 0.9f;
     int default_top_k = 50;
-    float default_repetition_penalty = 1.0f;
+    float default_repetition_penalty = 1.1f;
 
     arg_list args;
     args.add_argument(float_arg("--temperature", "(OPTIONAL) The temperature to use when generating outputs. Defaults to 0.9.", "-t", false, &default_temperature));

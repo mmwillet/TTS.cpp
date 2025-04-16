@@ -63,7 +63,7 @@ The CLI executable and other exceutables will be in the `./build` directory (e.g
 If you wish to install TTS.cpp with Espeak-ng phonemization support, first [install Espeak-ng](https://github.com/espeak-ng/espeak-ng/blob/master/docs/guide.md). Depending on your installation method the path of the installed library will vary. Upon identifying the installation path to espeak-ng (it should contain `./lib`, `./bin`, `./include`, and `./share` directories), you can compile TTS.cpp with espeak phonemization support by running the follwing in the repositories base directory:
 
 ```commandline
-export ESPEAK_INSTALL_DIR=/absolute/path/to/espeak/dir
+export ESPEAK_INSTALL_DIR=/absolute/path/to/espeak-ng/dir
 cmake -B build                                           
 cmake --build build --config Release
 ```
@@ -71,6 +71,10 @@ cmake --build build --config Release
 ### Usage
 
 See the [CLI example readme](./examples/cli/README.md) for more details on its general usage.
+
+### Quantization and Lower Precision Models
+
+See the [quantization cli readme](./examples/quantize/README.md) for more details on its general usage and behavior. **Please note** Quantization and lower precision conversion is currently only supported for Parler TTS models. 
 
 ### Performance
 
