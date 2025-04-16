@@ -114,6 +114,8 @@ struct parler_context : runner_context {
     }
     struct parler_tts_model * model;
     std::vector<bool> eos_seen;
+    uint32_t eos_total = 0;
+    uint32_t max_eos_before_completion = 0;
 
     bool use_cache = true;
     

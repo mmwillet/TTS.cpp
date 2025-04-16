@@ -27,11 +27,15 @@ struct generation_configuration {
     generation_configuration(
     	std::string voice = "",
     	int top_k = 50, 
-    	float temperature = 1.0, 
-    	float repetition_penalty = 1.0, 
+    	float temperature = 1.0f, 
+    	float repetition_penalty = 1.0f, 
     	bool use_cross_attn = true, 
-    	bool sample = true): top_k(top_k), temperature(temperature), repetition_penalty(repetition_penalty), use_cross_attn(use_cross_attn), sample(sample), voice(voice) {};
+    	float eos_threshold = 0.0f,
+    	int max_eos_tokens = 0,
+    	bool sample = true): top_k(top_k), temperature(temperature), repetition_penalty(repetition_penalty), use_cross_attn(use_cross_attn), sample(sample), voice(voice), eos_threshold(eos_threshold), max_eos_tokens(max_eos_tokens) {};
 
+    int max_eos_tokens;
+    float eos_threshold;
     bool use_cross_attn;
     float temperature;
     float repetition_penalty;

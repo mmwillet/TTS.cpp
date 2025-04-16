@@ -20,6 +20,7 @@ void sampler::sample(float * logits, std::vector<uint32_t> & output_tokens) {
     }
 
     softmax(logits, picks, max_vals);
+
     bool has_repetition_penalty = repetition_penalty != 1.0;
     if (has_repetition_penalty && (last_token_ids.size() == 0 || repetition_counts.size() == 0)) {
         reset();
@@ -29,21 +30,26 @@ void sampler::sample(float * logits, std::vector<uint32_t> & output_tokens) {
     for (int i = 0; i < n_output_heads; i++) {
         float assignment = dist(gen);
         float cumulative = 0.0f;
-        for (uint32_t j = 0; j < (use_nucleus_sampling ? top_k : vocab_size); j++) {
-            int ii = use_nucleus_sampling ? (int) picks[i][j] : j;
-            cumulative += *(logits+(i*vocab_size+ii));
-            if ((assignment <= cumulative) || (ii >= vocab_size + 1)) {
-                if (has_repetition_penalty) {
-                    if (last_token_ids[i] != ii) {
-                        repetition_counts[i] = 0;
+        if (bark_processing && logits[i*vocab_size+eos_token_id] == 1.0f) {
+            output_tokens.push_back(eos_token_id);
+        } else {
+            for (uint32_t j = 0; j < (use_nucleus_sampling ? top_k : vocab_size); j++) {
+                int ii = use_nucleus_sampling ? (int) picks[i][j] : j;
+                cumulative += *(logits+(i*vocab_size+ii));
+                if ((assignment <= cumulative) || (ii >= vocab_size + 1)) {
+                    if (has_repetition_penalty) {
+                        if (last_token_ids[i] != ii) {
+                            repetition_counts[i] = 0;
+                        }
+                        last_token_ids[i] = ii;
+                        repetition_counts[i] += 1;
                     }
-                    last_token_ids[i] = ii;
-                    repetition_counts[i] += 1;
+                    output_tokens.push_back(ii);
+                    break;
                 }
-                output_tokens.push_back(ii);
-                break;
             }
         }
+
     }
 }
 
@@ -85,11 +91,17 @@ void sampler::softmax(float * logits, std::vector<std::vector<size_t>> picks, st
             cumsum += v;
             logits[index] = v;
         }
+        bool set_eos_pick = false;
         for (int j = 0; j < (use_nucleus_sampling ? picks[i].size() : vocab_size); j++) {
             int ii = use_nucleus_sampling ? picks[i][j] : j;
             int index = i * vocab_size + ii;
             float v = *(logits + index);
-            logits[index] = v / cumsum;
+            float score = v / cumsum;
+            if (bark_processing && (uint32_t)ii == eos_token_id && score > bark_min_eos_threshold) {
+                score = 1.0f;
+                fprintf(stdout, "made it here!\n");
+            }
+            logits[index] = score;
         }
     }
 }

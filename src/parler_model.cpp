@@ -313,6 +313,7 @@ void parler_context::reset(int32_t n_output_heads) {
     current_position = 0;
     output_size = 0;
     output_tokens.clear();
+    eos_total = 0;
     eos_seen.clear();
     for (int i = 0; i < (int) n_output_heads; i++) {
         eos_seen.push_back(false);
@@ -623,6 +624,9 @@ void parler_tts_runner::configure_generation(generation_configuration * config) 
     sampler->repetition_penalty = config->repetition_penalty;
     sampler->do_sample = config->sample;
     sampler->top_k = config->top_k;
+    sampler->eos_prioritized_processing = config->eos_threshold > 0.0f;
+    sampler->prioritize_eos_threshold = config->eos_threshold;
+    pctx->max_eos_before_completion = config->max_eos_tokens;
 }
 
 void parler_tts_runner::set_inputs(parler_ubatch & batch) {
@@ -734,15 +738,25 @@ bool parler_tts_runner::check_stopping() {
     if (pctx->current_position >= model->max_generation_size) {
         return true;
     }
-        
-    bool channels_complete = true;
+
     for (int i = 0; i < model->n_output_heads; i++) {
         pctx->eos_seen[i] = pctx->eos_seen[i] || pctx->output_tokens[token_position+i] == model->eos_token_id;
-        if (channels_complete) {
-            channels_complete = pctx->eos_seen[i];
+        if (pctx->output_tokens[token_position+i] == model->eos_token_id) {
+            pctx->eos_total += 1; 
         }
     }
-    return channels_complete;
+
+    // sometimes due to sampling Parler won't return the final eos token.
+    // This can result in blank noise at the end of generation. In these cases it seems
+    // to help to introduce a hard limit on the number of times parler has to initiate an eos
+    // sequence before stopping.
+    if (pctx->max_eos_before_completion > 0 && pctx->eos_total >= pctx->max_eos_before_completion) {
+        return true;
+    }
+
+    // Parler used to determine stopping by checking for eos tokens on all output heads, but they changed their approach to
+    // only look for eos token on the last output head.
+    return pctx->output_tokens[token_position+model->n_output_heads-1] == model->eos_token_id;
 }
 
 void parler_tts_runner::adjust_output_tokens(std::vector<uint32_t> & output_tokens, std::vector<uint32_t> & filtered) {
