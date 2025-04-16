@@ -382,7 +382,7 @@ struct t5_runner * text_encoder_from_file(std::string file_path, int n_threads, 
         TTS_ABORT("%s failed for file %s\n", __func__, file_path.c_str());
     }
     if (!tokenizer) {
-        tokenizer = tokenizer_from_gguf(meta_ctx);
+        tokenizer = unigram_tokenizer_from_gguf(meta_ctx);
     }
     if (!tokenizer->init) {
         tokenizer->initialize_tokenizer();

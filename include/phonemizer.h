@@ -294,8 +294,8 @@ enum lookup_code {
 };
 
 enum phoneme_type {
-	IPA,
-	ESPEAK_PHONEMES,
+	IPA = 1,
+	ESPEAK_PHONEMES = 2,
 };
 
 enum phonemizer_type {
@@ -318,9 +318,6 @@ bool is_numeric(char letter);
 std::string replace_accents(std::string word);
 std::string build_subthousand_phoneme(int value);
 std::string build_number_phoneme(long long int remainder);
-
-
-struct single_pass_string_tokenizer * single_pass_tokenizer_from_gguf(gguf_context * meta);
 
 // The conditions struct is used to track and describe stateful criteria while converting text to phonemes.
 struct conditions {
@@ -384,7 +381,7 @@ struct phonemizer_rule {
 typedef std::unordered_map<std::string, phonemizer_rule*> rules_lookup;
 
 struct word_phonemizer {
-	word_phonemizer(struct single_pass_string_tokenizer * tokenizer): tokenizer(tokenizer) {};
+	word_phonemizer(struct single_pass_tokenizer * tokenizer): tokenizer(tokenizer) {};
 	~word_phonemizer() {
 		for (auto it : rules) {
 			delete it.second;
@@ -392,7 +389,7 @@ struct word_phonemizer {
 		delete tokenizer;
 	}
 
-	struct single_pass_string_tokenizer * tokenizer;
+	struct single_pass_tokenizer * tokenizer;
 	rules_lookup rules;
 
 	std::string phonemize(std::string word);

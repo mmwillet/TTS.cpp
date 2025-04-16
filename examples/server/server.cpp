@@ -81,6 +81,7 @@ static T json_value(const json & body, const std::string & key, const T & defaul
 bool write_audio_data(float * data, size_t length, std::vector<uint8_t> & output, AudioFileFormat format = AudioFileFormat::Wave, float sample_rate = 44100.f, float frequency = 440.f, int channels = 1) {
     AudioFile<float> file;
     file.setBitDepth(16);
+    file.setSampleRate(sample_rate);
     file.setNumChannels(channels);
     int samples = (int) (length / channels);
     file.setNumSamplesPerChannel(samples);
@@ -115,6 +116,7 @@ struct simple_text_prompt_task {
     bool success = false;
     std::string message;
     std::chrono::time_point<std::chrono::steady_clock> time;
+    float sample_rate = 44100.0f;
 
     bool timed_out(int t) {
         auto now = std::chrono::steady_clock::now();
@@ -262,6 +264,7 @@ struct worker {
                 outcome = generate(runner, task->prompt, data, task->gen_config);
                 task->response = (void*) data->data;
                 task->length = data->n_outputs;
+                task->sample_rate = runner->sampling_rate;
                 task->success = outcome == 0;
                 response_map->push(task);
                 break;
@@ -376,7 +379,7 @@ int main(int argc, const char ** argv) {
     args.add_argument(float_arg("--temperature", "(OPTIONAL) The temperature to use when generating outputs. Defaults to 0.9.", "-t", false, &default_temperature));
     args.add_argument(int_arg("--topk", "(OPTIONAL) when set to an integer value greater than 0 generation uses nucleus sampling over topk nucleaus size. Defaults to 50.", "-tk", false, &default_top_k));
     args.add_argument(float_arg("--repetition-penalty", "The by channel repetition penalty to be applied the sampled output of the model. defaults to 1.0.", "-r", false, &default_repetition_penalty));
-    args.add_argument(string_arg("--model-path", "(REQUIRED) The local path of the gguf model file for Parler TTS mini or large v1.", "-mp", true));
+    args.add_argument(string_arg("--model-path", "(REQUIRED) The local path of the gguf model file for Parler TTS mini or large v1 or Kokoro.", "-mp", true));
     args.add_argument(int_arg("--n-threads", "The number of cpu threads to run generation with. Defaults to hardware concurrency.", "-nt", false, &default_n_threads));
     args.add_argument(bool_arg("--use-metal", "(OPTIONAL) Whether to use metal acceleration", "-m"));
     args.add_argument(bool_arg("--no-cross-attn", "(OPTIONAL) Whether to not include cross attention", "-ca"));
@@ -388,6 +391,7 @@ int main(int argc, const char ** argv) {
     args.add_argument(int_arg("--n-http-threads", "(OPTIONAL) The number of http threads to use. Defaults to hardware concurrency minus 1.", "-ht", false, &default_http_threads));
     args.add_argument(int_arg("--timeout", "(OPTIONAL) The server side timeout on http calls in seconds. Defaults to 300 seconds.", "-t", false, &default_timeout));
     args.add_argument(int_arg("--n-parallelism", "(OPTIONAL) the number of parallel models to run asynchronously. Deafults to 1.", "-np", false, &default_n_parallel));
+    args.add_argument(string_arg("--voice", "(OPTIONAL) the default voice to use when generating audio. Only used with applicable models.", "-v", false, "af_alloy"));
     args.parse(argc, argv);
     if (args.for_help) {
         args.help();
@@ -395,7 +399,7 @@ int main(int argc, const char ** argv) {
     }
     args.validate();
 
-    generation_configuration * default_generation_config = new generation_configuration(*args.get_int_param("--topk"), *args.get_float_param("--temperature"), *args.get_float_param("--repetition-penalty"), !args.get_bool_param("--no-cross-attn"));
+    generation_configuration * default_generation_config = new generation_configuration(args.get_string_param("--voice"), *args.get_int_param("--topk"), *args.get_float_param("--temperature"), *args.get_float_param("--repetition-penalty"), !args.get_bool_param("--no-cross-attn"));
 
     worker_pool * pool = nullptr;
     struct simple_task_queue * tqueue = new simple_task_queue;
@@ -541,6 +545,10 @@ int main(int argc, const char ** argv) {
             conf->repetition_penalty = rep_pen;
         }
 
+        if (data.contains("voice") && data.at("voice").is_string()) {
+            conf->voice = data.at("voice").get<std::string>();
+        }
+
         task->gen_config = conf;
         tqueue->push(task);
         struct simple_text_prompt_task * rtask = rmap->get(id);
@@ -551,7 +559,7 @@ int main(int argc, const char ** argv) {
         }
 
         std::vector<uint8_t> audio;
-        bool success = write_audio_data((float *)rtask->response, rtask->length, audio, audio_type);
+        bool success = write_audio_data((float *)rtask->response, rtask->length, audio, audio_type, rtask->sample_rate);
         if (!success) {
             json formatted_error = format_error_response("failed to write audio data", ERROR_TYPE_SERVER);
             res_error(res, formatted_error);

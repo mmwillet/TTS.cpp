@@ -6,6 +6,7 @@
 void write_audio_file(std::string path, struct tts_response * data, float sample_rate = 44100.f, float frequency = 440.f, int channels = 1) {
     AudioFile<float> file;
     file.setBitDepth(16);
+    file.setSampleRate(sample_rate);
     file.setNumChannels(channels);
     int samples = (int) (data->n_outputs / channels);
     file.setNumSamplesPerChannel(samples);
@@ -34,6 +35,7 @@ int main(int argc, const char ** argv) {
     args.add_argument(bool_arg("--no-cross-attn", "(OPTIONAL) Whether to not include cross attention", "-ca"));
     args.add_argument(string_arg("--conditional-prompt", "(OPTIONAL) A distinct conditional prompt to use for generating. If none is provided the preencoded prompt is used. '--text-encoder-path' must be set to use conditional generation.", "-cp", false));
     args.add_argument(string_arg("--text-encoder-path", "(OPTIONAL) The local path of the text encoder gguf model for conditional generaiton.", "-tep", false));
+    args.add_argument(string_arg("--voice", "(OPTIONAL) The voice to use to generate the audio. This is only used for models with voice packs.", "-v", false, "af_alloy"));
     args.parse(argc, argv);
     if (args.for_help) {
         args.help();
@@ -48,7 +50,7 @@ int main(int argc, const char ** argv) {
         exit(1);
     }
 
-    generation_configuration * config = new generation_configuration(*args.get_int_param("--topk"), *args.get_float_param("--temperature"), *args.get_float_param("--repetition-penalty"), !args.get_bool_param("--no-cross-attn"));
+    generation_configuration * config = new generation_configuration(args.get_string_param("--voice"), *args.get_int_param("--topk"), *args.get_float_param("--temperature"), *args.get_float_param("--repetition-penalty"), !args.get_bool_param("--no-cross-attn"));
 
     struct tts_runner * runner = runner_from_file(args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), config, !args.get_bool_param("--use-metal"));
 
@@ -58,6 +60,6 @@ int main(int argc, const char ** argv) {
     tts_response data;
     
     generate(runner, args.get_string_param("--prompt"), &data, config);
-    write_audio_file(args.get_string_param("--save-path"), &data);
+    write_audio_file(args.get_string_param("--save-path"), &data, runner->sampling_rate);
     return 0;
 }

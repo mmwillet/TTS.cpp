@@ -235,18 +235,18 @@ static struct ggml_tensor * dac_build_audio_inputs(struct ggml_context * ctx, st
 
 static struct ggml_tensor * build_residual_unit(ggml_context * ctx, struct ggml_tensor * cur, dac_residual_unit & u, int padding, int dilation) {
     struct ggml_tensor * residual = cur;
-    cur = dac_snake_1d(ctx, u.in_snake_alpha, cur);
+    cur = snake_1d(ctx, u.in_snake_alpha, cur);
     cur = ggml_conv_1d(ctx, u.in_conv_kernel, cur, 1, padding, dilation);
     cur = ggml_add(ctx, cur, u.in_conv_bias);
-    cur = dac_snake_1d(ctx, u.out_snake_alpha, cur);
+    cur = snake_1d(ctx, u.out_snake_alpha, cur);
     cur = ggml_conv_1d(ctx, u.out_conv_kernel,  cur, 1, 0, 1);
     cur = ggml_add(ctx, cur, u.out_conv_bias);
     return ggml_add(ctx, cur, residual);
 }
 
 static struct ggml_tensor * build_decoder_block(ggml_context * ctx, struct ggml_tensor * cur, dac_layer & l, struct dac_context * dctx) {
-    cur = dac_snake_1d(ctx, l.snake_alpha_in, cur);
-    cur = ggml_conv_transpose_1d(ctx, l.out_conv_kernel, cur, l.stride, l.padding, 1);
+    cur = snake_1d(ctx, l.snake_alpha_in, cur);
+    cur = ggml_conv_transpose_1d(ctx, l.out_conv_kernel, cur, l.stride, l.padding, 1, 0, 1);
     cur = ggml_add(ctx, cur, l.out_conv_bias);
     for (int i = 0; i < l.residual_blocks.size(); i++) {
         cur = build_residual_unit(ctx, cur, l.residual_blocks[i], pow(3, (i + 1)), pow(3, i));
@@ -292,7 +292,7 @@ struct ggml_cgraph * dac_runner::build_dac_graph(dac_ubatch & batch) {
     for (auto l : model->layers) {
         cur = build_decoder_block(ctx, cur, l, dctx);
     }
-    cur = dac_snake_1d(ctx, model->snake_alpha, cur);
+    cur = snake_1d(ctx, model->snake_alpha, cur);
     cur = ggml_conv_1d(ctx, model->out_conv_kernel, cur, 1, 3, 1);
     cur = ggml_add(ctx, cur, model->out_conv_bias);
     cur = ggml_tanh(ctx, cur);

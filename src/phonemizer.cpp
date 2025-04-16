@@ -113,7 +113,7 @@ std::vector<std::string> split(std::string target, const char split_on) {
     		last = i+1;
     	}
     }
-    if (last < target.size() - 1) {
+    if (last < target.size()) {
     	std::string part(target.substr(last));
     	output.push_back(part);
     }
@@ -348,7 +348,7 @@ void word_phonemizer::add_rule(std::vector<std::string> keys, std::string phonem
 std::string word_phonemizer::phonemize(std::string word) {
 	std::vector<std::string> graphemes;
 	word = to_lower(word); 
-	tokenizer->tokenize(word, graphemes);
+	tokenizer->token_split(word, graphemes);
 	std::string phoneme = "";
 	for (int i = 0; i < graphemes.size(); i++) {
 		std::string before = i > 0 ? graphemes[i-1] : "^";
@@ -933,7 +933,6 @@ void phonemizer::text_to_phonemes(const char * text, size_t size, std::string* o
 	if (mode == ESPEAK) {
 #ifdef ESPEAK_INSTALL
 		TTS_ABORT("%s attempted to run in espeak mode with output already defined. \n", __func__);
-
 #else
 		TTS_ABORT("%s attempted to run in espeak mode without espeak installed. \n", __func__);
 #endif
@@ -953,21 +952,8 @@ void phonemizer::text_to_phonemes(std::string text, std::string* output) {
 	text_to_phonemes(text.c_str(), text.size(), output);
 }
 
-struct single_pass_string_tokenizer * single_pass_tokenizer_from_gguf(gguf_context * meta) {
-	int graphemes_key = gguf_find_key(meta, "phonemizer.graphemes");
-	if (graphemes_key == -1) {
-		TTS_ABORT("The 'phonemizer.graphemes' key must be set in order to support phonemization");
-	}
-	std::set<std::string> phonemes;
-	int grapheme_count = gguf_get_arr_n(meta, graphemes_key);
-	for (int i = 0; i < grapheme_count; i++) {
-		phonemes.insert(gguf_get_arr_str(meta, graphemes_key, i));
-	}
-	return new single_pass_string_tokenizer(phonemes);
-}
-
 struct word_phonemizer * word_phonemizer_from_gguf(gguf_context * meta) {
-	struct single_pass_string_tokenizer * tokenizer = single_pass_tokenizer_from_gguf(meta);
+	struct single_pass_tokenizer * tokenizer = single_pass_tokenizer_from_gguf(meta);
 	word_phonemizer * wph = new word_phonemizer(tokenizer);
     int rule_keys_key = gguf_find_key(meta, "phonemizer.rules.keys");
     int phoneme_key = gguf_find_key(meta, "phonemizer.rules.phonemes");
@@ -1040,11 +1026,12 @@ struct phonemizer * phonemizer_from_gguf(gguf_context * meta) {
     if (mode_key == -1) {
         TTS_ABORT("Key 'phonemizer.type' must be specified in gguf file for all models using a phonemizer.");
     }
-    uint32_t phonemizer_type = gguf_get_val_u32(meta, mode_key);
-    if (phonemizer_type == ESPEAK) {
+    uint32_t ph_type = gguf_get_val_u32(meta, mode_key);
+
+    if ((phonemizer_type) ph_type == ESPEAK) {
 #ifdef ESPEAK_INSTALL
     	espeak_Initialize(AUDIO_OUTPUT_SYNCHRONOUS, 0, ESPEAK_DATA_PATH, 0);
-		espeak_SetVoiceByName("gmw/en-US");
+    	espeak_SetVoiceByName("gmw/en-US");
 		ph = new phonemizer(nullptr, nullptr);
 		ph->mode = ESPEAK;
 #else
@@ -1052,8 +1039,8 @@ struct phonemizer * phonemizer_from_gguf(gguf_context * meta) {
 #endif
 		int phoneme_type_key = gguf_find_key(meta, "phonemizer.phoneme_type");
 		if (phoneme_type_key != -1) {
-			uint32_t phonemizer_type = gguf_get_val_u32(meta, mode_key);
-			if (phonemizer_type == ESPEAK_PHONEMES) {
+			uint32_t phoneme_typing = gguf_get_val_u32(meta, mode_key);
+			if ((phoneme_type)phoneme_typing == ESPEAK_PHONEMES) {
 				ph->phoneme_mode = ESPEAK_PHONEMES;
 			}
 		}
@@ -1066,14 +1053,20 @@ struct phonemizer * phonemizer_from_gguf(gguf_context * meta) {
 }
 
 struct phonemizer * espeak_phonemizer(bool use_espeak_phonemes) {
+#ifdef ESPEAK_INSTALL
 	espeak_Initialize(AUDIO_OUTPUT_SYNCHRONOUS, 0, ESPEAK_DATA_PATH, 0);
+	
 	espeak_SetVoiceByName("gmw/en-US");
+
 	phonemizer * ph = new phonemizer(nullptr, nullptr);
 	ph->mode = ESPEAK;
 	if (use_espeak_phonemes) {
 		ph->phoneme_mode = ESPEAK_PHONEMES;
 	}
 	return ph;
+#else
+	TTS_ABORT("%s attempted to load an espeak phonemizer without espeak installed. \n", __func__);
+#endif
 }
 
 struct phonemizer * phonemizer_from_file(const std::string fname) {

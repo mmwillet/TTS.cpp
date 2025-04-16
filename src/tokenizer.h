@@ -4,7 +4,7 @@
 #include <unordered_map>
 #include <stdint.h>
 #include <map>
-#include <set>
+#include <unordered_set>
 #include <regex>
 #include "util.h"
 
@@ -49,15 +49,29 @@ struct unigram_tokenizer {
 };
 
 // For intializing a new tokenizer from a gguf file meta
-unigram_tokenizer * tokenizer_from_gguf(gguf_context * meta);
+unigram_tokenizer * unigram_tokenizer_from_gguf(gguf_context * meta);
 
 // While this functions like a tokenizer, no token ids are assigned as the token ids never need to be used in the context in which this is
 // currently being used. This tokenizer pattern is currently being used by the phonemizer to break up a word into its relevant graphemes. 
 // As such, only the graphemes need to be returned.
-struct single_pass_string_tokenizer {
-    single_pass_string_tokenizer(std::set<std::string> tokens): token_vocab(tokens) {}; 
-    std::set<std::string> token_vocab;
-    void tokenize(const std::string & text, std::vector<std::string> & tokens);
+struct single_pass_tokenizer {
+    single_pass_tokenizer(std::vector<std::string> tkns): tokens(tkns) {
+        max_size = 0;
+        for (auto token : tkns) {
+            token_vocab.insert(token);
+            if (token.size() > max_size) {
+                max_size = token.size();
+            }
+        }
+    }
+    size_t max_size;
+    uint32_t unknown_id = 0;
+    std::vector<std::string> tokens;
+    std::unordered_set<std::string> token_vocab;
+    void tokenize(const std::string & text, std::vector<uint32_t> & token_ids);
+    void token_split(const std::string & text, std::vector<std::string> & tokens);
 };
+
+single_pass_tokenizer * single_pass_tokenizer_from_gguf(gguf_context * meta, std::string key_name = "phonemizer.graphemes");
 
 #endif

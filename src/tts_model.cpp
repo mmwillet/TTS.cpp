@@ -91,7 +91,7 @@ void tts_model::set_tensor(struct ggml_tensor * tensor, struct ggml_tensor * tar
 }
 
 void tts_model::setup_from_file(gguf_context * meta_ctx, ggml_context * load_context, bool cpu_only, std::string model_prefix, float size_offset, uint32_t dedicated_add_on_size) {
-    tensor_meta = compute_tensor_meta(model_prefix, load_context);
+    tensor_meta = compute_tensor_meta(model_prefix, load_context, compute_tensor_meta_cb);
     prep_buffers_and_context(cpu_only, size_offset, dedicated_add_on_size);
 }
 

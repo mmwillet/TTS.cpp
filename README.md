@@ -14,7 +14,11 @@ In this endeavor, MacOS and metal support will be treated as the primary platfor
 
 #### Model Support
 
-Currently [Parler TTS Mini v1.0](https://huggingface.co/parler-tts/parler-tts-mini-v1) and [Parler TTS Large v1.0](https://huggingface.co/parler-tts/parler-tts-large-v1) are the only supported TTS models.
+| Models | CPU | Metal Acceleration | Quantization | GGUF files |
+|--------------------------------------------------------------------------|-------|-------|-------|--------------------------------------------------------|
+| [Parler TTS Mini](https://huggingface.co/parler-tts/parler-tts-mini-v1)  |&check;|&check;|&check;|[here](https://huggingface.co/mmwillet2/Parler_TTS_GGUF)|
+| [Parler TTS Large](https://huggingface.co/parler-tts/parler-tts-large-v1)|&check;|&check;|&check;|[here](https://huggingface.co/mmwillet2/Parler_TTS_GGUF)|
+| [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M)                      |&check;|&cross;|&cross;|[here](https://huggingface.co/mmwillet2/Kokoro_GGUF)    |
 
 Additional Model support will initially be added based on open source model performance in the [TTS model arena](https://huggingface.co/spaces/TTS-AGI/TTS-Arena) and the availability of said models' architectures and checkpoints.
 
