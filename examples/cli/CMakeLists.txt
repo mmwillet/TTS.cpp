@@ -6,14 +6,10 @@ add_executable(cli
     write_file.h
 )
 
-if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(PULSE libpulse-simple)
-    if (PULSE_FOUND)
-        set_source_files_properties(playback.cpp PROPERTIES COMPILE_FLAGS "${PULSE_CFLAGS_OTHER} -DPULSE_INSTALL=1")
-        set_source_files_properties(playback.cpp PROPERTIES INCLUDE_DIRECTORIES "${PULSE_INCLUDE_DIRS}")
-        target_link_libraries(cli PRIVATE ${PULSE_LIBRARIES})
-    endif()
+find_package(SDL2 REQUIRED CONFIG REQUIRED COMPONENTS SDL2)
+if (SDL2_FOUND)
+    target_link_libraries(cli PRIVATE SDL2::SDL2)
+    set_source_files_properties(playback.cpp PROPERTIES COMPILE_FLAGS -DSDL2_INSTALL=1)
 endif()
 
 target_link_libraries(cli PRIVATE ggml tts)
