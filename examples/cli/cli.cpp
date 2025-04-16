@@ -1,7 +1,8 @@
 #include "tts.h"
-#include "write_file.h"
 #include "args.h"
 #include "common.h"
+#include "playback.h"
+#include "write_file.h"
 
 int main(int argc, const char ** argv) {
     float default_temperature = 0.9f;
@@ -21,6 +22,7 @@ int main(int argc, const char ** argv) {
     args.add_argument(string_arg("--conditional-prompt", "(OPTIONAL) A distinct conditional prompt to use for generating. If none is provided the preencoded prompt is used. '--text-encoder-path' must be set to use conditional generation.", "-cp", false));
     args.add_argument(string_arg("--text-encoder-path", "(OPTIONAL) The local path of the text encoder gguf model for conditional generaiton.", "-tep", false));
     args.add_argument(string_arg("--voice", "(OPTIONAL) The voice to use to generate the audio. This is only used for models with voice packs.", "-v", false, "af_alloy"));
+    register_play_tts_response_args(args);
     args.parse(argc, argv);
     if (args.for_help) {
         args.help();
@@ -43,8 +45,10 @@ int main(int argc, const char ** argv) {
         update_conditional_prompt(runner, text_encoder_path, conditional_prompt, true);
     }
     tts_response data;
-    
+
     generate(runner, args.get_string_param("--prompt"), &data, config);
-    write_audio_file(data, args.get_string_param("--save-path"), runner->sampling_rate);
+    if (!play_tts_response(args, data, runner->sampling_rate)) {
+        write_audio_file(data, args.get_string_param("--save-path"), runner->sampling_rate);
+    }
     return 0;
 }
