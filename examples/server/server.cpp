@@ -47,20 +47,6 @@ enum task_type {
     CONDITIONAL_PROMPT,
 };
 
-void write_audio_file(std::string path, float * data, size_t length, float sample_rate = 44100.f, float frequency = 440.f, int channels = 1) {
-    AudioFile<float> file;
-    file.setBitDepth(16);
-    file.setNumChannels(channels);
-    int samples = (int) (length / channels);
-    file.setNumSamplesPerChannel(samples);
-    for (int channel = 0; channel < channels; channel++) {
-        for (int i = 0; i < samples; i++) {
-            file.samples[channel][i] = data[i];
-        }
-    }
-    file.save(path, AudioFileFormat::Wave);
-}
-
 using json = nlohmann::ordered_json;
 
 template <typename T>
