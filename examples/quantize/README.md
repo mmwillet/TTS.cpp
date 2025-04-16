@@ -66,6 +66,7 @@ Valid types passed to `--quantized-type` are described by the `ggml_type` enum i
         GGML_TYPE_IQ2_S   = 22,
         GGML_TYPE_IQ4_XS  = 23,
         GGML_TYPE_I8      = 24,
+        GGML_TYPE_BF16    = 30,
         GGML_TYPE_Q4_0_4_4 = 31,
         GGML_TYPE_Q4_0_4_8 = 32,
         GGML_TYPE_Q4_0_8_8 = 33,
