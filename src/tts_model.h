@@ -11,6 +11,7 @@ struct runner_context {
 	runner_context(int n_threads): n_threads(n_threads) {};
     virtual ~runner_context() {
         ggml_backend_sched_free(sched);
+        ggml_threadpool_free(threadpool);
         ggml_backend_free(backend_cpu);
         ggml_backend_free(backend);
         ggml_backend_buffer_free(buf_output);

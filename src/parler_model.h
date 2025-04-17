@@ -88,7 +88,7 @@ struct parler_tts_model : tts_model {
     void assign_weight(std::string name, ggml_tensor * tensor);
     void prep_constants(gguf_context * meta);
     void prep_layers(gguf_context * meta);
-    void prep_cross_key_values(struct tts_response * conditional_prompt = nullptr);
+    void prep_cross_key_values(int n_threads, struct tts_response * conditional_prompt = nullptr);
     void setup_from_file(gguf_context * meta_ctx, ggml_context * load_context, bool cpu_only) {
         prep_constants(meta_ctx);
         prep_layers(meta_ctx);
