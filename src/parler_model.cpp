@@ -135,6 +135,7 @@ void parler_tts_model::prep_cross_key_values(int n_threads, struct tts_response 
     for (int i = 0; i < layers.size(); i++) {
         struct ggml_tensor * Kcur = ggml_mul_mat(cctx, layers[i]->attn_k_proj, precomputed_input_emb);
         struct ggml_tensor * Vcur = ggml_mul_mat(cctx, layers[i]->attn_v_proj, precomputed_input_emb);
+
         Kcur = ggml_reshape_3d(cctx, Kcur, head_size, n_attn_heads, n_encode_length);
         Vcur = ggml_transpose(cctx, Vcur);
 
@@ -562,7 +563,7 @@ struct ggml_cgraph * parler_tts_runner::build_parler_graph(parler_ubatch & batch
                         ggml_element_size(kv_self->v_l[l])*model->max_ctx_length,
                         ggml_element_size(kv_self->v_l[l])*model->max_ctx_length*model->head_size,
                         0);
-                        
+            
             Qcur = ggml_reshape_3d(ctx, Qcur, model->head_size, model->n_attn_heads, batch.sequence_length);
             struct ggml_tensor * q = ggml_permute(ctx, Qcur, 0, 2, 1, 3);
             struct ggml_tensor * kq = ggml_mul_mat(ctx, k, q);
