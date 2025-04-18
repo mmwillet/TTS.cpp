@@ -81,25 +81,6 @@ struct ggml_tensor * snake_1d(ggml_context * ctx, struct ggml_tensor * alpha, st
     return ggml_add(ctx, a, ggml_mul(ctx, ggml_sqr(ctx, ggml_sin(ctx, ggml_mul(ctx, a, alpha))), ggml_reciprocal(ctx, alpha)));
 }
 
-uint64_t get_cpu_count() {
-    uint64_t cpu_count = 0;
-    size_t size = sizeof(cpu_count);
-#ifdef __APPLE__
-    if (sysctlbyname("hw.ncpu", &cpu_count, &size, NULL, 0) < 0) {
-        // this functionis only currently used to prepare static cross attention keys and values, and it is fast enough with a single cpu.
-        return 1;
-    }
-#elif __linux__
-    cpu_count = sysconf(_SC_NPROCESSORS_ONLN);
-    if (cpu_count == -1) {
-        return 1;
-    }
-#else
-    // windows stuff
-#endif
-    return cpu_count;
-}
-
 bool has_suffix(std::string value, std::string suffix) {
     return value.size() >= suffix.size() && value.compare(value.size()-suffix.size(), suffix.size(), suffix) == 0;
 }
