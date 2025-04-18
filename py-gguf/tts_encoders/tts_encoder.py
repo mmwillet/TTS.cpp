@@ -61,7 +61,7 @@ class TTSEncoder(abc.ABC):
 
         data = data.astype(dtype)
         self.gguf_writer.add_tensor(name, data, raw_dtype=gguf_dtype)
-        self.logger.debug(f"Added tensor '{name}' with shape {data.shape} and type {type}.")
+        self.logger.debug(f"Added tensor '{name}' with shape {data.shape} and type {gguf_dtype}.")
 
     def write(self):
         """

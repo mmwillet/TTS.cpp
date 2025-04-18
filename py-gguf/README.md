@@ -42,7 +42,7 @@ To use this model alongside the parler tts model see the [cli readme for informa
 
 The GGUF conversion script for Kokorocan be run via the `convert_kokoro_to_gguf` file locally like so: 
 ```commandline
-python3 ./convert_kokoro_to_gguf --save-path ./kokoro.gguf --espeak-phonemization
+python3 ./convert_kokoro_to_gguf --save-path ./kokoro.gguf
 ```
 
-the command accepts _--save-path_ which described where to save the GGUF model file to, _--espeak-phonemizer_ which when passed encodes the model to use espeak phonemization (currently recommended), and _--repo-id_ which describes the hugging face repo from which to download the model (defaults to 'hexgrad/Kokoro-82M'). Currently all standard Kokoro voices packs are encoded alongside the model (this is not currently customizable through the CLI).
+the command accepts _--save-path_ which described where to save the GGUF model file to, _--tts-phonemizer_ which when passed encodes the model to use TTS.cpp native phonemization (currently not recommended), and _--repo-id_ which describes the hugging face repo from which to download the model (defaults to 'hexgrad/Kokoro-82M'). Currently all standard Kokoro voices packs are encoded alongside the model (this is not currently customizable through the CLI).

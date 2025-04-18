@@ -135,7 +135,7 @@ class ParlerTTSEncoder(TTSEncoder):
         model_kwargs = self.model._prepare_text_encoder_kwargs_for_generation(
             inputs_tensor, model_kwargs, model_input_name, self.model.generation_config
         )
-        data = model_kwargs["encoder_outputs"].last_hidden_state
+        data = model_kwargs["encoder_outputs"].last_hidden_state.squeeze()
         self.set_tensor("decoder.text_encoding", data)
         self.gguf_writer.add_uint32(f"parler-tts.decoder.encode_length", data.shape[0])
 
