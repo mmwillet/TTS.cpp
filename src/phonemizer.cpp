@@ -743,7 +743,7 @@ bool phonemizer::process_word(corpus* text, std::string* output, std::string wor
 			text->size_pop(word.size()+unaccented_size_difference);
 			return true;
 		}
-	} else if (can_be_roman_numeral(word) && (is_all_upper(word) || small_english_words.find(to_lower(word)) == small_english_words.end()) && handle_roman_numeral(text, output, flags)) {
+	} else if (can_be_roman_numeral(word) && is_all_upper(word) && small_english_words.find(to_lower(word)) == small_english_words.end() && handle_roman_numeral(text, output, flags)) {
 		return true;
 	} else if (is_acronym_like(text, word, flags)) {
 		return handle_acronym(text, word, output, flags);
