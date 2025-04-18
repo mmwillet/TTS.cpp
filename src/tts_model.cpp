@@ -11,6 +11,8 @@ void runner_context::set_threads() {
     }
     if (backend_cpu != nullptr) {
         ggml_backend_cpu_set_n_threads(backend_cpu, n_threads);
+        struct ggml_threadpool_params ttp = ggml_threadpool_params_default(n_threads);
+        threadpool = ggml_threadpool_new(&ttp);
         ggml_backend_cpu_set_threadpool(backend_cpu, threadpool);
     }
 }

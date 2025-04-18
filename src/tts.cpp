@@ -22,7 +22,7 @@ struct tts_runner * parler_tts_from_file(gguf_context * meta_ctx, ggml_context *
     }
 
     if (config->use_cross_attn) {
-        runner->model->prep_cross_key_values();
+        runner->model->prep_cross_key_values(n_threads);
     }
 
     runner->prepare_post_load();

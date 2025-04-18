@@ -107,13 +107,11 @@ void parler_tts_model::prep_constants(gguf_context * meta) {
     }
 }
 
-void parler_tts_model::prep_cross_key_values(struct tts_response * conditional_prompt) {
-    ggml_threadpool_t threadpool = nullptr;
-    int n_threads = (int) get_cpu_count();
+void parler_tts_model::prep_cross_key_values(int n_threads, struct tts_response * conditional_prompt) {
     ggml_backend_t backend_cpu = ggml_backend_cpu_init();
     ggml_backend_buffer_type_t backend_cpu_buffer = ggml_backend_cpu_buffer_type();
+    // Let it create a disposable threadpool just this once
     ggml_backend_cpu_set_n_threads(backend_cpu, n_threads);
-    ggml_backend_cpu_set_threadpool(backend_cpu, threadpool);
     std::vector<ggml_backend_buffer_type_t> bufs = {backend_cpu_buffer};
     std::vector<ggml_backend_t> backs = {backend_cpu};
     ggml_backend_sched_t sched = ggml_backend_sched_new(backs.data(), bufs.data(), 1, max_cross_nodes*n_layers, false);
@@ -515,7 +513,7 @@ void parler_tts_runner::update_conditional_prompt(const std::string file_path, c
     t5_runner * text_encoder = text_encoder_from_file(file_path, n_threads, tokenizer, cpu_only);
     tts_response* response;
     text_encoder->generate(prompt, response);
-    model->prep_cross_key_values(response);
+    model->prep_cross_key_values(n_threads, response);
     delete text_encoder;
     return;
 }

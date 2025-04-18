@@ -299,17 +299,7 @@ struct kokoro_ubatch {
 struct kokoro_duration_context : runner_context {
     kokoro_duration_context(kokoro_model * model, int n_threads): runner_context(n_threads), model(model) {};
     ~kokoro_duration_context() {
-        ggml_backend_sched_free(sched);
-        ggml_backend_free(backend_cpu);
-        if (backend) {
-            ggml_backend_free(backend);
-        }
-        if (buf_output) {
-            ggml_backend_buffer_free(buf_output);
-        }
-        if (buf_len_output) {
-        	ggml_backend_buffer_free(buf_len_output);
-        }
+        ggml_backend_buffer_free(buf_len_output);
     }
     
     std::string voice = "af_alloy";

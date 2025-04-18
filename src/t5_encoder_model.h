@@ -75,16 +75,6 @@ void assign_to_t5_layer(t5_encoder * model, t5_layer & layer, std::string name, 
 
 struct t5_context : runner_context {
     t5_context(t5_encoder * model, int n_threads): runner_context(n_threads), model(model) {};
-    ~t5_context() {
-        ggml_backend_sched_free(sched);
-        ggml_backend_free(backend_cpu);
-        if (backend) {
-            ggml_backend_free(backend);
-        }
-        if (buf_output) {
-            ggml_backend_buffer_free(buf_output);
-        }
-    }
     
     struct t5_encoder * model;
     

@@ -88,7 +88,7 @@ struct parler_tts_model : tts_model {
     void assign_weight(std::string name, ggml_tensor * tensor);
     void prep_constants(gguf_context * meta);
     void prep_layers(gguf_context * meta);
-    void prep_cross_key_values(struct tts_response * conditional_prompt = nullptr);
+    void prep_cross_key_values(int n_threads, struct tts_response * conditional_prompt = nullptr);
     void setup_from_file(gguf_context * meta_ctx, ggml_context * load_context, bool cpu_only) {
         prep_constants(meta_ctx);
         prep_layers(meta_ctx);
@@ -102,16 +102,6 @@ void assign_to_decoder(parler_tts_model * model, const std::string name, ggml_te
 
 struct parler_context : runner_context {
     parler_context(parler_tts_model * model, int n_threads): runner_context(n_threads), model(model) {};
-    ~parler_context() {
-        ggml_backend_sched_free(sched);
-        ggml_backend_free(backend_cpu);
-        if (backend) {
-            ggml_backend_free(backend);
-        }
-        if (buf_output) {
-            ggml_backend_buffer_free(buf_output);
-        }
-    }
     struct parler_tts_model * model;
     std::vector<bool> eos_seen;
 
