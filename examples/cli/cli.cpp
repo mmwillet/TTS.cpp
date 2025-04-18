@@ -7,7 +7,7 @@
 
 int main(int argc, const char ** argv) {
     float default_temperature = 0.9f;
-    int default_n_threads = std::min((int)std::thread::hardware_concurrency(), 1);
+    int default_n_threads = std::max((int)std::thread::hardware_concurrency(), 1);
     int default_top_k = 50;
     float default_repetition_penalty = 1.1f;
     arg_list args;

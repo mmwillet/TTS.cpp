@@ -351,8 +351,8 @@ inline void signal_handler(int signal) {
 }
 
 int main(int argc, const char ** argv) {
-    int default_n_threads = std::min((int)std::thread::hardware_concurrency(), 1);
-    int default_http_threads = std::min((int)std::thread::hardware_concurrency() - 1, 3);
+    int default_n_threads = std::max((int)std::thread::hardware_concurrency(), 1);
+    int default_http_threads = std::max((int)std::thread::hardware_concurrency() - 1, 3);
     int default_n_parallel = 1;
     int default_port = 8080;
     int default_timeout = 300;
