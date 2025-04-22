@@ -15,16 +15,16 @@ int main(int argc, const char ** argv) {
     args.add_argument(string_arg("--model-path", "(REQUIRED) The local path of the gguf model file for Parler TTS mini or large v1.", "-mp", true));
     args.add_argument(string_arg("--prompt", "(REQUIRED) The text prompt for which to generate audio in quotation markers.", "-p", true));
     args.add_argument(string_arg("--save-path", "(OPTIONAL) The path to save the audio output to in a .wav format. Defaults to TTS.cpp.wav", "-sp", false, "TTS.cpp.wav"));
-    args.add_argument(float_arg("--temperature", "The temperature to use when generating outputs. Defaults to 0.9.", "-t", false, &default_temperature));
+    args.add_argument(float_arg("--temperature", "The temperature to use when generating outputs. Defaults to 1.0.", "-t", false, &default_temperature));
     args.add_argument(int_arg("--n-threads", "The number of cpu threads to run generation with. Defaults to hardware concurrency. If hardware concurrency cannot be determined then it defaults to 1.", "-nt", false, &default_n_threads));
     args.add_argument(int_arg("--topk", "(OPTIONAL) When set to an integer value greater than 0 generation uses nucleus sampling over topk nucleaus size. Defaults to 50.", "-tk", false, &default_top_k));
-    args.add_argument(float_arg("--repetition-penalty", "The by channel repetition penalty to be applied the sampled output of the model. defaults to 1.1.", "-r", false, &default_repetition_penalty));
+    args.add_argument(float_arg("--repetition-penalty", "The by channel repetition penalty to be applied the sampled output of the model. defaults to 1.0.", "-r", false, &default_repetition_penalty));
     args.add_argument(bool_arg("--use-metal", "(OPTIONAL) Whether to use metal acceleration", "-m"));
     args.add_argument(bool_arg("--no-cross-attn", "(OPTIONAL) Whether to not include cross attention", "-ca"));
     args.add_argument(string_arg("--conditional-prompt", "(OPTIONAL) A distinct conditional prompt to use for generating. If none is provided the preencoded prompt is used. '--text-encoder-path' must be set to use conditional generation.", "-cp", false));
     args.add_argument(string_arg("--text-encoder-path", "(OPTIONAL) The local path of the text encoder gguf model for conditional generaiton.", "-tep", false));
     args.add_argument(string_arg("--voice", "(OPTIONAL) The voice to use to generate the audio. This is only used for models with voice packs.", "-v", false, "af_alloy"));
-    args.add_argument(bool_arg("--vad", "(OPTIONAL) whether to apply voice activity detection (VAD) and strip silence form the output. By default, no VAD is applied.", "-va"));
+    args.add_argument(bool_arg("--vad", "(OPTIONAL) whether to apply voice inactivity detection (VAD) and strip silence form the end of the output (particularly useful for Parler TSS). By default, no VAD is applied.", "-va"));
     register_play_tts_response_args(args);
     args.parse(argc, argv);
     if (args.for_help) {
@@ -50,7 +50,6 @@ int main(int argc, const char ** argv) {
     tts_response data;
 
     generate(runner, args.get_string_param("--prompt"), &data, config);
-    write_audio_file(data, "/Users/matthewwillett-jeffries/Desktop/test2.wav", runner->sampling_rate);
     if (args.get_bool_param("--vad")) {
         apply_energy_voice_inactivity_detection(data, runner->sampling_rate);
     }

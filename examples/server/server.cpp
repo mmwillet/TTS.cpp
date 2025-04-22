@@ -362,7 +362,7 @@ int main(int argc, const char ** argv) {
     float default_repetition_penalty = 1.0f;
 
     arg_list args;
-    args.add_argument(float_arg("--temperature", "(OPTIONAL) The temperature to use when generating outputs. Defaults to 0.9.", "-t", false, &default_temperature));
+    args.add_argument(float_arg("--temperature", "(OPTIONAL) The temperature to use when generating outputs. Defaults to 1.0.", "-t", false, &default_temperature));
     args.add_argument(int_arg("--topk", "(OPTIONAL) when set to an integer value greater than 0 generation uses nucleus sampling over topk nucleaus size. Defaults to 50.", "-tk", false, &default_top_k));
     args.add_argument(float_arg("--repetition-penalty", "The by channel repetition penalty to be applied the sampled output of the model. defaults to 1.0.", "-r", false, &default_repetition_penalty));
     args.add_argument(string_arg("--model-path", "(REQUIRED) The local path of the gguf model file for Parler TTS mini or large v1 or Kokoro.", "-mp", true));

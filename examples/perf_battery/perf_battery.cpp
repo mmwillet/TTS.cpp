@@ -89,9 +89,9 @@ int main(int argc, const char ** argv) {
 	arg_list args;
     args.add_argument(string_arg("--model-path", "(REQUIRED) The local path of the gguf model file for Parler TTS mini v1.", "-mp", true));
     args.add_argument(int_arg("--n-threads", "The number of cpu threads to run generation with. Defaults to hardware concurrency. If hardware concurrency cannot be determined it defaults to 1.", "-nt", false, &default_n_threads));
-    args.add_argument(float_arg("--temperature", "The temperature to use when generating outputs. Defaults to 0.9.", "-t", false, &default_temperature));
+    args.add_argument(float_arg("--temperature", "The temperature to use when generating outputs. Defaults to 1.0.", "-t", false, &default_temperature));
     args.add_argument(int_arg("--topk", "(OPTIONAL) When set to an integer value greater than 0 generation uses nucleus sampling over topk nucleaus size. Defaults to 50.", "-tk", false, &default_top_k));
-    args.add_argument(float_arg("--repetition-penalty", "The by channel repetition penalty to be applied the sampled output of the model. defaults to 1.1.", "-r", false, &default_repetition_penalty));
+    args.add_argument(float_arg("--repetition-penalty", "The by channel repetition penalty to be applied the sampled output of the model. defaults to 1.0.", "-r", false, &default_repetition_penalty));
     args.add_argument(bool_arg("--use-metal", "(OPTIONAL) whether or not to use metal acceleration.", "-m"));
     args.add_argument(bool_arg("--no-cross-attn", "(OPTIONAL) Whether to not include cross attention", "-ca"));
     args.parse(argc, argv);

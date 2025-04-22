@@ -10,7 +10,7 @@ In order to get a detailed breakdown of the functionality currently available yo
 ./build/bin/tts-server --help
 
 --temperature (-t):
-    (OPTIONAL) The temperature to use when generating outputs by default. Defaults to 0.9.
+    (OPTIONAL) The temperature to use when generating outputs by default. Defaults to 1.0.
 --repetition-penalty (-r):
     The by channel repetition penalty to be applied to the sampled output of the model by default. defaults to 1.0.
 --topk (-tk):
