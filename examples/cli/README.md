@@ -14,23 +14,27 @@ In order to get a detailed breakdown the functionality currently available you c
 ./cli --help
 
 --temperature (-t):
-    The temperature to use when generating outputs. Defaults to 0.9.
+    The temperature to use when generating outputs. Defaults to 1.0.
 --repetition-penalty (-r):
-    The by channel repetition penalty to be applied the sampled output of the model. defaults to 1.1.
+    The by channel repetition penalty to be applied the sampled output of the model. defaults to 1.0.
 --n-threads (-nt):
-    The number of cpu threads to run generation with. Defaults to 10.
+    The number of cpu threads to run generation with. Defaults to hardware concurrency. If hardware concurrency cannot be determined then it defaults to 1.
 --topk (-tk):
-    (OPTIONAL) when set to an integer value greater than 0 generation uses nucleus sampling over topk nucleaus size. Defaults to 50.
+    (OPTIONAL) When set to an integer value greater than 0 generation uses nucleus sampling over topk nucleaus size. Defaults to 50.
 --use-metal (-m):
     (OPTIONAL) Whether to use metal acceleration
 --no-cross-attn (-ca):
     (OPTIONAL) Whether to not include cross attention
+--vad (-va):
+    (OPTIONAL) whether to apply voice inactivity detection (VAD) and strip silence form the end of the output (particularly useful for Parler TSS). By default, no VAD is applied.
+--play:
+    (OPTIONAL) Whether to play back the audio immediately instead of saving it to file.
 --model-path (-mp):
     (REQUIRED) The local path of the gguf model file for Parler TTS mini or large v1.
 --prompt (-p):
     (REQUIRED) The text prompt for which to generate audio in quotation markers.
 --save-path (-sp):
-    (REQUIRED) The path to save the audio output to in a .wav format.
+    (OPTIONAL) The path to save the audio output to in a .wav format. Defaults to TTS.cpp.wav
 --conditional-prompt (-cp):
     (OPTIONAL) A distinct conditional prompt to use for generating. If none is provided the preencoded prompt is used. '--text-encoder-path' must be set to use conditional generation.
 --text-encoder-path (-tep):

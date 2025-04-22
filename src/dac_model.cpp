@@ -211,6 +211,7 @@ static struct ggml_tensor * dac_build_audio_inputs(struct ggml_context * ctx, st
     
     dctx->inp_tokens = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, batch.sequence_length*dctx->model->n_heads);
     ggml_set_input(dctx->inp_tokens);
+
     if (dctx->backend) {
         ggml_backend_sched_set_tensor_backend(dctx->sched, dctx->inp_tokens, dctx->backend);
     }

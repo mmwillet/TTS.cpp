@@ -4,6 +4,8 @@ add_executable(cli
     playback.h
     write_file.cpp
     write_file.h
+    vad.cpp
+    vad.h
 )
 
 find_package(SDL2 REQUIRED CONFIG REQUIRED COMPONENTS SDL2)

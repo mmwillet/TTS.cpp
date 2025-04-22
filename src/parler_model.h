@@ -59,6 +59,7 @@ struct parler_tts_model : tts_model {
     // These default configurations are based on the configuration of Parler TTS Mini (version 1.0)
     uint32_t n_output_heads = 9;
     uint32_t n_encode_length;
+    uint32_t max_encode_length = 512; // This corresponds with the max token length of the conditional prompt
     uint32_t hidden_size = 1024;
     uint32_t max_ctx_length = 4096;
     uint32_t n_attn_heads = 16;
@@ -92,7 +93,7 @@ struct parler_tts_model : tts_model {
     void setup_from_file(gguf_context * meta_ctx, ggml_context * load_context, bool cpu_only) {
         prep_constants(meta_ctx);
         prep_layers(meta_ctx);
-        tts_model::setup_from_file(meta_ctx, load_context, cpu_only, "decoder", 1.25, n_encode_length*hidden_size*sizeof(float)*n_layers*2);
+        tts_model::setup_from_file(meta_ctx, load_context, cpu_only, "decoder", 1.30, max_encode_length*hidden_size*sizeof(float)*n_layers*2);
     }
 };
 
