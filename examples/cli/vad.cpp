@@ -13,7 +13,8 @@ void apply_energy_voice_inactivity_detection(
 	float sample_rate, 
 	int ms_per_frame,
 	int frame_threshold,
-	float normalized_energy_threshold) {
+	float normalized_energy_threshold,
+	int trailing_silent_frames) {
 	int samples_per_frame = (int) (ms_per_frame * sample_rate / 1000.0f);
 	int n_frames = (int) (data.n_outputs / samples_per_frame);
 
@@ -47,7 +48,7 @@ void apply_energy_voice_inactivity_detection(
 		}
 	}
 	if (concurrent_silent_frames >= frame_threshold) {
-		data.n_outputs -= ((concurrent_silent_frames - 1) * samples_per_frame);
+		data.n_outputs -= ((concurrent_silent_frames - trailing_silent_frames) * samples_per_frame);
 	}
 	free(energies);
 }
