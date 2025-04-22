@@ -82,10 +82,10 @@ std::string benchmark_printout(tts_arch arch, std::vector<double> generation_sam
 
 
 int main(int argc, const char ** argv) {
-    float default_temperature = 0.9f;
+    float default_temperature = 1.0f;
     int default_n_threads = std::max((int)std::thread::hardware_concurrency(), 1);
     int default_top_k = 50;
-    float default_repetition_penalty = 1.1f;
+    float default_repetition_penalty = 1.0f;
 	arg_list args;
     args.add_argument(string_arg("--model-path", "(REQUIRED) The local path of the gguf model file for Parler TTS mini v1.", "-mp", true));
     args.add_argument(int_arg("--n-threads", "The number of cpu threads to run generation with. Defaults to hardware concurrency. If hardware concurrency cannot be determined it defaults to 1.", "-nt", false, &default_n_threads));

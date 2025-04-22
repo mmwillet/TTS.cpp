@@ -357,9 +357,9 @@ int main(int argc, const char ** argv) {
     int default_port = 8080;
     int default_timeout = 300;
     std::string default_host = "127.0.0.1";
-    float default_temperature = 0.9f;
+    float default_temperature = 1.0f;
     int default_top_k = 50;
-    float default_repetition_penalty = 1.1f;
+    float default_repetition_penalty = 1.0f;
 
     arg_list args;
     args.add_argument(float_arg("--temperature", "(OPTIONAL) The temperature to use when generating outputs. Defaults to 0.9.", "-t", false, &default_temperature));

@@ -2,14 +2,15 @@
 #include "args.h"
 #include "common.h"
 #include "playback.h"
+#include "vad.h"
 #include "write_file.h"
 #include <thread>
 
 int main(int argc, const char ** argv) {
-    float default_temperature = 0.9f;
+    float default_temperature = 1.0f;
     int default_n_threads = std::max((int)std::thread::hardware_concurrency(), 1);
     int default_top_k = 50;
-    float default_repetition_penalty = 1.1f;
+    float default_repetition_penalty = 1.0f;
     arg_list args;
     args.add_argument(string_arg("--model-path", "(REQUIRED) The local path of the gguf model file for Parler TTS mini or large v1.", "-mp", true));
     args.add_argument(string_arg("--prompt", "(REQUIRED) The text prompt for which to generate audio in quotation markers.", "-p", true));
@@ -23,6 +24,7 @@ int main(int argc, const char ** argv) {
     args.add_argument(string_arg("--conditional-prompt", "(OPTIONAL) A distinct conditional prompt to use for generating. If none is provided the preencoded prompt is used. '--text-encoder-path' must be set to use conditional generation.", "-cp", false));
     args.add_argument(string_arg("--text-encoder-path", "(OPTIONAL) The local path of the text encoder gguf model for conditional generaiton.", "-tep", false));
     args.add_argument(string_arg("--voice", "(OPTIONAL) The voice to use to generate the audio. This is only used for models with voice packs.", "-v", false, "af_alloy"));
+    args.add_argument(bool_arg("--vad", "(OPTIONAL) whether to apply voice activity detection (VAD) and strip silence form the output. By default, no VAD is applied.", "-va"));
     register_play_tts_response_args(args);
     args.parse(argc, argv);
     if (args.for_help) {
@@ -48,6 +50,10 @@ int main(int argc, const char ** argv) {
     tts_response data;
 
     generate(runner, args.get_string_param("--prompt"), &data, config);
+    write_audio_file(data, "/Users/matthewwillett-jeffries/Desktop/test2.wav", runner->sampling_rate);
+    if (args.get_bool_param("--vad")) {
+        apply_energy_voice_inactivity_detection(data, runner->sampling_rate);
+    }
     if (!play_tts_response(args, data, runner->sampling_rate)) {
         write_audio_file(data, args.get_string_param("--save-path"), runner->sampling_rate);
     }
