@@ -165,6 +165,94 @@ bool is_numeric(char letter) {
 	return val >= 48 && val <= 57;
 }
 
+
+std::string parse_voice_code(std::string voice_code) {
+#ifdef ESPEAK_INSTALL
+	voice_code = to_lower(voice_code);
+	const espeak_VOICE * primary_match = nullptr;
+	const espeak_VOICE * secondary_match = nullptr;
+	bool search_by_lc = voice_code.size() == 2;
+	bool search_by_lfc = !search_by_lc && voice_code.size() == 3;
+	bool search_by_id = !search_by_lfc && voice_code.find("/") != std::string::npos;
+	// It is common for locale's to be '_' separated rather than '-' separated. Check for both.
+	bool search_by_lcc = !search_by_id && (voice_code.find("-") != std::string::npos || voice_code.find("_") != std::string::npos);
+	if (search_by_id || search_by_lcc) {
+		voice_code = replace(voice_code, '_', '-');
+	}
+	const espeak_VOICE** espeak_voices = espeak_ListVoices(nullptr);
+	// ideally we'd use the espeak voice scores which order voices by preference, but they are only returned when a voice_spec is passed to the list api and
+	// the voice spec isn't compatible with partials (e.g. country codes, language family code, etc) 
+	int i = 0;
+	while (espeak_voices[i] != nullptr) {
+		auto identifier_parts = split(espeak_voices[i]->identifier, "/");
+		// it is possible to add languages to espeak-ng without following their identifier pattern, if we run into such a language just try to match against
+		// the identifier and otherwise continue;
+		if (identifier_parts.size() == 1) {
+			if (voice_code == identifier_parts[0] || voice_code == espeak_voices[i]->name) {
+				primary_match = espeak_voices[i];
+			} else {
+				continue;
+			}
+		}
+		if (search_by_lc) {
+			std::string language_part = identifier_parts[1];
+			if (language_part == voice_code) {
+				primary_match = espeak_voices[i];
+				break; // if we have an exact match then we can exit
+			} else if (has_prefix(language_part, voice_code) && (!primary_match || strlen(primary_match->identifier) > strlen(espeak_voices[i]->identifier))) {
+				// prefer the smaller codes as longer codes typically refer to more specific locales
+				primary_match = espeak_voices[i] ;
+			} else {
+				auto subparts = split(language_part, "-");
+				if (subparts.size() > 1 && to_lower(subparts[1]) == voice_code && (!secondary_match || strlen(secondary_match->identifier) > strlen(espeak_voices[i]->identifier))) {
+					// country codes are typically capitalized in espeak-ng
+					secondary_match = espeak_voices[i];
+				}
+			}
+		} else if (search_by_lfc) {
+			// espeak-ng uses language family codes in their identifiers, but also uses ISO 639-3 language codes for some languages.
+			// Since language codes are more specific attempt to match against the language code as the primary and match against the language family
+			// code as the secondary.
+			if (has_prefix(identifier_parts[1], voice_code) && (!primary_match || strlen(primary_match->identifier) > strlen(espeak_voices[i]->identifier))) {
+				primary_match = espeak_voices[i];
+			} else if (identifier_parts[0] == voice_code && (!secondary_match || strlen(secondary_match->identifier) > strlen(espeak_voices[i]->identifier))) {
+				secondary_match = espeak_voices[i];
+			}
+		} else if (search_by_id && has_prefix(to_lower(espeak_voices[i]->identifier), voice_code) && (!primary_match || strlen(primary_match->identifier) > strlen(espeak_voices[i]->identifier))) {
+			primary_match = espeak_voices[i];
+		} else if (search_by_lcc && has_prefix(to_lower(identifier_parts[1]), voice_code) && (!primary_match || strlen(primary_match->identifier) > strlen(espeak_voices[i]->identifier))) {
+			primary_match = espeak_voices[i];
+		} else if (to_lower(espeak_voices[i]->name).find(voice_code) != std::string::npos && (!primary_match || strlen(primary_match->identifier) > strlen(espeak_voices[i]->identifier))) {
+			primary_match = espeak_voices[i];
+		}
+		i++;
+	}
+	if (!primary_match && !secondary_match) {
+		TTS_ABORT("Failed to match espeak voice code '%s' to known espeak voices.\n", voice_code.c_str());
+	}
+	if (!primary_match) {
+		primary_match = secondary_match;
+	}
+	fprintf(stdout, "Passed Espeak Voice Code '%s' doesn't directly match any known Espeak Voice IDs. Nearest match with name '%s' and id '%s' will be used instead.\n", voice_code.c_str(), primary_match->name, primary_match->identifier);
+	return std::string(primary_match->identifier);
+#else
+	TTS_ABORT("Attempted to list voices without espeak-ng installed.")
+#endif
+}
+
+void update_voice(std::string voice_code) {
+#ifdef ESPEAK_INSTALL
+	espeak_ERROR e = espeak_SetVoiceByName(voice_code.c_str());
+   	if (e != EE_OK) {
+   		voice_code = parse_voice_code(voice_code);
+   		espeak_SetVoiceByName(voice_code.c_str());
+    }
+#else
+    TTS_ABORT("Attempted to set voice without espeak-ng installed.")
+#endif
+}
+
+
 void conditions::reset_for_clause_end() {
 	hyphenated = false;
 	was_punctuated_acronym = false;
@@ -1020,7 +1108,7 @@ struct phoneme_dictionary * phoneme_dictionary_from_gguf(gguf_context * meta) {
     return dict;
 }
 
-struct phonemizer * phonemizer_from_gguf(gguf_context * meta) {
+struct phonemizer * phonemizer_from_gguf(gguf_context * meta, const std::string espeak_voice_code) {
 	int mode_key = gguf_find_key(meta, "phonemizer.type");
 	phonemizer * ph;
     if (mode_key == -1) {
@@ -1031,7 +1119,9 @@ struct phonemizer * phonemizer_from_gguf(gguf_context * meta) {
     if ((phonemizer_type) ph_type == ESPEAK) {
 #ifdef ESPEAK_INSTALL
     	espeak_Initialize(AUDIO_OUTPUT_SYNCHRONOUS, 0, ESPEAK_DATA_PATH, 0);
-    	espeak_SetVoiceByName("gmw/en-US");
+
+    	update_voice(espeak_voice_code);
+
 		ph = new phonemizer(nullptr, nullptr);
 		ph->mode = ESPEAK;
 #else
@@ -1052,11 +1142,11 @@ struct phonemizer * phonemizer_from_gguf(gguf_context * meta) {
     return ph;
 }
 
-struct phonemizer * espeak_phonemizer(bool use_espeak_phonemes) {
+struct phonemizer * espeak_phonemizer(bool use_espeak_phonemes, std::string espeak_voice_code) {
 #ifdef ESPEAK_INSTALL
 	espeak_Initialize(AUDIO_OUTPUT_SYNCHRONOUS, 0, ESPEAK_DATA_PATH, 0);
 	
-	espeak_SetVoiceByName("gmw/en-US");
+	update_voice(espeak_voice_code);
 
 	phonemizer * ph = new phonemizer(nullptr, nullptr);
 	ph->mode = ESPEAK;
@@ -1069,7 +1159,7 @@ struct phonemizer * espeak_phonemizer(bool use_espeak_phonemes) {
 #endif
 }
 
-struct phonemizer * phonemizer_from_file(const std::string fname) {
+struct phonemizer * phonemizer_from_file(const std::string fname, const std::string espeak_voice_code) {
 	ggml_context * weight_ctx = NULL;
     struct gguf_init_params params = {
         /*.no_alloc   =*/ false,
@@ -1079,6 +1169,6 @@ struct phonemizer * phonemizer_from_file(const std::string fname) {
     if (!meta_ctx) {
         TTS_ABORT("%s failed for file %s\n", __func__, fname.c_str());
     }
-    return phonemizer_from_gguf(meta_ctx);
+    return phonemizer_from_gguf(meta_ctx, espeak_voice_code);
 }
 

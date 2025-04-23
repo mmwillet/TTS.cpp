@@ -1303,11 +1303,17 @@ void kokoro_runner::assign_weight(std::string name, ggml_tensor * tensor) {
 	model->assign_weight(name, tensor);
 }
 
-int kokoro_runner::generate(std::string prompt, struct tts_response * response, std::string voice) {
+int kokoro_runner::generate(std::string prompt, struct tts_response * response, std::string voice, std::string voice_code) {
 	if (model->voices.find(voice) == model->voices.end()) {
-		kctx->voice = default_voice;
-        drunner->kctx->voice = default_voice;
+		TTS_ABORT("Failed to find Kokoro voice '%s' aborting.\n", voice.c_str());
     } else {
+    	// if the language changed then we should change the phonemization voice
+    	if (phmzr->mode == ESPEAK && kctx->voice[0] != voice[0]) {
+    		if (voice_code.empty()) {
+    			voice_code = get_espeak_id_from_kokoro_voice(voice);
+    		}
+    		update_voice(voice_code);
+    	}
         kctx->voice = voice;
         drunner->kctx->voice = voice;
     }
@@ -1326,6 +1332,11 @@ int kokoro_runner::generate(std::string prompt, struct tts_response * response, 
 
 	run(batch, response);
 	return 0;
+}
+
+
+std::string get_espeak_id_from_kokoro_voice(std::string voice) {
+	return !voice.empty() && KOKORO_LANG_TO_ESPEAK_ID.find(voice[0]) != KOKORO_LANG_TO_ESPEAK_ID.end() ? KOKORO_LANG_TO_ESPEAK_ID[voice[0]] : "gmw/en-US";
 }
 
 struct kokoro_duration_context * build_new_duration_kokoro_context(struct kokoro_model * model, int n_threads, bool use_cpu) {

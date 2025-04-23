@@ -303,6 +303,8 @@ enum phonemizer_type {
 	ESPEAK = 1,
 };
 
+std::string parse_voice_code(std::string voice_code);
+void update_voice(std::string voice_code);
 const std::unordered_set<std::string> inline_combine_sets(const std::vector<std::unordered_set<std::string>> sets);
 std::string strip(std::string target, std::string vals = " ");
 std::vector<std::string> split(std::string target, std::string split_on);
@@ -491,8 +493,8 @@ struct phonemizer {
 	bool handle_unknown(corpus* text);
 };
 
-struct phonemizer * phonemizer_from_gguf(gguf_context * meta);
-struct phonemizer * phonemizer_from_file(const std::string fname);
-struct phonemizer * espeak_phonemizer(bool use_espeak_phonemes = false);
+struct phonemizer * phonemizer_from_gguf(gguf_context * meta, const std::string espeak_voice_code = "gmw/en-US");
+struct phonemizer * phonemizer_from_file(const std::string fname, const std::string espeak_voice_code = "gmw/en-US");
+struct phonemizer * espeak_phonemizer(bool use_espeak_phonemes = false, std::string espeak_voice_code = "gmw/en-US");
 
 #endif

@@ -30,7 +30,8 @@ struct generation_configuration {
     	float temperature = 1.0, 
     	float repetition_penalty = 1.0, 
     	bool use_cross_attn = true, 
-    	bool sample = true): top_k(top_k), temperature(temperature), repetition_penalty(repetition_penalty), use_cross_attn(use_cross_attn), sample(sample), voice(voice) {};
+    	std::string espeak_voice_id = "",
+    	bool sample = true): top_k(top_k), temperature(temperature), repetition_penalty(repetition_penalty), use_cross_attn(use_cross_attn), sample(sample), voice(voice), espeak_voice_id(espeak_voice_id) {};
 
     bool use_cross_attn;
     float temperature;
@@ -38,6 +39,7 @@ struct generation_configuration {
     int top_k;
     std::string voice = "";
     bool sample = true;
+    std::string espeak_voice_id = "";
 };
 
 struct tts_runner {

@@ -41,6 +41,8 @@ In order to get a detailed breakdown of the functionality currently available yo
     (OPTIONAL) the hostname of the server. Defaults to '127.0.0.1'.
 --voice (-v):
     (OPTIONAL) the default voice to use when generating audio. Only used with applicable models.
+--espeak-voice-id (-eid):
+    (OPTIONAL) The espeak voice id to use for phonemization. This should only be specified when the correct espeak voice cannot be inferred from the kokoro voice (see MultiLanguage Configuration in the cli README for more info).
 ```
 
 Important configuration here includes `--n-parallelism` which describes how may models for asynchronous processing and `--model-path` which describes from where to load the model locally.

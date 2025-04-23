@@ -6,6 +6,21 @@
 #include "tokenizer.h"
 #include "phonemizer.h"
 
+// Rather than using ISO 639-2 language codes, Kokoro voice pack specify their corresponding language via their first letter.
+// Below is a map that describes the relationship between those designations and espeak-ng's voice identifiers so that the 
+// appropriate phonemization protocol can inferred from the Kokoro voice.
+static std::map<char, std::string> KOKORO_LANG_TO_ESPEAK_ID = {
+	{'a', "gmw/en-US"},
+	{'b', "gmw/en"},
+	{'e', "roa/es"},
+	{'f', "roa/fr"},
+	{'h', "inc/hi"},
+	{'i', "roa/it"},
+	{'j', "jpx/ja"},
+	{'p', "roa/pt-BR"},
+	{'z', "sit/cmn"}
+};
+
 struct lstm_cell {
 	std::vector<ggml_tensor*> weights; 
 	std::vector<ggml_tensor*> biases;
@@ -335,6 +350,7 @@ static kokoro_generator_residual_block * build_res_block_from_file(gguf_context 
 static kokoro_noise_residual_block * build_noise_block_from_file(gguf_context * meta, int index);
 static kokoro_generator_upsample_block* kokoro_generator_upsample_block(gguf_context * meta, int index);
 
+std::string get_espeak_id_from_kokoro_voice(std::string voice);
 struct kokoro_duration_context * build_new_duration_kokoro_context(struct kokoro_model * model, int n_threads, bool use_cpu = true);
 
 struct kokoro_duration_response {
@@ -439,7 +455,7 @@ struct kokoro_runner : tts_runner {
     void set_inputs(kokoro_ubatch & batch, uint32_t total_size);
     struct ggml_cgraph * build_kokoro_graph(kokoro_ubatch & batch);
     void run(kokoro_ubatch & batch, struct tts_response * outputs);
-    int generate(std::string prompt, struct tts_response * response, std::string voice);
+    int generate(std::string prompt, struct tts_response * response, std::string voice, std::string voice_code = "");
 };
 
 #endif

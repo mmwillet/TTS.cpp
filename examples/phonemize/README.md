@@ -19,6 +19,8 @@ In order to get a detailed breakdown the functionality currently available you c
     (OPTIONAL) The local path of the gguf phonemiser file for TTS.cpp phonemizer. This is required if not using espeak.
 --prompt (-p):
     (REQUIRED) The text prompt to phonemize.
+--espeak-voice-id (-eid):
+    (OPTIONAL) The voice id to use for espeak phonemization. Defaults to 'gmw/en-US'.
 ```
 
 General usage should follow from these possible parameters. E.G. The following command will return the phonemized IPA text for the prompt via the TTS.cpp phonemizer.

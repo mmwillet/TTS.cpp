@@ -41,6 +41,8 @@ In order to get a detailed breakdown the functionality currently available you c
     (OPTIONAL) The local path of the text encoder gguf model for conditional generaiton.
 --voice (-v):
     (OPTIONAL) The voice to use to generate the audio. This is only used for models with voice packs.
+--espeak-voice-id (-eid):
+    (OPTIONAL) The espeak voice id to use for phonemization. This should only be specified when the correct espeak voice cannot be inferred from the kokoro voice (see MultiLanguage Configuration in the README for more info).
 ```
 
 General usage should follow from these possible parameters. E.G. The following command will save generated speech to the `/tmp/test.wav` file.
@@ -56,3 +58,37 @@ By default the Parler TTS model is saved to the GGUF format with a pre-encoded c
 ```commandline
 ./cli --model-path /model/path/to/gguf_file.gguf --prompt "I am saying some words" --save-path /tmp/test.wav --text-encoder-path /model/path/to/t5_encoder_file.gguf --consditional-prompt "deep voice"
 ```
+
+#### MultiLanguage Configuration
+
+Kokoro supports multiple langauges with distinct voices, and, by default, the standard voices are encoded in the Kokoro gguf file. Below is a list of the available voices:
+
+```
+'af_alloy', 'af_aoede', 'af_bella', 'af_heart', 'af_jessica', 'af_kore', 'af_nicole',
+'af_nova', 'af_river', 'af_sarah', 'af_sky', 'am_adam', 'am_echo', 'am_eric', 'am_fenrir',
+'am_liam', 'am_michael', 'am_onyx', 'am_puck', 'am_santa', 'bf_alice', 'bf_emma',
+'bf_isabella', 'bf_lily', 'bm_daniel', 'bm_fable', 'bm_george', 'bm_lewis', 'ef_dora',
+'em_alex', 'em_santa', 'ff_siwis', 'hf_alpha', 'hf_beta', 'hm_omega', 'hm_psi', 'if_sara',
+'im_nicola', 'jf_alpha', 'jf_gongitsune', 'jf_nezumi', 'jf_tebukuro', 'jm_kumo', 'pf_dora',
+'pm_alex', 'pm_santa', 'zf_xiaobei', 'zf_xiaoni', 'zf_xiaoxiao', 'zf_xiaoyi'
+```
+
+Each voice has a language assigned and gender assigned to it where the first letter of the pack represents the language and the second the gender (e.g. `af_alloy` is an American English Female voice; `a` corresponds to American Enlgish and `f` to Female). Below is a list of all currently supported langauges mapped to their respective codes:
+
+```
+# 🇺🇸 'a' => American English, 🇬🇧 'b' => British English
+# 🇪🇸 'e' => Spanish es
+# 🇫🇷 'f' => French fr-fr
+# 🇮🇳 'h' => Hindi hi
+# 🇮🇹 'i' => Italian it
+# 🇯🇵 'j' => Japanese: pip install misaki[ja]
+# 🇧🇷 'p' => Brazilian Portuguese pt-br
+# 🇨🇳 'z' => Mandarin Chinese: pip install misaki[zh]
+```
+
+By default when a voice of a specific language is used, phonemization for that language will be automatically detected. However, when multiple phonetic alphabets exist for a single language the default phonemization language might not be appropriate (e.g. Mandarin latin as english is standard for Mandarin, but Pinyin might be preferred). In such cases it is necessary to specify the specific espeak-ng voice file id via the `--espeak-voice-id` argument. A comprehensive list of viable voice ids for this field can be found under the `file` column via the following espeak command:
+
+```commandline
+espeak-ng --voices
+```
+
