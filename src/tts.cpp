@@ -41,7 +41,12 @@ struct tts_runner * kokoro_from_file(gguf_context * meta_ctx, ggml_context * wei
     struct kokoro_duration_context * kdctx = build_new_duration_kokoro_context(model, n_threads, cpu_only);
     struct kokoro_duration_runner * duration_runner = new kokoro_duration_runner(model, kdctx, spt);
     struct kokoro_context * kctx = build_new_kokoro_context(model, n_threads, cpu_only);
-    struct phonemizer * phmzr = phonemizer_from_gguf(meta_ctx);
+    // if an espeak voice id wasn't specifically set infer it from the kokoro voice, if it was override it, otherwise fallback to American English.
+    std::string espeak_voice_id = config->espeak_voice_id;
+    if (espeak_voice_id.empty()) {
+        espeak_voice_id = !config->voice.empty() && KOKORO_LANG_TO_ESPEAK_ID.find(config->voice.at(0)) != KOKORO_LANG_TO_ESPEAK_ID.end() ? KOKORO_LANG_TO_ESPEAK_ID[config->voice.at(0)] : "gmw/en-US";
+    }
+    struct phonemizer * phmzr = phonemizer_from_gguf(meta_ctx, espeak_voice_id);
     struct kokoro_runner * runner = new kokoro_runner(model, kctx, spt, duration_runner, phmzr);
 
     // TODO: change this weight assignment pattern to mirror llama.cpp
@@ -95,7 +100,7 @@ int generate(tts_runner * runner, std::string sentence, struct tts_response * re
             ((parler_tts_runner*)runner)->configure_generation(config);
             return ((parler_tts_runner*)runner)->generate(sentence, response);
         case KOKORO_ARCH:
-            return ((kokoro_runner*)runner)->generate(sentence, response, config->voice);
+            return ((kokoro_runner*)runner)->generate(sentence, response, config->voice, config->espeak_voice_id);
         default:
             TTS_ABORT("%s failed. The architecture '%d' is not supported.", __func__, runner->arch);
     }

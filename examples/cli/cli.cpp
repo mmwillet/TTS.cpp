@@ -25,6 +25,7 @@ int main(int argc, const char ** argv) {
     args.add_argument(string_arg("--text-encoder-path", "(OPTIONAL) The local path of the text encoder gguf model for conditional generaiton.", "-tep", false));
     args.add_argument(string_arg("--voice", "(OPTIONAL) The voice to use to generate the audio. This is only used for models with voice packs.", "-v", false, "af_alloy"));
     args.add_argument(bool_arg("--vad", "(OPTIONAL) whether to apply voice inactivity detection (VAD) and strip silence form the end of the output (particularly useful for Parler TSS). By default, no VAD is applied.", "-va"));
+    args.add_argument(string_arg("--espeak-voice-id", "(OPTIONAL) The espeak voice id to use for phonemization. This should only be specified when the correct espeak voice cannot be inferred from the kokoro voice ( see MultiLanguage Configuration in the README for more info).", "-eid", false));
     register_play_tts_response_args(args);
     args.parse(argc, argv);
     if (args.for_help) {
@@ -40,7 +41,13 @@ int main(int argc, const char ** argv) {
         exit(1);
     }
 
-    generation_configuration * config = new generation_configuration(args.get_string_param("--voice"), *args.get_int_param("--topk"), *args.get_float_param("--temperature"), *args.get_float_param("--repetition-penalty"), !args.get_bool_param("--no-cross-attn"));
+    generation_configuration * config = new generation_configuration(
+        args.get_string_param("--voice"), 
+        *args.get_int_param("--topk"), 
+        *args.get_float_param("--temperature"), 
+        *args.get_float_param("--repetition-penalty"), 
+        !args.get_bool_param("--no-cross-attn"),
+        args.get_string_param("--espeak-voice-id"));
 
     struct tts_runner * runner = runner_from_file(args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), config, !args.get_bool_param("--use-metal"));
 

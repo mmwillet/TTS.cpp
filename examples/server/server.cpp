@@ -378,6 +378,8 @@ int main(int argc, const char ** argv) {
     args.add_argument(int_arg("--timeout", "(OPTIONAL) The server side timeout on http calls in seconds. Defaults to 300 seconds.", "-t", false, &default_timeout));
     args.add_argument(int_arg("--n-parallelism", "(OPTIONAL) the number of parallel models to run asynchronously. Deafults to 1.", "-np", false, &default_n_parallel));
     args.add_argument(string_arg("--voice", "(OPTIONAL) the default voice to use when generating audio. Only used with applicable models.", "-v", false, "af_alloy"));
+    args.add_argument(string_arg("--espeak-voice-id", "(OPTIONAL) The espeak voice id to use for phonemization. This should only be specified when the correct espeak voice cannot be inferred from the kokoro voice (see #MultiLanguage Configuration in the cli README for more info).", "-eid", false));
+
     args.parse(argc, argv);
     if (args.for_help) {
         args.help();
@@ -385,7 +387,7 @@ int main(int argc, const char ** argv) {
     }
     args.validate();
 
-    generation_configuration * default_generation_config = new generation_configuration(args.get_string_param("--voice"), *args.get_int_param("--topk"), *args.get_float_param("--temperature"), *args.get_float_param("--repetition-penalty"), !args.get_bool_param("--no-cross-attn"));
+    generation_configuration * default_generation_config = new generation_configuration(args.get_string_param("--voice"), *args.get_int_param("--topk"), *args.get_float_param("--temperature"), *args.get_float_param("--repetition-penalty"), !args.get_bool_param("--no-cross-attn"), args.get_string_param("--espeak-voice-id"));
 
     worker_pool * pool = nullptr;
     struct simple_task_queue * tqueue = new simple_task_queue;
