@@ -1318,7 +1318,7 @@ int kokoro_runner::generate(std::string prompt, struct tts_response * response, 
         drunner->kctx->voice = voice;
     }
     if (phmzr->mode == ESPEAK) {
-    	prompt = replace_any(prompt, ".,;:?!", "--");
+    	prompt = replace_any(prompt, ".,;:?!", "--"); // espeak phonemization stops at this punctuation, so replace punctuation with '--' which espeak will treat as a pause.
     }
   	std::string phonemized_prompt = phmzr->text_to_phonemes(prompt);
 	std::vector<uint32_t> tokens;
@@ -1329,7 +1329,6 @@ int kokoro_runner::generate(std::string prompt, struct tts_response * response, 
 	kokoro_ubatch batch;
 	batch.n_tokens = tokens.size();
 	batch.input_tokens = tokens.data();
-
 	run(batch, response);
 	return 0;
 }
