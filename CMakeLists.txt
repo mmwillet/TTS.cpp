@@ -26,7 +26,7 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(ESPEAK espeak-ng)
     if (ESPEAK_FOUND)
-        set(ESPEAK_CFLAGS_OTHER "${ESPEAK_CFLAGS_OTHER} -DESPEAK_INSTALL=1 -DESPEAK_DATA_PATH=\\\"${ESPEAK_PREFIX}/share\\\"")
+        set(ESPEAK_CFLAGS_OTHER "${ESPEAK_CFLAGS_OTHER} -DESPEAK_INSTALL=1 -DESPEAK_DATA_PATH=\\\"${ESPEAK_LIBDIR}/espeak-ng-data\\\"")
     endif()
 endif()
 
