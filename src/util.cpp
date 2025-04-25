@@ -171,8 +171,9 @@ void compute_window_squared_sum(size_t n_fft, size_t hop, size_t n_frames, float
 std::string replace_any(std::string target, std::string to_replace, std::string replacement) {
     for (int i = 0; i < to_replace.size(); i++) {
         size_t position = target.find(to_replace[i]);
-        if (position != std::string::npos) {
+        while (position != std::string::npos) {
             target.replace(position, 1, replacement);
+            position = target.find(to_replace[i]);
         }
     }
     return target;
