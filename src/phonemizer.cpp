@@ -1009,17 +1009,15 @@ std::string phonemizer::text_to_phonemes(const char * text, size_t size) {
 	std::string output = ""; 
 	if (mode == ESPEAK) {
 #ifdef ESPEAK_INSTALL
-		if (preserve_punctuation) {
-			auto parts = split(text, ",.:;?!", true);
-			std::string phonemes = "";
-			for (int i = 0; i < parts.size(); i+=2) {
-				phonemes += espeak_text_to_phonemes(parts[i].c_str());
-				if (preserve_punctuation && i + 1 < parts.size()) {
-					phonemes += parts[i+1] + " ";
-				}
+		auto parts = split(text, STOPPING_TOKENS, true);
+		std::string phonemes = "";
+		for (int i = 0; i < parts.size(); i+=2) {
+			phonemes += espeak_text_to_phonemes(parts[i].c_str());
+			if (preserve_punctuation && i + 1 < parts.size()) {
+				phonemes += parts[i+1];
 			}
-			return phonemes;
 		}
+		return phonemes;
 #else
 		TTS_ABORT("%s attempted to run in espeak mode without espeak installed. \n", __func__);
 #endif

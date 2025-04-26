@@ -286,6 +286,9 @@ static const std::map<std::string, std::string> CONTRACTION_PHONEMES = {
 	{"t", "t"},
 };
 
+// characters that Espeak-ng treats as stopping tokens.
+static std::string STOPPING_TOKENS = ".,:;!?";
+
 enum lookup_code {
 	SUCCESS = 100,
 	SUCCESS_PARTIAL = 101,

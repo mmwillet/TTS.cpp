@@ -1070,8 +1070,6 @@ void kokoro_duration_runner::run(kokoro_ubatch & batch) {
 	    kctx->buf_output = ggml_backend_buft_alloc_buffer(kctx->backend_cpu_buffer, new_size);
 	}
 
-    kctx->buf_output = ggml_backend_buft_alloc_buffer(kctx->backend_cpu_buffer, new_size);
-
     prev_size = kctx->buf_len_output ? ggml_backend_buffer_get_size(kctx->buf_len_output) : 0;
     new_size = model->max_context_length * sizeof(float);
     
@@ -1264,9 +1262,9 @@ void kokoro_runner::run(kokoro_ubatch & batch, tts_response * outputs) {
             kctx->buf_output = nullptr;
             kctx->logits = nullptr;
         }
-
         kctx->buf_output = ggml_backend_buft_alloc_buffer(kctx->backend_cpu_buffer, new_size);
     }
+
     outputs->data = (float *) ggml_backend_buffer_get_base(kctx->buf_output);
     ggml_backend_buffer_clear(kctx->buf_output, 0);
 
@@ -1384,7 +1382,10 @@ int kokoro_runner::generate(std::string prompt, struct tts_response * response, 
   	// beginning of sentence and end of sentence tokens then we can compute it all at once.
   	if (phonemized_prompt.size() < model->max_context_length - 2) { 
   		// we preserved punctuation and Kokoro interprets these tokens as end of sentence tokens, so we have to remove them for all-at-once compute.
-  		phonemized_prompt = replace_any(phonemized_prompt, ".!?", "");
+  		phonemized_prompt = strip(replace_any(phonemized_prompt, ".!?", ""));
+  		if (phonemized_prompt.empty()) {
+  			return 0;
+  		}
 		std::vector<uint32_t> tokens;
 		tokens.push_back(model->bos_token_id);
 		tokenizer->tokenize(phonemized_prompt, tokens);

@@ -21,8 +21,6 @@ static std::map<char, std::string> KOKORO_LANG_TO_ESPEAK_ID = {
 	{'z', "sit/cmn"}
 };
 
-static std::string STOPPING_TOKENS = ".,:;!?"; 
-
 struct lstm_cell {
 	std::vector<ggml_tensor*> weights; 
 	std::vector<ggml_tensor*> biases;

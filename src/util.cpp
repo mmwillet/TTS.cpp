@@ -66,7 +66,7 @@ void random_gen(int count, float * tgt, float min, float max) {
     static std::default_random_engine e;
     static std::uniform_real_distribution<float> dis(min, max);
     for (int i = 0; i < count; i++) {
-        tgt[i] = 0.5f; //dis(e);
+        tgt[i] = dis(e);
     }
 }
 

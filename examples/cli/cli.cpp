@@ -57,6 +57,10 @@ int main(int argc, const char ** argv) {
     tts_response data;
 
     generate(runner, args.get_string_param("--prompt"), &data, config);
+    if (data.n_outputs == 0) {
+        fprintf(stderr, "Got empty response for prompt, '%s'.\n", args.get_string_param("--prompt").c_str());
+        exit(1);
+    }
     if (args.get_bool_param("--vad")) {
         apply_energy_voice_inactivity_detection(data, runner->sampling_rate);
     }
