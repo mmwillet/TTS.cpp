@@ -6,6 +6,7 @@
 #include <random>
 #include <stdio.h>
 #include <string>
+#include <cstring>
 #include <vector>
 #include <stdint.h>
 #include <sys/types.h>
