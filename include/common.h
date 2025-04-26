@@ -10,7 +10,7 @@
 // pointer directly rather than copying the contents of the buffer to a predefined std::vector.
 struct tts_response {
 	float * data;
-	size_t n_outputs;
+	size_t n_outputs = 0;
 	uint32_t hidden_size; // this parameter is only currently used by the t5_encoder for which n_outputs corresponds to sequence length;
 };
 

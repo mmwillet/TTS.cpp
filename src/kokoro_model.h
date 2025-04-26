@@ -21,6 +21,8 @@ static std::map<char, std::string> KOKORO_LANG_TO_ESPEAK_ID = {
 	{'z', "sit/cmn"}
 };
 
+static std::string STOPPING_TOKENS = ".,:;!?"; 
+
 struct lstm_cell {
 	std::vector<ggml_tensor*> weights; 
 	std::vector<ggml_tensor*> biases;
@@ -180,6 +182,7 @@ struct kokoro_model : tts_model {
 	// tokenization
 	uint32_t bos_token_id = 0;
 	uint32_t eos_token_id = 0;
+	uint32_t space_token_id = 16;
 	// duration prediction
 	uint32_t max_context_length = 512;
 	uint32_t vocab_size = 178;
@@ -449,6 +452,8 @@ struct kokoro_runner : tts_runner {
         tts_runner::init_build(&kctx->buf_compute_meta);
     }
     
+
+    std::vector<std::vector<uint32_t>> tokenize_chunks(std::vector<std::string> clauses);
     void assign_weight(std::string name, ggml_tensor * tensor);
     void prepare_post_load();
     kokoro_ubatch build_worst_case_batch();

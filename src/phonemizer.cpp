@@ -83,7 +83,7 @@ std::string replace_accents(std::string word) {
 	return new_word;
 }
 
-std::vector<std::string> split(std::string target, std::string split_on) {
+std::vector<std::string> split(std::string target, std::string split_on, bool include_split_characters) {
 	std::vector<std::string> output;
     size_t last = 0;
 
@@ -91,6 +91,9 @@ std::vector<std::string> split(std::string target, std::string split_on) {
     	if (i > last && split_on.find(target[i]) != std::string::npos) {
     		std::string part(target.substr(last, i - last));
     		output.push_back(part);
+    		if (include_split_characters) {
+    			output.push_back(target.substr(i, 1));
+    		}
     		last = i+1;
     	}
     }
@@ -102,7 +105,7 @@ std::vector<std::string> split(std::string target, std::string split_on) {
     return output;
 }
 
-std::vector<std::string> split(std::string target, const char split_on) {
+std::vector<std::string> split(std::string target, const char split_on, bool include_split_characters) {
 	std::vector<std::string> output;
     size_t last = 0;
 
@@ -110,6 +113,9 @@ std::vector<std::string> split(std::string target, const char split_on) {
     	if (i > last && split_on == target[i]) {
     		std::string part(target.substr(last, i - last));
     		output.push_back(part);
+    		if (include_split_characters) {
+    			output.push_back(target.substr(i, 1));
+    		}
     		last = i+1;
     	}
     }
@@ -1003,7 +1009,17 @@ std::string phonemizer::text_to_phonemes(const char * text, size_t size) {
 	std::string output = ""; 
 	if (mode == ESPEAK) {
 #ifdef ESPEAK_INSTALL
-		return espeak_text_to_phonemes(text);
+		if (preserve_punctuation) {
+			auto parts = split(text, ",.:;?!", true);
+			std::string phonemes = "";
+			for (int i = 0; i < parts.size(); i+=2) {
+				phonemes += espeak_text_to_phonemes(parts[i].c_str());
+				if (preserve_punctuation && i + 1 < parts.size()) {
+					phonemes += parts[i+1] + " ";
+				}
+			}
+			return phonemes;
+		}
 #else
 		TTS_ABORT("%s attempted to run in espeak mode without espeak installed. \n", __func__);
 #endif

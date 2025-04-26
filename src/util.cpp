@@ -66,7 +66,7 @@ void random_gen(int count, float * tgt, float min, float max) {
     static std::default_random_engine e;
     static std::uniform_real_distribution<float> dis(min, max);
     for (int i = 0; i < count; i++) {
-        tgt[i] = dis(e);
+        tgt[i] = 0.5f; //dis(e);
     }
 }
 
@@ -157,6 +157,7 @@ void compute_window_squared_sum(size_t n_fft, size_t hop, size_t n_frames, float
     size_t out_size = n_frames * hop;
     size_t half = n_fft / 2;
     size_t cutoff = out_size - n_fft;
+    std::memset(tgt, 0, cutoff*sizeof(float));
     for (int i = 0; i < n_frames; i++) {
         for (int ii = 0; ii < n_fft; ii++) {
             int index = ii + i*hop - half;

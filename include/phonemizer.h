@@ -307,8 +307,8 @@ std::string parse_voice_code(std::string voice_code);
 void update_voice(std::string voice_code);
 const std::unordered_set<std::string> inline_combine_sets(const std::vector<std::unordered_set<std::string>> sets);
 std::string strip(std::string target, std::string vals = " ");
-std::vector<std::string> split(std::string target, std::string split_on);
-std::vector<std::string> split(std::string target, const char split_on);
+std::vector<std::string> split(std::string target, std::string split_on, bool include_split_characters = false);
+std::vector<std::string> split(std::string target, const char split_on, bool include_split_characters = false);
 int upper_count(std::string word);
 bool is_all_upper(std::string word);
 bool is_roman_numeral(char letter);
@@ -450,7 +450,7 @@ struct phoneme_dictionary * phoneme_dictionary_from_gguf(gguf_context * meta);
  * effecively like a simple router lexer. It will only support utf-8 encoded text and english IPA conversion.
  */
 struct phonemizer {
-	phonemizer(struct phoneme_dictionary * dict, struct word_phonemizer * phonetic_phonemizer): dict(dict), phonetic_phonemizer(phonetic_phonemizer) {};
+	phonemizer(struct phoneme_dictionary * dict, struct word_phonemizer * phonetic_phonemizer, bool preserve_punctuation = true): dict(dict), phonetic_phonemizer(phonetic_phonemizer), preserve_punctuation(preserve_punctuation) {};
 	~phonemizer() {
 		delete dict;
 		delete phonetic_phonemizer;

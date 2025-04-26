@@ -224,7 +224,6 @@ static struct ggml_tensor * build_generator(ggml_context * ctx, kokoro_model * m
 		cur = ggml_cont(ctx, ggml_transpose(ctx, ggml_div(ctx, cur, model->n_kernels_tensor)));
 	}
 
-
 	cur = ggml_leaky_relu(ctx, cur, 0.01f, false);
 	cur = ggml_add(ctx, ggml_conv_1d(ctx, generator->out_conv_weight, ggml_cont(ctx, ggml_transpose(ctx, cur)), 1, model->out_conv_padding, 1), generator->out_conv_bias);
 
@@ -1061,16 +1060,17 @@ void kokoro_duration_runner::run(kokoro_ubatch & batch) {
 
     size_t prev_size = kctx->buf_output ? ggml_backend_buffer_get_size(kctx->buf_output) : 0;
     size_t new_size = model->max_context_length * (model->duration_hidden_size + model->style_half_size) * sizeof(float);
-    
-    if (!kctx->buf_output || prev_size < new_size) {
-        if (kctx->buf_output) {
-            ggml_backend_buffer_free(kctx->buf_output);
-            kctx->buf_output = nullptr;
-            kctx->logits = nullptr;
-        }
 
-        kctx->buf_output = ggml_backend_buft_alloc_buffer(kctx->backend_cpu_buffer, new_size);
-    }
+    if (!kctx->buf_output || prev_size < new_size) {
+	    if (kctx->buf_output) {
+	        ggml_backend_buffer_free(kctx->buf_output);
+	        kctx->buf_output = nullptr;
+	        kctx->logits = nullptr;
+	    }
+	    kctx->buf_output = ggml_backend_buft_alloc_buffer(kctx->backend_cpu_buffer, new_size);
+	}
+
+    kctx->buf_output = ggml_backend_buft_alloc_buffer(kctx->backend_cpu_buffer, new_size);
 
     prev_size = kctx->buf_len_output ? ggml_backend_buffer_get_size(kctx->buf_len_output) : 0;
     new_size = model->max_context_length * sizeof(float);
@@ -1160,6 +1160,7 @@ struct ggml_cgraph * kokoro_runner::build_kokoro_graph(kokoro_ubatch & batch) {
     cur = build_lstm(ctx, cur, model->prosody_pred->shared_lstm, cur->ne[1]);
 
     ggml_build_forward_expand(gf, cur);
+
     struct ggml_tensor * f0_curve = cur;
     for (auto block : model->prosody_pred->f0_blocks) {
     	f0_curve = build_ada_residual_conv(ctx, f0_curve, block, style_half, model->sqrt_tensor);
@@ -1303,6 +1304,62 @@ void kokoro_runner::assign_weight(std::string name, ggml_tensor * tensor) {
 	model->assign_weight(name, tensor);
 }
 
+/*
+ * #tokenize_chunks is used to split up a larger than max context size (512) token prompt into discrete
+ * blocks for generation. This solution, in accordance with Kokoro's pyTorch implementation, splits
+ * the prompt by sentence when possible (this can result in slower inference but generally produces cleaner 
+ * speech). If a disinct sentence is too long, then it splits at the nearest space.
+ */
+std::vector<std::vector<uint32_t>> kokoro_runner::tokenize_chunks(std::vector<std::string> clauses) {
+	std::vector<std::vector<uint32_t>> chunks;
+	for (auto clause : clauses) {
+		clause = strip(clause);
+		if (clause.empty()) {
+			continue;
+		} 
+		std::vector<uint32_t> tokens;
+		tokens.push_back(model->bos_token_id);
+		tokenizer->tokenize(clause, tokens);
+		// if there are more clause tokens than the max context length then try to split by space tokens.
+		// To be protective, split mid-word when there are no spaces (this should never happen).
+		if (tokens.size() > model->max_context_length - 2) {
+			// we skip the first token here becuase it is the bos token.
+			int last_space_token = 1;
+			int last_split = 1;
+			for (int i = 1; i < tokens.size(); i++) {
+				if (tokens[i] == model->space_token_id) {
+					last_space_token = i;
+				}
+				if ((i - last_split) + chunks.back().size() >= model->max_context_length - 1) {
+					if (last_space_token > last_split) {
+						std::vector<uint32_t> portion = { model->bos_token_id };
+						portion.insert(portion.end(), tokens.begin() + last_split, tokens.begin() + last_space_token);
+						portion.push_back(model->eos_token_id);
+						chunks.push_back(portion);
+						last_split = last_space_token;
+					} else {
+						std::vector<uint32_t> portion = { model->bos_token_id };
+						portion.insert(portion.end(), tokens.begin() + last_split, tokens.begin() + i + 1);
+						portion.push_back(model->eos_token_id);
+						chunks.push_back(portion);
+						last_split = i + 1;
+					}
+				}
+			}
+			if (last_split + 1 < tokens.size()) {
+				std::vector<uint32_t> portion = { model->bos_token_id };
+				portion.insert(portion.end(), tokens.begin() + last_split, tokens.end());
+				portion.push_back(model->eos_token_id);
+				chunks.push_back(portion);
+			}
+		} else {
+			tokens.push_back(model->eos_token_id);
+			chunks.push_back(tokens);
+		}
+	}
+	return chunks;
+}
+
 int kokoro_runner::generate(std::string prompt, struct tts_response * response, std::string voice, std::string voice_code) {
 	if (model->voices.find(voice) == model->voices.end()) {
 		TTS_ABORT("Failed to find Kokoro voice '%s' aborting.\n", voice.c_str());
@@ -1317,24 +1374,40 @@ int kokoro_runner::generate(std::string prompt, struct tts_response * response, 
         kctx->voice = voice;
         drunner->kctx->voice = voice;
     }
-    if (phmzr->mode == ESPEAK) {
-    	prompt = replace_any(prompt, ".,;:?!", "--"); // espeak phonemization stops at this punctuation, so replace punctuation with '--' which espeak will treat as a pause.
-    }
+    // replace all non-sentence terminating characters with '--' which espeak will treat as a pause.
+    // We preserve the other punctuation for cleaner chunking pre-tokenization
+    prompt = replace_any(prompt, ",;:", "--");
+    prompt = replace_any(prompt, "\n", " ");
   	std::string phonemized_prompt = phmzr->text_to_phonemes(prompt);
-	std::vector<uint32_t> tokens;
-	tokens.push_back(model->bos_token_id);
-	tokenizer->tokenize(phonemized_prompt, tokens);
-	tokens.push_back(model->eos_token_id);
-	// This will be removed when proper chunking is implemented.
-	if (tokens.size() > model->max_context_length) {
-		TTS_ABORT("The passed prompt allocated %d tokens which surpassed Kokoro's max context limit of %d tokens.\n", tokens.size(), model->max_context_length);
-	}
 
-	kokoro_ubatch batch;
-	batch.n_tokens = tokens.size();
-	batch.input_tokens = tokens.data();
-	run(batch, response);
-	return 0;
+  	// Kokoro users a utf-8 single character tokenizer so if the size of the prompt is smaller than the max context length without the 
+  	// beginning of sentence and end of sentence tokens then we can compute it all at once.
+  	if (phonemized_prompt.size() < model->max_context_length - 2) { 
+  		// we preserved punctuation and Kokoro interprets these tokens as end of sentence tokens, so we have to remove them for all-at-once compute.
+  		phonemized_prompt = replace_any(phonemized_prompt, ".!?", "");
+		std::vector<uint32_t> tokens;
+		tokens.push_back(model->bos_token_id);
+		tokenizer->tokenize(phonemized_prompt, tokens);
+		tokens.push_back(model->eos_token_id);
+		kokoro_ubatch batch;
+		batch.n_tokens = tokens.size();
+		batch.input_tokens = tokens.data();
+		run(batch, response);
+  	} else {
+  		// TODO: determine the performance to memory trade off in using a batched compute approach verse this chunking approach.
+  		// This approach is likely to be slower than a batched approach, but given the already huge memory overhead of Kokoro's graph it 
+  		// might be preferable to use this chunking approach.
+  		std::vector<std::string> clauses = split(phonemized_prompt, ".!?");
+  		for (auto tokens : tokenize_chunks(clauses)) {
+			kokoro_ubatch batch;
+			batch.n_tokens = tokens.size();
+			batch.input_tokens = tokens.data();
+			struct tts_response * partial = new tts_response;
+			run(batch, partial);
+			append_to_response(response, partial);
+		}
+  	}
+  	return 0;
 }
 
 

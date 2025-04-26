@@ -2,6 +2,19 @@
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
 
+void append_to_response(struct tts_response * response, struct tts_response * to_append) {
+    float * new_data = (float *) malloc((response->n_outputs + to_append->n_outputs) * sizeof(float));
+    if (response->n_outputs > 0) {
+        std::memcpy(new_data, response->data, response->n_outputs*sizeof(float));
+    }
+    if (to_append->n_outputs > 0) {
+        float * next_loc = new_data + response->n_outputs;
+        std::memcpy(next_loc, to_append->data, to_append->n_outputs*sizeof(float));
+    }
+    response->data = new_data;
+    response->n_outputs += to_append->n_outputs;
+}
+
 void runner_context::set_threads() {
     if (backend != nullptr) {
 #ifdef GGML_USE_METAL
