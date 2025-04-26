@@ -1325,6 +1325,10 @@ int kokoro_runner::generate(std::string prompt, struct tts_response * response, 
 	tokens.push_back(model->bos_token_id);
 	tokenizer->tokenize(phonemized_prompt, tokens);
 	tokens.push_back(model->eos_token_id);
+	// This will be removed when proper chunking is implemented.
+	if (tokens.size() > model->max_context_length) {
+		TTS_ABORT("The passed prompt allocated %d tokens which surpassed Kokoro's max context limit of %d tokens.\n", tokens.size(), model->max_context_length);
+	}
 
 	kokoro_ubatch batch;
 	batch.n_tokens = tokens.size();
