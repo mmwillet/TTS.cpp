@@ -322,35 +322,30 @@ void kokoro_model::post_load_assign() {
 	ggml_backend_tensor_set(sqrt_tensor, &sqrt2, 0, size);
 	offset += size;
 
+	std::vector<float> data{};
 	for (int l = 0; l < lstms.size(); l++) {
 		lstm * rnn = lstms[l];
-		size_t hidden_size = rnn->cells[0]->biases[0]->ne[0];
-		float * data = (float*) malloc(hidden_size * sizeof(float));
-
-		for (int i = 0; i < hidden_size; i++) {
-			data[i] = 0.0f;
-		}
+		const int32_t hidden_size = rnn->cells[0]->biases[0]->ne[0];
+		data.resize(hidden_size);
 
 		for (int i = 0; i < rnn->cells.size(); i++) {
-			int32_t hidden_size = rnn->cells[0]->biases[0]->ne[0];
 			struct ggml_tensor * h = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, hidden_size);
 			struct ggml_tensor * s = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, hidden_size);
 			h->buffer = buf;
     		h->data = (void *)((uint8_t *) ggml_backend_buffer_get_base(buf) + offset);
     		size_t size = ggml_nbytes(h);
-			ggml_backend_tensor_set(h, data, 0, size);
-    		ggml_set_name(h, ("lstm"+std::to_string(l)+"_hidden").c_str());
+			ggml_backend_tensor_set(h, data.data(), 0, size);
+			ggml_format_name(h, "lstm%d_hidden", l);
     		offset += size;
 			s->buffer = buf;
     		s->data = (void *)((uint8_t *) ggml_backend_buffer_get_base(buf) + offset);
-			ggml_backend_tensor_set(s, data, 0, size);
-    		ggml_set_name(s, ("lstm"+std::to_string(l)+"_state").c_str());
+			ggml_backend_tensor_set(s, data.data(), 0, size);
+			ggml_format_name(h, "lstm%d_state", l);
     		offset += size;
     		rnn->hidden.push_back(h);
     		rnn->states.push_back(s);
 		}
-
-		delete data;
+		data.clear();
 	}
 
 	if (window == "hann") {
