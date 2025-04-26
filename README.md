@@ -64,7 +64,17 @@ If you wish to install TTS.cpp with Espeak-ng phonemization support, first [inst
 
 ```commandline
 export ESPEAK_INSTALL_DIR=/absolute/path/to/espeak-ng/dir
-cmake -B build                                           
+cmake -B build
+cmake --build build --config Release
+```
+
+On Linux, you don't need to manually download or `export` anything. Our build system will automatically detect the development packages installed on your machine:
+
+```bash
+# Change `apt` and the package names to match your distro
+sudo apt install build-essential cmake # Minimum requirements
+sudo apt install git libespeak-ng-dev libsdl2-dev pkg-config # Optional requirements
+cmake -B build
 cmake --build build --config Release
 ```
 

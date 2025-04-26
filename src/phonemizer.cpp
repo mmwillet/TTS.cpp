@@ -236,7 +236,7 @@ std::string parse_voice_code(std::string voice_code) {
 	fprintf(stdout, "Passed Espeak Voice Code '%s' doesn't directly match any known Espeak Voice IDs. Nearest match with name '%s' and id '%s' will be used instead.\n", voice_code.c_str(), primary_match->name, primary_match->identifier);
 	return std::string(primary_match->identifier);
 #else
-	TTS_ABORT("Attempted to list voices without espeak-ng installed.")
+	TTS_ABORT("Attempted to list voices without espeak-ng installed.");
 #endif
 }
 
@@ -248,7 +248,7 @@ void update_voice(std::string voice_code) {
    		espeak_SetVoiceByName(voice_code.c_str());
     }
 #else
-    TTS_ABORT("Attempted to set voice without espeak-ng installed.")
+    TTS_ABORT("Attempted to set voice without espeak-ng installed.");
 #endif
 }
 
