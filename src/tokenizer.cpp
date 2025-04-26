@@ -160,7 +160,7 @@ void single_pass_tokenizer::tokenize(const std::string & text, std::vector<uint3
     std::string remaining = text;
     while (remaining.size() > 0) {
         uint32_t token_id = unknown_id;
-        for (int i = 1; i < std::min(remaining.size()+1, max_size); i++) {
+        for (int i = 1; i < std::min(remaining.size()+1, max_size+1); i++) {
             std::string part = remaining.substr(0, i);
             ptrdiff_t pos = std::distance(tokens.begin(), std::find(tokens.begin(), tokens.end(), part));
             if (pos < tokens.size()) {
