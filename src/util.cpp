@@ -125,7 +125,7 @@ void uv_noise_compute(struct ggml_tensor * dst, const struct ggml_tensor * a, co
     float sin_amp_div = ((float *) userdata)[3];
     float * rand_init = ((float *) userdata) + 4;
 
-    const int rpt = (b->ne[0]) / nth + 1;
+    const int rpt = (b->ne[0] + nth - 1)/nth;
     const int start = ith * rpt;
     const int end = MIN((ith + 1) * rpt, b->ne[0]);
 
@@ -157,6 +157,7 @@ void compute_window_squared_sum(size_t n_fft, size_t hop, size_t n_frames, float
     size_t out_size = n_frames * hop;
     size_t half = n_fft / 2;
     size_t cutoff = out_size - n_fft;
+    std::memset(tgt, 0, cutoff*sizeof(float));
     for (int i = 0; i < n_frames; i++) {
         for (int ii = 0; ii < n_fft; ii++) {
             int index = ii + i*hop - half;
