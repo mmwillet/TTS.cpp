@@ -349,9 +349,7 @@ void t5_runner::run(uint32_t * input_tokens, uint32_t sequence_length, struct tt
 
     ggml_backend_sched_graph_compute_async(t5ctx->sched, gf);
 
-    ggml_backend_t backend_res = ggml_backend_sched_get_tensor_backend(t5ctx->sched, result);
-
-    ggml_backend_tensor_get_async(backend_res, result, outputs->data, 0, batch.n_tokens*sizeof(float)*model->output_size);
+    t5ctx->get_ggml_node_data(result, outputs->data, batch.n_tokens*sizeof(float)*model->output_size);
 
     // Reset state for the next token before backend sync, to allow the CPU activities in the reset to
     // overlap with device computation.

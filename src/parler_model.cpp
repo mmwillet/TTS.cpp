@@ -693,10 +693,9 @@ int parler_tts_runner::decode(parler_ubatch & batch) {
 
     set_inputs(batch);
     parler_graph_compute(gf);
-    ggml_backend_t backend_res = ggml_backend_sched_get_tensor_backend(pctx->sched, res);
 
     float * logits_out = pctx->logits + pctx->n_outputs * model->output_vocab_size * model->n_output_heads;
-    ggml_backend_tensor_get_async(backend_res, res, logits_out, 0, n_outputs_new*model->output_vocab_size*model->n_output_heads*sizeof(float));
+    pctx->get_ggml_node_data(res, logits_out, n_outputs_new*model->output_vocab_size*model->n_output_heads*sizeof(float));
 
     // set to total number of outputs in the batch*/
     pctx->n_outputs += n_outputs_new;
