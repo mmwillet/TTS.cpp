@@ -125,7 +125,7 @@ void uv_noise_compute(struct ggml_tensor * dst, const struct ggml_tensor * a, co
     float sin_amp_div = ((float *) userdata)[3];
     float * rand_init = ((float *) userdata) + 4;
 
-    const int rpt = (b->ne[0]) / nth + 1;
+    const int rpt = (b->ne[0] + nth - 1)/nth;
     const int start = ith * rpt;
     const int end = MIN((ith + 1) * rpt, b->ne[0]);
 

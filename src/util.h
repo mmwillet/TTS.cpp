@@ -51,6 +51,6 @@ bool has_prefix(std::string value, std::string prefix);
 
 std::string replace_any(std::string target, std::string to_replace, std::string replacement);
 
-void tts_abort(const char * file, int line, const char * fmt, ...);
+[[noreturn]] void tts_abort(const char * file, int line, const char * fmt, ...);
 
 #endif
