@@ -345,8 +345,6 @@ static struct ggml_tensor * build_lstm_run(ggml_context * ctx, ggml_tensor * inp
 static struct ggml_tensor * build_ada_residual_conv(ggml_context * ctx, struct ggml_tensor * x, ada_residual_conv_block * block, struct ggml_tensor * style, struct ggml_tensor * sqrt_tensor);
 static struct ggml_tensor * build_kokoro_generator_res_block(ggml_context * ctx, struct ggml_tensor * x, struct ggml_tensor * style, kokoro_generator_residual_block * block);
 static struct ggml_tensor * build_noise_block(ggml_context * ctx, kokoro_noise_residual_block * block, struct ggml_tensor * x, struct ggml_tensor * style);
-static struct ggml_tensor * build_sin_gen(ggml_context * ctx, kokoro_model * model, struct ggml_tensor * x, int harmonic_num, int sequence_length, float voice_threshold, float sin_amp, float noise_std);
-static struct ggml_tensor * build_generator(ggml_context * ctx, kokoro_model * model, struct ggml_tensor * x, struct ggml_tensor * style, struct ggml_tensor * f0_curve, kokoro_generator* generator, int sequence_length, struct ggml_tensor * window_sq_sum, ggml_cgraph * gf);
 static kokoro_generator_residual_block * build_res_block_from_file(gguf_context * meta, std::string base_config_key);
 static kokoro_noise_residual_block * build_noise_block_from_file(gguf_context * meta, int index);
 static kokoro_generator_upsample_block* kokoro_generator_upsample_block(gguf_context * meta, int index);
@@ -415,11 +413,16 @@ struct kokoro_context : runner_context {
     struct ggml_tensor * duration_pred;
     struct ggml_tensor * duration_mask;
     struct ggml_tensor * window_sq_sum; // needs to be calculatd from the generator window.
+    struct ggml_tensor * uv_noise_data;
     
     void build_schedule() {
         runner_context::build_schedule(model->max_gen_nodes()*30);
     }
 };
+
+// TODO: now that we are passing the context down to these methods we should clean up their parameters
+static struct ggml_tensor * build_generator(ggml_context * ctx, kokoro_model * model, kokoro_context * kctx, struct ggml_tensor * x, struct ggml_tensor * style, struct ggml_tensor * f0_curve, kokoro_generator* generator, int sequence_length, struct ggml_tensor * window_sq_sum, ggml_cgraph * gf);
+static struct ggml_tensor * build_sin_gen(ggml_context * ctx, kokoro_model * model, kokoro_context * kctx, struct ggml_tensor * x, int harmonic_num, int sequence_length, float voice_threshold, float sin_amp, float noise_std);
 
 struct kokoro_context * build_new_kokoro_context(struct kokoro_model * model, int n_threads, bool use_cpu = true);
 

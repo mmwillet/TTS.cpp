@@ -34,7 +34,7 @@ struct ggml_tensor * snake_1d(ggml_context * ctx, struct ggml_tensor * alpha, st
 int search_for_gguf_keys(gguf_context * meta, std::vector<std::string> possible_keys);
 
 // a simple window function for stft
-void hann_window(size_t n_fft, float * tgt);
+void hann_window(size_t n_fft, std::vector<float>& tgt);
 
 // currently this assumes a center view in which the output vector is reflectively padded by n_fft / 2 on each side.
 void compute_window_squared_sum(size_t n_fft, size_t hop, size_t n_frames, float * tgt, float * window);
@@ -44,7 +44,7 @@ struct ggml_tensor * stft(ggml_context * ctx, struct ggml_tensor * a, struct ggm
 struct ggml_tensor * istft(ggml_context * ctx, struct ggml_tensor * a, struct ggml_tensor * window_squared_sum, struct ggml_tensor * window, size_t n_fft, size_t hop, bool abs_and_angle, bool one_sided);
 
 // This is a custom ops for sine_generation in the kokoro model.
-void uv_noise_compute(struct ggml_tensor * dst, const struct ggml_tensor * a, const struct ggml_tensor * b, int ith, int nth, void * userdata);
+void uv_noise_compute(struct ggml_tensor * dst, const struct ggml_tensor * a, const struct ggml_tensor * b, const struct ggml_tensor * c, int ith, int nth, void * userdata);
 
 bool has_suffix(std::string value, std::string suffix);
 bool has_prefix(std::string value, std::string prefix);

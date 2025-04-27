@@ -110,20 +110,20 @@ struct ggml_tensor * istft(ggml_context * ctx, struct ggml_tensor * a, struct gg
     return cur;
 }
 
-void hann_window(size_t n_fft, float * tgt) {
+void hann_window(size_t n_fft, std::vector<float> & tgt) {
     for (int i = 0; i < n_fft; i++) {
         float v = pow(sin(M_PI * (double)i / (double) n_fft), 2.0);
-        tgt[i] = v;
+        tgt.push_back(v);
     }
 }
 
 // This is a custom map op for computing noise and relevant voiced sections.
-void uv_noise_compute(struct ggml_tensor * dst, const struct ggml_tensor * a, const struct ggml_tensor * b, int ith, int nth, void * userdata) {
-    float voice_threshold = ((float *) userdata)[0];
-    float noise_std = ((float *) userdata)[1];
-    float sin_amp = ((float *) userdata)[2];
-    float sin_amp_div = ((float *) userdata)[3];
-    float * rand_init = ((float *) userdata) + 4;
+void uv_noise_compute(struct ggml_tensor * dst, const struct ggml_tensor * a, const struct ggml_tensor * b, const struct ggml_tensor * c, int ith, int nth, void * userdata) {
+    float voice_threshold = ((float *) c->data)[0];
+    float noise_std = ((float *) c->data)[1];
+    float sin_amp = ((float *) c->data)[2];
+    float sin_amp_div = ((float *) c->data)[3];
+    float * rand_init = ((float *) c->data) + 4;
 
     const int rpt = (b->ne[0] + nth - 1)/nth;
     const int start = ith * rpt;
