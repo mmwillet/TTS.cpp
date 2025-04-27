@@ -1082,7 +1082,7 @@ void kokoro_duration_runner::run(kokoro_ubatch & batch) {
     batch.resp->hidden_states = (float *) ggml_backend_buffer_get_base(kctx->buf_output);
     ggml_backend_buffer_clear(kctx->buf_output, 0);
     batch.resp->lengths = (float *) ggml_backend_buffer_get_base(kctx->buf_len_output);
-    ggml_backend_buffer_clear(kctx->buf_output, 0);
+    ggml_backend_buffer_clear(kctx->buf_len_output, 0);
     
     struct ggml_cgraph * gf = NULL;
     gf = build_kokoro_duration_graph(batch);
@@ -1249,8 +1249,12 @@ void kokoro_runner::run(kokoro_ubatch & batch, tts_response * outputs) {
 	ggml_backend_sched_reset(kctx->sched);
 
     const size_t prev_size = kctx->buf_output ? ggml_backend_buffer_get_size(kctx->buf_output) : 0;
-    const size_t new_size = model->max_context_length * model->up_sampling_factor * sizeof(float); // this is wrong as we need to include the total duraiton size; 
-    
+    uint32_t total_length = 0;
+    for (int i = 0; i < batch.resp->n_outputs; i++) {
+    	total_length += (uint32_t) batch.resp->lengths[i];
+    }
+    const size_t new_size = total_length * model->up_sampling_factor * sizeof(float);
+
     if (!kctx->buf_output || prev_size < new_size) {
         if (kctx->buf_output) {
             ggml_backend_buffer_free(kctx->buf_output);
@@ -1263,10 +1267,6 @@ void kokoro_runner::run(kokoro_ubatch & batch, tts_response * outputs) {
     outputs->data = (float *) ggml_backend_buffer_get_base(kctx->buf_output);
     ggml_backend_buffer_clear(kctx->buf_output, 0);
 
-    uint32_t total_length = 0;
-    for (int i = 0; i < batch.resp->n_outputs; i++) {
-    	total_length += (uint32_t) batch.resp->lengths[i];
-    }
     kctx->sequence_length = batch.n_tokens;
 	kctx->total_duration = total_length;
 
@@ -1284,7 +1284,7 @@ void kokoro_runner::run(kokoro_ubatch & batch, tts_response * outputs) {
 
     ggml_backend_t backend_res = ggml_backend_sched_get_tensor_backend(kctx->sched, output);
 
-    ggml_backend_tensor_get_async(backend_res, output, outputs->data, 0, total_length*model->up_sampling_factor*sizeof(float));
+    ggml_backend_tensor_get_async(backend_res, output, outputs->data, 0, new_size);
 
     // Reset state for the next token before backend sync, to allow the CPU activities in the reset to
     // overlap with device computation.
