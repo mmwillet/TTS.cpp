@@ -1,9 +1,12 @@
 #ifndef tts_model_h
 #define tts_model_h
 
+#include <cstring>
 #include <functional>
 #include "util.h"
 #include "common.h"
+
+void append_to_response(struct tts_response * response, struct tts_response * to_append);
 
 using tensor_meta_callback = std::function<void(ggml_tensor*)>*;
 

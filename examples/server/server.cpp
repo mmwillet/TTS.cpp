@@ -511,6 +511,11 @@ int main(int argc, const char ** argv) {
         }
 
         std::string prompt = data.at("input").get<std::string>();
+        if (prompt.empty()) {
+            json formatted_error = format_error_response("the 'input' field must be a non empty string", ERROR_TYPE_INVALID_REQUEST);
+            res_error(res, formatted_error);
+            return;
+        }
         struct simple_text_prompt_task * task = new simple_text_prompt_task(TTS, prompt);
         int id = task->id;
         generation_configuration * conf = new generation_configuration();
@@ -542,6 +547,12 @@ int main(int argc, const char ** argv) {
         struct simple_text_prompt_task * rtask = rmap->get(id);
         if (!rtask->success) {
             json formatted_error = format_error_response(rtask->message, ERROR_TYPE_SERVER);
+            res_error(res, formatted_error);
+            return;
+        }
+
+        if (rtask->length == 0) {
+            json formatted_error = format_error_response("Model returned an empty response.", ERROR_TYPE_SERVER);
             res_error(res, formatted_error);
             return;
         }
