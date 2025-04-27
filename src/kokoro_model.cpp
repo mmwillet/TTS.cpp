@@ -162,24 +162,20 @@ static struct ggml_tensor * build_noise_block(ggml_context * ctx, kokoro_noise_r
 	return build_kokoro_generator_res_block(ctx, cur, style, block->res_block);
 }
 
-static struct ggml_tensor * build_sin_gen(ggml_context * ctx, kokoro_model * model, struct ggml_tensor * x, int harmonic_num, int sequence_length, float voice_threshold, float sin_amp, float noise_std) {
+static struct ggml_tensor * build_sin_gen(ggml_context * ctx, kokoro_model * model, kokoro_context * kctx, struct ggml_tensor * x, int harmonic_num, int sequence_length, float voice_threshold, float sin_amp, float noise_std) {
 	struct ggml_tensor * cur = ggml_mul(ctx, ggml_repeat(ctx, x, ggml_new_tensor_2d(ctx, GGML_TYPE_F32, x->ne[0], harmonic_num)), model->harmonic_sampling_norm);
 	cur = ggml_mul(ctx, ggml_cumsum(ctx, ggml_mod(ctx, cur, 1.0f)), model->sampling_factor_scalar);
 	cur = ggml_upscale_linear(ctx, cur, 300);
 	struct ggml_tensor * upscaled = ggml_upscale_ext(ctx, x, x->ne[0]*300, x->ne[1], x->ne[2], x->ne[3]);
-     
-    float * uv_noise_data = (float *) malloc((sequence_length * harmonic_num + 4) * sizeof(float));
-    random_gen(sequence_length*harmonic_num, uv_noise_data + 4);
-    uv_noise_data[0] = voice_threshold;
-    uv_noise_data[1] = noise_std;
-    uv_noise_data[2] = sin_amp;
-    uv_noise_data[3] = sin_amp / 3.0f;
+
+	kctx->uv_noise_data = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, sequence_length*harmonic_num+4);
+	ggml_set_input(kctx->uv_noise_data);
 
     struct ggml_tensor * fake = ggml_new_tensor_3d(ctx, GGML_TYPE_F32, sequence_length, harmonic_num, 2);
 
     // ggml doesn't support boolean tensors nor does it support greater than and roll ops. As a result, we represent these boolean tensors as 1.0 or 0.0 or simply perform
     // multiplications in place via a custom map.
-    struct ggml_tensor * uv_noise = ggml_map_custom2(ctx, fake, upscaled, &uv_noise_compute, sequence_length, (void*) uv_noise_data);
+    struct ggml_tensor * uv_noise = ggml_map_custom3(ctx, fake, upscaled, kctx->uv_noise_data, &uv_noise_compute, sequence_length, nullptr);
 
 
     struct ggml_tensor * noise = ggml_cont(ctx, ggml_view_2d(ctx, uv_noise, uv_noise->ne[0], uv_noise->ne[1], uv_noise->nb[1], uv_noise->nb[2]));
@@ -188,8 +184,8 @@ static struct ggml_tensor * build_sin_gen(ggml_context * ctx, kokoro_model * mod
 	return ggml_cont(ctx, ggml_transpose(ctx, ggml_add(ctx, ggml_mul(ctx, ggml_sin(ctx, cur), uv), noise)));
 }
 
-static struct ggml_tensor * build_generator(ggml_context * ctx, kokoro_model * model, struct ggml_tensor * x, struct ggml_tensor * style, struct ggml_tensor * f0_curve, kokoro_generator* generator, int sequence_length, struct ggml_tensor * window_sq_sum, ggml_cgraph * gf) {
-	struct ggml_tensor * sing = build_sin_gen(ctx, model, f0_curve, model->harmonic_num + 1, f0_curve->ne[0] * 300, model->voice_threshold, model->sin_amp, model->noise_std);
+static struct ggml_tensor * build_generator(ggml_context * ctx, kokoro_model * model, kokoro_context * kctx, struct ggml_tensor * x, struct ggml_tensor * style, struct ggml_tensor * f0_curve, kokoro_generator* generator, int sequence_length, struct ggml_tensor * window_sq_sum, ggml_cgraph * gf) {
+	struct ggml_tensor * sing = build_sin_gen(ctx, model, kctx, f0_curve, model->harmonic_num + 1, f0_curve->ne[0] * 300, model->voice_threshold, model->sin_amp, model->noise_std);
 	struct ggml_tensor * har = ggml_tanh(ctx, ggml_add(ctx, ggml_mul_mat(ctx, generator->m_source_weight, sing), generator->m_source_bias));
 
 	har = stft(ctx, ggml_cont(ctx, ggml_transpose(ctx, har)), generator->window, model->true_n_fft, model->stft_hop, true, true);
@@ -348,17 +344,17 @@ void kokoro_model::post_load_assign() {
 	}
 
 	if (window == "hann") {
-		float * wdata = (float*) malloc(true_n_fft * sizeof(float));
+		std::vector<float> wdata;
+		wdata.reserve(true_n_fft);
 		hann_window(true_n_fft, wdata);
 		decoder->generator->window = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, true_n_fft);
 		decoder->generator->window->buffer = buf;
 		decoder->generator->window->data = (void *)((uint8_t *) ggml_backend_buffer_get_base(buf) + offset);
 		size_t size = ggml_nbytes(decoder->generator->window);
-		ggml_backend_tensor_set(decoder->generator->window, (void*)wdata, 0, size);
-		//hann_window(true_n_fft, (float*) decoder->generator->window->data);
+		ggml_backend_tensor_set(decoder->generator->window, wdata.data(), 0, size);
     	ggml_set_name(decoder->generator->window, "stft_window");
     	offset += size;
-    	//delete wdata;
+    	wdata.clear();
 	} else {
 		TTS_ABORT("Window of type %s is not supported.", window.c_str());
 	}
@@ -366,12 +362,14 @@ void kokoro_model::post_load_assign() {
 	harmonic_sampling_norm = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, 1, harmonic_num + 1);
 	harmonic_sampling_norm->buffer = buf;
 	harmonic_sampling_norm->data = (void *)((uint8_t *) ggml_backend_buffer_get_base(buf) + offset);
-	float * hdata = (float*) malloc((harmonic_num + 1) * sizeof(float));
+	std::vector<float> hdata;
+	hdata.reserve(harmonic_num + 1);
 	for (int i = 0; i < harmonic_num + 1; i++) {
-		hdata[i] = ((float)i + 1.0f) / sample_rate;
+		hdata.push_back(((float)i + 1.0f) / sample_rate);
 	}
 	size_t hsize = ggml_nbytes(harmonic_sampling_norm);
-	ggml_backend_tensor_set(harmonic_sampling_norm, (void*)hdata, 0, hsize);
+	ggml_backend_tensor_set(harmonic_sampling_norm, hdata.data(), 0, hsize);
+	hdata.clear();
 	offset += hsize;
 
 	sampling_factor_scalar = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, 1);
@@ -1210,7 +1208,7 @@ struct ggml_cgraph * kokoro_runner::build_kokoro_graph(kokoro_ubatch & batch) {
 	ggml_set_input(kctx->window_sq_sum);
 
 	// run generation
-	cur = build_generator(ctx, model, cur, style_half2, f0_curve, model->decoder->generator, (int)kctx->sequence_length, kctx->window_sq_sum, gf);
+	cur = build_generator(ctx, model, kctx, cur, style_half2, f0_curve, model->decoder->generator, (int)kctx->sequence_length, kctx->window_sq_sum, gf);
     ggml_build_forward_expand(gf, cur);
     free_build();
     return gf;
@@ -1225,6 +1223,11 @@ void kokoro_runner::prepare_post_load() {
 }
 
 void kokoro_runner::set_inputs(kokoro_ubatch & batch, uint32_t total_size) {
+	random_gen(total_size * model->up_sampling_factor * (model->harmonic_num + 1), ((float*)kctx->uv_noise_data->data) + 4);
+    ((float*) kctx->uv_noise_data->data)[0] = model->voice_threshold;
+    ((float*) kctx->uv_noise_data->data)[1] = model->noise_std;
+    ((float*) kctx->uv_noise_data->data)[2] = model->sin_amp;
+    ((float*) kctx->uv_noise_data->data)[3] = model->sin_amp / 3.0f;
 	compute_window_squared_sum(model->true_n_fft, model->stft_hop, total_size*model->up_sampling_factor/model->stft_hop, (float*) kctx->window_sq_sum->data, (float*) model->decoder->generator->window->data);
 	kctx->sequence_length = batch.n_tokens;
 	kctx->total_duration = total_size;
