@@ -15,6 +15,23 @@ void append_to_response(struct tts_response * response, struct tts_response * to
     response->n_outputs += to_append->n_outputs;
 }
 
+/* 
+ * Pulls output_size to prepped buffer 'output' from 'output_node' tensor. If no buffer is passed will default to the existing output buffer present 
+ * on runner_context. 
+ */
+void runner_context::get_ggml_node_data(struct ggml_tensor * output_node, float * output, size_t output_size, ggml_backend_buffer_t buffer) {
+    if (buffer == nullptr) {
+        buffer = buf_output;
+    }
+    if (ggml_backend_buffer_get_size(buffer) < output_size) {
+        TTS_ABORT("Output buffer overflow of %d / %d for output node '%s'\n", output_size, ggml_backend_buffer_get_size(buffer), ggml_get_name(output_node));
+    } else if (ggml_nbytes(output_node) < output_size) {
+        TTS_ABORT("Output node, '%s', with %d bytes is too small for #ggml_backend_tensor_get_async with size of %d.\n", ggml_get_name(output_node), ggml_nbytes(output_node), output_size);
+    }
+    ggml_backend_t backend_res = ggml_backend_sched_get_tensor_backend(sched, output_node);
+    ggml_backend_tensor_get_async(backend_res, output_node, output, 0, output_size);
+}
+
 void runner_context::set_threads() {
     if (backend != nullptr) {
 #ifdef GGML_USE_METAL

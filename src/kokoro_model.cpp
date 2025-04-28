@@ -1095,11 +1095,8 @@ void kokoro_duration_runner::run(kokoro_ubatch & batch) {
 
     ggml_backend_sched_graph_compute_async(kctx->sched, gf);
 
-    ggml_backend_t backend_lens_res = ggml_backend_sched_get_tensor_backend(kctx->sched, lens);
-    ggml_backend_t backend_res = ggml_backend_sched_get_tensor_backend(kctx->sched, hidden_states);
-
-    ggml_backend_tensor_get_async(backend_lens_res, lens, batch.resp->lengths, 0, batch.n_tokens*sizeof(float));
-    ggml_backend_tensor_get_async(backend_res, hidden_states, batch.resp->hidden_states, 0, batch.n_tokens*(model->duration_hidden_size+model->style_half_size)*sizeof(float));
+    kctx->get_ggml_node_data(lens, batch.resp->lengths, batch.n_tokens*sizeof(float), kctx->buf_len_output);
+    kctx->get_ggml_node_data(hidden_states, batch.resp->hidden_states, batch.n_tokens*(model->duration_hidden_size+model->style_half_size)*sizeof(float));
 
     // Reset state for the next token before backend sync, to allow the CPU activities in the reset to
     // overlap with device computation.
@@ -1285,9 +1282,7 @@ void kokoro_runner::run(kokoro_ubatch & batch, tts_response * outputs) {
 
     ggml_backend_sched_graph_compute_async(kctx->sched, gf);
 
-    ggml_backend_t backend_res = ggml_backend_sched_get_tensor_backend(kctx->sched, output);
-
-    ggml_backend_tensor_get_async(backend_res, output, outputs->data, 0, new_size);
+    kctx->get_ggml_node_data(output, outputs->data, new_size);
 
     // Reset state for the next token before backend sync, to allow the CPU activities in the reset to
     // overlap with device computation.

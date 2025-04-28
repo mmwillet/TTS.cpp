@@ -335,9 +335,7 @@ void dac_runner::run(uint32_t * input_tokens, uint32_t sequence_length, struct t
 
     ggml_backend_sched_graph_compute_async(dctx->sched, gf);
 
-    ggml_backend_t backend_res = ggml_backend_sched_get_tensor_backend(dctx->sched, result);
-
-    ggml_backend_tensor_get_async(backend_res, result, outputs->data, 0, batch.sequence_length*sizeof(float)*model->up_sampling_factor);
+    dctx->get_ggml_node_data(result, outputs->data, batch.sequence_length*sizeof(float)*model->up_sampling_factor);
 
     // Reset state for the next token before backend sync, to allow the CPU activities in the reset to
     // overlap with device computation.
