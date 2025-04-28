@@ -19,7 +19,7 @@ void append_to_response(struct tts_response * response, struct tts_response * to
  * Pulls output_size to prepped buffer 'output' from 'output_node' tensor. If no buffer is passed will default to the existing output buffer present 
  * on runner_context. 
  */
-void runner_context::get_ggml_node_data(struct ggml_tensor * output_node, float * output, const size_t output_size, ggml_backend_buffer_t buffer) {
+void runner_context::get_ggml_node_data(struct ggml_tensor * output_node, float * output, size_t output_size, ggml_backend_buffer_t buffer) {
     if (buffer == nullptr) {
         buffer = buf_output;
     }

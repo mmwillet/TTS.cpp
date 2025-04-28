@@ -32,7 +32,7 @@ struct runner_context {
     ggml_threadpool_t threadpool = nullptr;
     int n_threads;
 
-    void get_ggml_node_data(struct ggml_tensor * output_tensor, float * output, const size_t output_size, ggml_backend_buffer_t buffer = nullptr);
+    void get_ggml_node_data(struct ggml_tensor * output_tensor, float * output, size_t output_size, ggml_backend_buffer_t buffer = nullptr);
     void set_threads();
     void build_schedule(size_t max_nodes);
     bool prep_schedule(ggml_cgraph * gf);
