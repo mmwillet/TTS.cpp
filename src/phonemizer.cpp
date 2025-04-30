@@ -905,9 +905,11 @@ bool phonemizer::handle_contraction(corpus* text, std::string* output, condition
 		output->append(CONTRACTION_PHONEMES.at(next));
 	} catch (const std::out_of_range& e) {
 		// in the situation that we cannt find a contraction then we just want to pop the ' character and continue
-		// it could be the end of a single quote which ignored by the espeak phonemizer.
+		// it could be the end of a single quote which is ignored by the espeak phonemizer.
 		return true;
 	}
+	// make sure to pop the contraction.
+	text->pop_in(ALPHABET); 
 	return true;
 }
 
