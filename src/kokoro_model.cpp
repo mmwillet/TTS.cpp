@@ -1217,6 +1217,7 @@ void kokoro_runner::prepare_post_load() {
     auto batch = build_worst_case_batch();
     auto gf = build_kokoro_graph(batch);
     kctx->prep_schedule(gf);
+    free(batch.resp);
 }
 
 void kokoro_runner::set_inputs(kokoro_ubatch & batch, uint32_t total_size) {
@@ -1288,6 +1289,7 @@ void kokoro_runner::run(kokoro_ubatch & batch, tts_response * outputs) {
     // overlap with device computation.
     ggml_backend_sched_reset(kctx->sched);
     outputs->n_outputs = total_length*model->up_sampling_factor;
+    free(batch.resp);
     return;
 }
 
