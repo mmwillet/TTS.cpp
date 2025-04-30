@@ -154,11 +154,11 @@ void uv_noise_compute(struct ggml_tensor * dst, const struct ggml_tensor * a, co
 
 // currently this assumes a center view in which the output vector is reflectively padded by n_fft / 2 on each side.
 void compute_window_squared_sum(size_t n_fft, size_t hop, size_t n_frames, float * tgt, float * window) {
-    size_t out_size = n_frames * hop;
+    size_t cutoff = n_frames * hop;
     size_t half = n_fft / 2;
-    size_t cutoff = out_size - n_fft;
     std::memset(tgt, 0, cutoff*sizeof(float));
-    for (int i = 0; i < n_frames; i++) {
+    // istft applies half / hop steps before the beginning of the sequence. We need to account for these accumulated windows.
+    for (int i = 0; i < n_frames + (half / hop); i++) {
         for (int ii = 0; ii < n_fft; ii++) {
             int index = ii + i*hop - half;
             if (index < 0 || index >= cutoff) {
