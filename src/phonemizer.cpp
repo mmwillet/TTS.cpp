@@ -383,6 +383,9 @@ std::string corpus::after_until(int aftr, std::string val) {
 }
 
 std::string phonemizer_rule::lookup_rule(std::vector<std::string> & keys, int index) {
+	if (index >= keys.size()) {
+		return value;
+	}
 	std::string found_key = keys[index];
 	bool found_match = false;
 	for (const auto& pair : rules) {
