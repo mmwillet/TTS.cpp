@@ -54,6 +54,7 @@ enum error_type {
 enum task_type {
     TTS,
     CONDITIONAL_PROMPT,
+    VOICES,
 };
 
 using json = nlohmann::ordered_json;
@@ -96,8 +97,8 @@ static void log_server_request(const httplib::Request & req, const httplib::Resp
     fprintf(stdout, "request: %s %s %s %d\n", req.method.c_str(), req.path.c_str(), req.remote_addr.c_str(), res.status);
 }
 
-struct simple_text_prompt_task {
-    simple_text_prompt_task(task_type task, std::string prompt): task(task), prompt(prompt) {
+struct simple_server_task {
+    simple_server_task(task_type task, std::string prompt = ""): task(task), prompt(prompt) {
         id = rand();
         time = std::chrono::steady_clock::now();
     }
@@ -124,11 +125,11 @@ struct simple_text_prompt_task {
 struct simple_task_queue {
     std::mutex rw_mutex;
     std::condition_variable condition;
-    std::deque<simple_text_prompt_task*> queue;
+    std::deque<simple_server_task*> queue;
     bool running = true;
 
-    struct simple_text_prompt_task * get_next() {
-        struct simple_text_prompt_task * resp;
+    struct simple_server_task * get_next() {
+        struct simple_server_task * resp;
         std::unique_lock<std::mutex> lock(rw_mutex);
         condition.wait(lock, [&]{ 
             return !queue.empty() || !running; 
@@ -148,7 +149,7 @@ struct simple_task_queue {
         condition.notify_all();
     }
 
-    void push(struct simple_text_prompt_task * task) {
+    void push(struct simple_server_task * task) {
         std::lock_guard<std::mutex> lock(rw_mutex);
         queue.push_back(task);
         condition.notify_one();
@@ -162,7 +163,7 @@ struct simple_response_map {
     std::atomic<bool> running = true;
     std::thread * cleanup_thread;
 
-    std::map<int, simple_text_prompt_task*> completed;
+    std::map<int, simple_server_task*> completed;
 
     void cleanup_routine() {
         std::unique_lock<std::mutex> lock(rw_mutex);
@@ -192,16 +193,16 @@ struct simple_response_map {
         updated.notify_all();
     }
 
-    void push(struct simple_text_prompt_task * task) {
+    void push(struct simple_server_task * task) {
         std::unique_lock<std::mutex> lock(rw_mutex);
         completed[task->id] = task;
         lock.unlock();
         updated.notify_all();
     }
 
-    struct simple_text_prompt_task * get(int id) {
+    struct simple_server_task * get(int id) {
         std::unique_lock<std::mutex> lock(rw_mutex);
-        struct simple_text_prompt_task * resp = nullptr;
+        struct simple_server_task * resp = nullptr;
         try {
             return completed.at(id);
         } catch (const std::out_of_range& e) {
@@ -243,14 +244,14 @@ struct worker {
 
     void loop() {
         while (running) {
-            struct simple_text_prompt_task * task = task_queue->get_next();
+            struct simple_server_task * task = task_queue->get_next();
             if (task) {
                 process_task(task);
             }
         }
     }
 
-    void process_task(struct simple_text_prompt_task * task) {
+    void process_task(struct simple_server_task * task) {
         if (task->timed_out(task_timeout)) {
             return;
         }
@@ -274,6 +275,21 @@ struct worker {
                     break;
                 }
                 update_conditional_prompt(runner, text_encoder_path, task->prompt);
+                task->success = true;
+                response_map->push(task);
+                break;
+            case VOICES:
+                if (!runner->supports_voices) {
+                    task->message = "Voices are not supported for architecture '" + runner->arch_name() + "'.";
+                    response_map->push(task);
+                    break;
+                }
+                for (auto voice : list_voices(runner)) {
+                    if (!task->message.empty()) {
+                        task->message += ",";
+                    }
+                    task->message += voice;
+                }
                 task->success = true;
                 response_map->push(task);
                 break;
@@ -518,6 +534,15 @@ int main(int argc, const char ** argv) {
         res.status = 200;
     };
 
+    auto res_ok_voices = [](httplib::Response & res, const std::vector<std::string> & voices) {
+        json json_voices = json::array();
+        for (auto voice : voices) {
+            json_voices.push_back(voice);
+        }
+        res.set_content(safe_json_to_str(json_voices), MIMETYPE_JSON);
+        res.status = 200;
+    };
+
     svr->set_exception_handler([&res_error](const httplib::Request &, httplib::Response & res, const std::exception_ptr & ep) {
         std::string message;
         try {
@@ -614,7 +639,7 @@ int main(int argc, const char ** argv) {
             res_error(res, formatted_error);
             return;
         }
-        struct simple_text_prompt_task * task = new simple_text_prompt_task(TTS, prompt);
+        struct simple_server_task * task = new simple_server_task(TTS, prompt);
         int id = task->id;
         generation_configuration * conf = new generation_configuration();
         std::memcpy((void*)conf, default_generation_config, sizeof(generation_configuration));
@@ -661,7 +686,7 @@ int main(int argc, const char ** argv) {
 
         task->gen_config = conf;
         tqueue->push(task);
-        struct simple_text_prompt_task * rtask = rmap->get(id);
+        struct simple_server_task * rtask = rmap->get(id);
         if (!rtask->success) {
             json formatted_error = format_error_response(rtask->message, ERROR_TYPE_SERVER);
             res_error(res, formatted_error);
@@ -728,7 +753,7 @@ int main(int argc, const char ** argv) {
 
         int id = task->id;
         tqueue->push(task);
-        struct simple_text_prompt_task * rtask = rmap->get(id);
+        struct simple_server_task * rtask = rmap->get(id);
         if (!rtask->success) {
             json formatted_error = format_error_response(rtask->message, ERROR_TYPE_SERVER);
             res_error(res, formatted_error);
@@ -745,6 +770,25 @@ int main(int argc, const char ** argv) {
         &models_json
     ](const httplib::Request & _, httplib::Response & res) {
         res_ok_json(res, models_json);
+    }
+
+    const auto handle_voices = [&args, &tqueue, &rmap, &res_error, &res_ok_voices](const httplib::Request & req, httplib::Response & res) {
+        struct simple_server_task * task = new simple_server_task(VOICES);
+        int id = task->id;
+        tqueue->push(task);
+        struct simple_server_task * rtask = rmap->get(id);
+        if (!rtask->success) {
+            json formatted_error;
+            if (has_prefix(rtask->message, "Voices are not supported")) {
+                formatted_error = format_error_response(rtask->message, ERROR_TYPE_NOT_SUPPORTED);
+            } else {
+                formatted_error = format_error_response(rtask->message, ERROR_TYPE_SERVER);
+            }
+            res_error(res, formatted_error);
+            return;
+        }
+        std::vector<std::string> voices = split(rtask->message, ",");
+        res_ok_voices(res, voices);
     };
 
     // register API routes
@@ -753,6 +797,7 @@ int main(int argc, const char ** argv) {
     svr->Post("/v1/audio/speech", handle_tts);
     svr->Post("/v1/audio/conditional-prompt", handle_conditional);
     svr->Get("/v1/models", handle_models);
+    svr->Get("/v1/audio/voices", handle_voices);
 
     // Start the server
     svr->new_task_queue = [&args] { 
