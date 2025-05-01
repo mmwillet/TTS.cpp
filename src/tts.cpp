@@ -106,6 +106,15 @@ int generate(tts_runner * runner, std::string sentence, struct tts_response * re
     }
 }
 
+std::vector<std::string> list_voices(tts_runner * runner) {
+    switch(runner->arch) {
+        case KOKORO_ARCH:
+            return ((kokoro_runner*)runner)->list_voices();
+        default:
+            TTS_ABORT("%s failed. The architecture '%d' does not support #list_voices supported.", __func__, runner->arch);
+    }   
+}
+
 void update_conditional_prompt(tts_runner * runner, const std::string file_path, const std::string prompt, bool cpu_only) {
     int n_threads = ((parler_tts_runner*)runner)->pctx->n_threads;
     ((parler_tts_runner*)runner)->update_conditional_prompt(file_path, prompt, n_threads, cpu_only);

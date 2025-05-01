@@ -430,6 +430,7 @@ struct kokoro_context * build_new_kokoro_context(struct kokoro_model * model, in
 struct kokoro_runner : tts_runner {
     kokoro_runner(kokoro_model * model, kokoro_context * context, single_pass_tokenizer * tokenizer, kokoro_duration_runner * drunner, phonemizer * phmzr): model(model), kctx(context), tokenizer(tokenizer), drunner(drunner), phmzr(phmzr) {
     	tts_runner::sampling_rate = 24000.0f;
+    	tts_runner::supports_voices = true;
     };
     ~kokoro_runner() {
         if (ctx) {
@@ -452,8 +453,8 @@ struct kokoro_runner : tts_runner {
     void init_build() {
         tts_runner::init_build(&kctx->buf_compute_meta);
     }
-    
 
+    std::vector<std::string> list_voices();
     std::vector<std::vector<uint32_t>> tokenize_chunks(std::vector<std::string> clauses);
     void assign_weight(std::string name, ggml_tensor * tensor);
     void prepare_post_load();

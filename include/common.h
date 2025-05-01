@@ -24,6 +24,11 @@ const std::map<std::string, tts_arch> SUPPORTED_ARCHITECTURES = {
 	{ "kokoro", KOKORO_ARCH },
 };
 
+const std::map<tts_arch, std::string> ARCHITECTURE_NAMES = {
+	{ PARLER_TTS_ARCH, "parler-tts" },
+	{ KOKORO_ARCH, "kokoro" },
+};
+
 struct generation_configuration {
     generation_configuration(
     	std::string voice = "",
@@ -47,6 +52,11 @@ struct tts_runner {
 	tts_arch arch;
 	struct ggml_context * ctx = nullptr;
 	float sampling_rate = 44100.0f;
+	bool supports_voices = false;
+
+	std::string arch_name() {
+		return ARCHITECTURE_NAMES.at(arch);
+	}
 
 	void init_build(std::vector<uint8_t>* buf_compute_meta);
 	void free_build();

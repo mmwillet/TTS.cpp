@@ -1406,6 +1406,15 @@ int kokoro_runner::generate(std::string prompt, struct tts_response * response, 
   	return 0;
 }
 
+std::vector<std::string> kokoro_runner::list_voices() {
+	std::vector<std::string> voices;
+	voices.reserve(model->voices.size());
+	for (auto voice : model->voices) {
+		voices.push_back(voice.first);
+	}
+	return voices;
+}
+
 
 std::string get_espeak_id_from_kokoro_voice(std::string voice) {
 	return !voice.empty() && KOKORO_LANG_TO_ESPEAK_ID.find(voice[0]) != KOKORO_LANG_TO_ESPEAK_ID.end() ? KOKORO_LANG_TO_ESPEAK_ID[voice[0]] : "gmw/en-US";
