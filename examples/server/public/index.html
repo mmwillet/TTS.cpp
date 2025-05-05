@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TTS.cpp Server API</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            display: flex;
+            margin: 0;
+            justify-content: center;
+            align-items: start;
+            height: 100vh;
+        }
+
+        .container {
+            margin: 1rem;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .content {
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #374151;
+            font-size: 0.875rem;
+        }
+
+        textarea, input[type="text"] {
+            box-sizing: border-box;
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 0.875rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        textarea:focus, input[type="text"]:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .slider-container {
+            margin-top: 8px;
+        }
+
+        .slider-value {
+            display: inline-block;
+            margin-left: 8px;
+            font-weight: 500;
+            color: #3b82f6;
+        }
+
+        .slider {
+            width: 100%;
+            height: 6px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: #e5e7eb;
+            border-radius: 3px;
+            outline: none;
+            margin-top: 8px;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+        }
+
+        .slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+        }
+
+        .toggle-button {
+            width: 100%;
+            padding: 10px;
+            background-color: #f3f4f6;
+            border: none;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            font-weight: 500;
+            color: #374151;
+            transition: background-color 0.2s;
+        }
+
+        .toggle-button:hover {
+            background-color: #e5e7eb;
+        }
+
+        .toggle-icon {
+            transition: transform 0.2s;
+        }
+
+        .toggle-icon.rotated {
+            transform: rotate(180deg);
+        }
+
+        .advanced-params {
+            margin-top: 15px;
+            display: none;
+        }
+
+        .advanced-params.visible {
+            display: block;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 12px;
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.2s;
+        }
+
+        .submit-btn:hover {
+            background-color: #2563eb;
+        }
+
+        .submit-btn:disabled {
+            background-color: #93c5fd;
+            cursor: not-allowed;
+        }
+
+        .spinner {
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            color: #ef4444;
+            font-size: 0.875rem;
+            text-align: center;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .audio-container {
+            margin-top: 20px;
+            display: none;
+        }
+
+        audio {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .audio-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 8px;
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+
+        .download-btn {
+            color: #3b82f6;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .download-btn:hover {
+            text-decoration: underline;
+        }
+
+        .hint {
+            font-size: 0.75rem;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>TTS.cpp Server API</h1>
+        </div>
+        
+        <div class="content">
+            <form id="tts-form">
+                <div class="form-group">
+                    <label for="text-input">Text to convert</label>
+                    <textarea id="text-input" placeholder="Enter text to convert to speech..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <button type="button" id="advanced-toggle" class="toggle-button">
+                        <span>Advanced Parameters</span>
+                        <svg id="advanced-icon" class="toggle-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </button>
+                    
+                    <div id="advanced-parameters" class="advanced-params">
+                        <div class="form-group">
+                            <label for="base-text-url">Base URL</label>
+                            <input type="text" id="base-text-url" placeholder="http://127.0.0.1:8080">
+                            <p class="hint">The address to the TTS server</p>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="temperature">
+                                Temperature: <span id="temperature-value" class="slider-value">0.75</span>
+                            </label>
+                            <div class="slider-container">
+                                <input type="range" id="temperature" min="0" max="1" step="0.01" value="0.75" class="slider">
+                            </div>
+                            <p class="hint">Controls randomness (lower = more predictable)</p>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="top_k">
+                                Top K: <span id="top_k-value" class="slider-value">40</span>
+                            </label>
+                            <div class="slider-container">
+                                <input type="range" id="top_k" min="1" max="100" step="1" value="40" class="slider">
+                            </div>
+                            <p class="hint">Number of most likely tokens to consider</p>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="repetition_penalty">
+                                Repetition Penalty: <span id="repetition_penalty-value" class="slider-value">1.2</span>
+                            </label>
+                            <div class="slider-container">
+                                <input type="range" id="repetition_penalty" min="1" max="2" step="0.01" value="1.2" class="slider">
+                            </div>
+                            <p class="hint">Penalty for repeated tokens (higher = less repetition)</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <button type="submit" id="submit-btn" class="submit-btn">
+                    <svg id="loading-spinner" class="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+                        <circle cx="12" cy="12" r="10" stroke-opacity="0.25" stroke-width="4"></circle>
+                        <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" fill="currentColor"></path>
+                    </svg>
+                    <span id="btn-text">Convert to Speech</span>
+                </button>
+                
+                <div id="error-msg" class="error-message" role="alert" aria-live="assertive"></div>
+            </form>
+            
+            <div id="audio-container" class="audio-container">
+                <audio controls id="audio-player" autoplay></audio>
+                <div class="audio-footer">
+                    <span>Generated audio</span>
+                    <a id="download-btn" class="download-btn">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Download
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_KEY = 'not-needed';
+        const API_URL = '/v1/audio/speech';
+        const form = document.getElementById('tts-form');
+        const textInput = document.getElementById('text-input');
+        const submitBtn = document.getElementById('submit-btn');
+        const btnText = document.getElementById('btn-text');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const errorText = document.getElementById('error-msg');
+        const audioContainer = document.getElementById('audio-container');
+        const audioPlayer = document.getElementById('audio-player');
+        const downloadBtn = document.getElementById('download-btn');
+        const advancedToggle = document.getElementById('advanced-toggle');
+        const advancedIcon = document.getElementById('advanced-icon');
+        const advancedParams = document.getElementById('advanced-parameters');
+        
+        // Advanced parameters
+        const baseTextUrl = document.getElementById('base-text-url');
+        const temperature = document.getElementById('temperature');
+        const temperatureValue = document.getElementById('temperature-value');
+        const top_k = document.getElementById('top_k');
+        const top_kValue = document.getElementById('top_k-value');
+        const repetition_penalty = document.getElementById('repetition_penalty');
+        const repetition_penaltyValue = document.getElementById('repetition_penalty-value');
+        
+        // Update slider values in real-time
+        temperature.addEventListener('input', () => {
+            temperatureValue.textContent = temperature.value;
+        });
+        
+        top_k.addEventListener('input', () => {
+            top_kValue.textContent = top_k.value;
+        });
+        
+        repetition_penalty.addEventListener('input', () => {
+            repetition_penaltyValue.textContent = repetition_penalty.value;
+        });
+        
+        // Toggle advanced parameters
+        advancedToggle.addEventListener('click', () => {
+            advancedParams.classList.toggle('visible');
+            advancedIcon.classList.toggle('rotated');
+        });
+        
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const text = textInput.value.trim();
+            
+            if (!text) {
+                showError('Please enter some text to convert.');
+                audioContainer.style.display = 'none';
+                return;
+            }
+            
+            clearError();
+            submitBtn.disabled = true;
+            btnText.textContent = 'Generating...';
+            loadingSpinner.style.display = 'block';
+            audioContainer.style.display = 'none';
+            audioPlayer.src = '';
+
+            try {
+                const requestBody = {
+                    input: textInput.value,
+                    response_format: 'wav',
+                    temperature: parseFloat(temperature.value),
+                    top_k: parseInt(top_k.value),
+                    repetition_penalty: parseFloat(repetition_penalty.value)
+                };
+                
+                let base = baseTextUrl.value.trim();
+                if (base === "") {
+                    base = document.location.href;
+                }
+                const postURL = new URL(API_URL, base)
+                
+                const response = await fetch(postURL, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${API_KEY}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestBody),
+                });
+
+                if (!response.ok) {
+                    let errorMessage = `API error: ${response.status} ${response.statusText}`;
+                    try {
+                        const errorData = await response.json();
+                        if (errorData?.error?.message) {
+                            errorMessage = `API error: ${errorData.error.message}`;
+                        } else if (typeof errorData === 'string') {
+                            errorMessage = `API error: ${errorData}`;
+                        }
+                    } catch (jsonError) {
+                        console.error('Failed to parse error response:', jsonError);
+                    }
+                    throw new Error(errorMessage);
+                }
+
+                const audioBlob = await response.blob();
+                const url = URL.createObjectURL(audioBlob);
+                audioPlayer.src = url;
+                audioContainer.style.display = 'block';
+                
+                // Set up download button
+                downloadBtn.onclick = () => {
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `tts-${Date.now()}.wav`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                };
+            } catch (err) {
+                console.error('Error synthesizing audio:', err);
+                showError(err.toString());
+                audioContainer.style.display = 'none';
+            } finally {
+                submitBtn.disabled = false;
+                btnText.textContent = 'Convert to Speech';
+                loadingSpinner.style.display = 'none';
+            }
+        });
+        
+        function showError(message) {
+            errorText.textContent = message;
+            errorText.style.display = 'block';
+        }
+        
+        function clearError() {
+            errorText.textContent = '';
+            errorText.style.display = 'none';
+        }
+    </script>
+</body>
+</html>
