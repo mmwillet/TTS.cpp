@@ -262,30 +262,30 @@
                         
                         <div class="form-group">
                             <label for="temperature">
-                                Temperature: <span id="temperature-value" class="slider-value">0.75</span>
+                                Temperature: <span id="temperature-value" class="slider-value">1</span>
                             </label>
                             <div class="slider-container">
-                                <input type="range" id="temperature" min="0" max="1" step="0.01" value="0.75" class="slider">
+                                <input type="range" id="temperature" min="0" max="1" step="0.01" value="1.0" class="slider">
                             </div>
                             <p class="hint">Controls randomness (lower = more predictable)</p>
                         </div>
                         
                         <div class="form-group">
                             <label for="top_k">
-                                Top K: <span id="top_k-value" class="slider-value">40</span>
+                                Top K: <span id="top_k-value" class="slider-value">50</span>
                             </label>
                             <div class="slider-container">
-                                <input type="range" id="top_k" min="1" max="100" step="1" value="40" class="slider">
+                                <input type="range" id="top_k" min="1" max="100" step="1" value="50" class="slider">
                             </div>
                             <p class="hint">Number of most likely tokens to consider</p>
                         </div>
                         
                         <div class="form-group">
                             <label for="repetition_penalty">
-                                Repetition Penalty: <span id="repetition_penalty-value" class="slider-value">1.2</span>
+                                Repetition Penalty: <span id="repetition_penalty-value" class="slider-value">1</span>
                             </label>
                             <div class="slider-container">
-                                <input type="range" id="repetition_penalty" min="1" max="2" step="0.01" value="1.2" class="slider">
+                                <input type="range" id="repetition_penalty" min="1" max="2" step="0.01" value="1.0" class="slider">
                             </div>
                             <p class="hint">Penalty for repeated tokens (higher = less repetition)</p>
                         </div>
