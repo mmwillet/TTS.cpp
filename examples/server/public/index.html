@@ -137,6 +137,13 @@
 
         .toggle-icon {
             transition: transform 0.2s;
+            width: 20px;
+            height: 20px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2px;
+            stroke-linecap: round;
+            stroke-linejoin: round;
         }
 
         .toggle-icon.rotated {
@@ -236,7 +243,7 @@
                 <div class="form-group">
                     <button type="button" id="advanced-toggle" class="toggle-button">
                         <span>Advanced Parameters</span>
-                        <svg id="advanced-icon" class="toggle-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg id="advanced-icon" class="toggle-icon" viewBox="0 0 24 24">
                             <polyline points="6 9 12 15 18 9"></polyline>
                         </svg>
                     </button>
