@@ -6,6 +6,7 @@
 #define MIMETYPE_WAV "audio/wav"
 #define MIMETYPE_AIFF "audio/aiff"
 #define MIMETYPE_JSON "application/json; charset=utf-8"
+#define MIMETYPE_HTML "text/html; charset=utf-8"
 
 #include <atomic>
 #include <condition_variable>
@@ -23,6 +24,8 @@
 #include "audio_file.h"
 #include "args.h"
 #include "common.h"
+
+#include "index.html.hpp"
 
 enum server_state {
     LOADING,  // Server is starting up / model loading
@@ -422,6 +425,11 @@ int main(int argc, const char ** argv) {
         res.status = json_value(error_data, "code", 500);
     };
 
+    auto res_ok_html = [](httplib::Response & res, const char * const & data) {
+        res.set_content(data, MIMETYPE_HTML);
+        res.status = 200;
+    };
+
     auto res_ok_json = [](httplib::Response & res, const json & data) {
         res.set_content(safe_json_to_str(data), MIMETYPE_JSON);
         res.status = 200;
@@ -482,6 +490,10 @@ int main(int argc, const char ** argv) {
         }
         return httplib::Server::HandlerResponse::Unhandled;
     });
+
+    const auto handle_index = [&](const httplib::Request &, httplib::Response & res) {
+        res_ok_html(res, reinterpret_cast<const char*>(index_html));
+    };
 
     const auto handle_health = [&](const httplib::Request &, httplib::Response & res) {
         json health = {{"status", "ok"}};
@@ -600,6 +612,7 @@ int main(int argc, const char ** argv) {
     };
 
     // register API routes
+    svr->Get("/", handle_index);
     svr->Get("/health", handle_health);
     svr->Post("/v1/audio/speech", handle_tts);
     svr->Post("/v1/audio/conditional-prompt", handle_conditional);
