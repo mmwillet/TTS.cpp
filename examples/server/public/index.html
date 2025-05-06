@@ -243,9 +243,15 @@
                     
                     <div id="advanced-parameters" class="advanced-params">
                         <div class="form-group">
-                            <label for="base-text-url">Base URL</label>
-                            <input type="text" id="base-text-url" placeholder="http://127.0.0.1:8080">
+                            <label for="base-url">Base URL</label>
+                            <input type="text" id="base-url" placeholder="http://127.0.0.1:8080">
                             <p class="hint">The address to the TTS server</p>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="api-key">API Key</label>
+                            <input type="text" id="api-key" placeholder="MY_API_KEY">
+                            <p class="hint">API key for authentication (does nothing for now)</p>
                         </div>
                         
                         <div class="form-group">
@@ -298,7 +304,6 @@
     </div>
 
     <script>
-        const API_KEY = 'not-needed';
         const API_URL = '/v1/audio/speech';
         const form = document.getElementById('tts-form');
         const textInput = document.getElementById('text-input');
@@ -313,7 +318,8 @@
         const advancedParams = document.getElementById('advanced-parameters');
         
         // Advanced parameters
-        const baseTextUrl = document.getElementById('base-text-url');
+        const baseUrl = document.getElementById('base-url');
+        const apiKey = document.getElementById('api-key');
         const temperature = document.getElementById('temperature');
         const temperatureValue = document.getElementById('temperature-value');
         const top_k = document.getElementById('top_k');
@@ -366,16 +372,18 @@
                     repetition_penalty: parseFloat(repetition_penalty.value)
                 };
                 
-                let base = baseTextUrl.value.trim();
+                let base = baseUrl.value.trim();
                 if (base === "") {
                     base = document.location.href;
                 }
                 const postURL = new URL(API_URL, base)
+
+                const auth = apiKey.value ?  `Bearer ${apiKey.value}` : undefined;
                 
                 const response = await fetch(postURL, {
                     method: 'POST',
                     headers: {
-                        'Authorization': `Bearer ${API_KEY}`,
+                        'Authorization': auth,
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify(requestBody),
