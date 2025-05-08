@@ -26,7 +26,7 @@ static const std::map<std::string, dac_tensor> DAC_TENSOR_GGUF_LOOKUP = {
 };
 
 void dac_model::prep_constants(gguf_context * meta) {
-    int output_heads_key = search_for_gguf_keys(meta, {"parler-tts.decoder.output_heads", "output_heads"});
+    int output_heads_key = search_for_gguf_keys(meta, {"parler-tts.decoder.output_heads", "output_heads", "dia.decoder.outpu_heads"});
     if (output_heads_key != -1) {
         n_heads = gguf_get_val_u32(meta, output_heads_key);;
     }
@@ -36,7 +36,7 @@ void dac_model::prep_constants(gguf_context * meta) {
         up_sampling_factor = gguf_get_val_u32(meta, sampling_factor_key);
     }
     
-    int max_gen_key = search_for_gguf_keys(meta, {"parler-tts.decoder.max_generation", "max_generation"});
+    int max_gen_key = search_for_gguf_keys(meta, {"parler-tts.decoder.max_generation", "max_generation", "dia.decoder.max_generation"});
     if (max_gen_key != -1) {
         max_generation_size = gguf_get_val_u32(meta, max_gen_key);
     }

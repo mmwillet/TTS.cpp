@@ -63,6 +63,31 @@ struct tts_runner * kokoro_from_file(gguf_context * meta_ctx, ggml_context * wei
     return (tts_runner*)runner;
 }
 
+struct tts_runner * dia_from_file(gguf_context * meta_ctx, ggml_context * weight_ctx, int n_threads, generation_configuration * config, tts_arch arch, bool cpu_only) {
+    dia_model * model = new dia_model;
+    dac_model * audio_model = new dac_model;
+    model->setup_from_file(meta_ctx, weight_ctx, cpu_only);
+    audio_model->setup_from_file(meta_ctx, weight_ctx, cpu_only);
+    struct sampler * samp = new sampler;
+    struct dac_context * dctx = build_new_dac_context(audio_model, n_threads, cpu_only);
+    struct dac_runner * audio_decoder = new dac_runner(audio_model, dctx);
+    struct dia_context * diactx = build_new_dia_context(model, n_threads, cpu_only);
+    struct dia_kv_cache * cache = new dia_kv_cache;
+    struct dia_runner * runner = new dia_runner(model, audio_decoder, diactx, samp, cache);
+
+    for (ggml_tensor * cur = ggml_get_first_tensor(weight_ctx); cur; cur = ggml_get_next_tensor(weight_ctx, cur)) {
+        runner->assign_weight(cur->name, cur);
+    }
+
+    runner->prepare_post_load();
+
+    gguf_free(meta_ctx);
+    ggml_free(weight_ctx);
+    runner->arch = arch;
+
+    return (tts_runner*)runner;
+}
+
 // currently only metal and cpu devices are supported, so cpu_only only describes whether or not to try to load and run on metal.
 struct tts_runner * runner_from_file(const std::string & fname, int n_threads, generation_configuration * config, bool cpu_only) {
     ggml_context * weight_ctx = NULL;
@@ -89,6 +114,8 @@ struct tts_runner * runner_from_file(const std::string & fname, int n_threads, g
             return parler_tts_from_file(meta_ctx, weight_ctx, n_threads, config, arch_type, cpu_only);
         case KOKORO_ARCH:
             return kokoro_from_file(meta_ctx, weight_ctx, n_threads, config, arch_type, cpu_only);
+        case DIA_ARCH:
+            return dia_from_file(meta_ctx, weight_ctx, n_threads, config, arch_type, cpu_only);
         default:
             TTS_ABORT("%s failed for file %s. The architecture '%s' is not supported.", __func__, fname.c_str(), arch.c_str());
     }
@@ -101,6 +128,9 @@ int generate(tts_runner * runner, std::string sentence, struct tts_response * re
             return ((parler_tts_runner*)runner)->generate(sentence, response);
         case KOKORO_ARCH:
             return ((kokoro_runner*)runner)->generate(sentence, response, config->voice, config->espeak_voice_id);
+        case DIA_ARCH:
+            ((dia_runner*)runner)->configure_generation(config);
+            return ((dia_runner*)runner)->generate(sentence, response);
         default:
             TTS_ABORT("%s failed. The architecture '%d' is not supported.", __func__, runner->arch);
     }

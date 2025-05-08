@@ -152,6 +152,29 @@ void uv_noise_compute(struct ggml_tensor * dst, const struct ggml_tensor * a, co
     }
 }
 
+// This is a custom map op for applying cfg scale. It is used at the terminus of logit generation in Dia.
+void cfg_scale(struct ggml_tensor * dst, const struct ggml_tensor * a, const struct ggml_tensor * b, int ith, int nth, void * userdata) {
+    const float scale = ((float *) userdata)[0];
+    const int rpt = (b->ne[0] + nth - 1)/nth;
+    const int start = ith * rpt;
+    const int end = MIN((ith + 1) * rpt, b->ne[0]);
+
+    float * output = (float *) dst->data;
+    float * cond = (float *) a->data;
+    float * uncond = (float *) b->data;
+
+    for(int bt = 0; bt < b->ne[2]; bt++) {
+        for (int h = 0; h < b->ne[1]; h++) {
+            int i = (h * b->ne[0]) + (bt * b->ne[0] * b->ne[1]);
+            for(int r = start; r < end; r++) {
+                const float cr = cond[i+r];
+                const float ur = uncond[i+r];
+                output[i+r] = cr + scale * (cr - ur);
+            }
+        }
+    }
+}
+
 // currently this assumes a center view in which the output vector is reflectively padded by n_fft / 2 on each side.
 void compute_window_squared_sum(size_t n_fft, size_t hop, size_t n_frames, float * tgt, float * window) {
     size_t cutoff = n_frames * hop;
@@ -167,6 +190,60 @@ void compute_window_squared_sum(size_t n_fft, size_t hop, size_t n_frames, float
             tgt[index] += powf(window[ii], 2);
         }
     }
+}
+
+std::vector<std::string> split(std::string target, std::string split_on, bool include_split_characters) {
+    std::vector<std::string> output;
+    size_t last = 0;
+
+    for (int i = 0; i < target.size(); i++) {
+        if (i > last && split_on.find(target[i]) != std::string::npos) {
+            std::string part(target.substr(last, i - last));
+            output.push_back(part);
+            if (include_split_characters) {
+                output.push_back(target.substr(i, 1));
+            }
+            last = i+1;
+        }
+    }
+    if (last < target.size()) {
+        std::string part(target.substr(last));
+        output.push_back(part);
+    }
+
+    return output;
+}
+
+std::vector<std::string> split(std::string target, const char split_on, bool include_split_characters) {
+    std::vector<std::string> output;
+    size_t last = 0;
+
+    for (int i = 0; i < target.size(); i++) {
+        if (i > last && split_on == target[i]) {
+            std::string part(target.substr(last, i - last));
+            output.push_back(part);
+            if (include_split_characters) {
+                output.push_back(target.substr(i, 1));
+            }
+            last = i+1;
+        }
+    }
+    if (last < target.size()) {
+        std::string part(target.substr(last));
+        output.push_back(part);
+    }
+
+    return output;
+}
+
+std::string strip(std::string target, std::string vals) {
+    target.erase(target.begin(), std::find_if(target.begin(), target.end(), [&vals](unsigned char ch) {
+        return vals.find(ch) == std::string::npos;
+    }));
+    target.erase(std::find_if(target.rbegin(), target.rend(), [&vals](unsigned char ch) {
+        return vals.find(ch) == std::string::npos;
+    }).base(), target.end());
+    return target;
 }
 
 std::string replace_any(std::string target, std::string to_replace, std::string replacement) {

@@ -19,6 +19,7 @@
 #include "ggml-cpp.h"
 
 #define TTS_ABORT(...) tts_abort(__FILE__, __LINE__, __VA_ARGS__)
+#define TTS_ASSERT(x) if (!(x)) TTS_ABORT("TTS_ASSERT(%s) failed", #x)
 
 struct model_tensor_meta {
 	uint32_t n_tensors = 0;
@@ -43,12 +44,18 @@ void compute_window_squared_sum(size_t n_fft, size_t hop, size_t n_frames, float
 struct ggml_tensor * stft(ggml_context * ctx, struct ggml_tensor * a, struct ggml_tensor * window, size_t n_fft, size_t hop, bool abs_and_angle, bool one_sided);
 struct ggml_tensor * istft(ggml_context * ctx, struct ggml_tensor * a, struct ggml_tensor * window_squared_sum, struct ggml_tensor * window, size_t n_fft, size_t hop, bool abs_and_angle, bool one_sided);
 
-// This is a custom ops for sine_generation in the kokoro model.
+// This is a custom op for sine_generation in the Kokoro model.
 void uv_noise_compute(struct ggml_tensor * dst, const struct ggml_tensor * a, const struct ggml_tensor * b, const struct ggml_tensor * c, int ith, int nth, void * userdata);
+
+// This is a custom op for logit correction in the Dia model.
+void cfg_scale(struct ggml_tensor * dst, const struct ggml_tensor * a, const struct ggml_tensor * b, int ith, int nth, void * userdata);
 
 bool has_suffix(std::string value, std::string suffix);
 bool has_prefix(std::string value, std::string prefix);
 
+std::vector<std::string> split(std::string target, std::string split_on, bool include_split_characters = false);
+std::vector<std::string> split(std::string target, const char split_on, bool include_split_characters = false);
+std::string strip(std::string target, std::string vals = " ");
 std::string replace_any(std::string target, std::string to_replace, std::string replacement);
 
 [[noreturn]] void tts_abort(const char * file, int line, const char * fmt, ...);

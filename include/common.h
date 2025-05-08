@@ -17,11 +17,13 @@ struct tts_response {
 enum tts_arch {
 	PARLER_TTS_ARCH = 0,
 	KOKORO_ARCH = 1,
+	DIA_ARCH = 2,
 };
 
 const std::map<std::string, tts_arch> SUPPORTED_ARCHITECTURES = {
 	{ "parler-tts", PARLER_TTS_ARCH },
 	{ "kokoro", KOKORO_ARCH },
+	{ "dia", DIA_ARCH },
 };
 
 struct generation_configuration {
@@ -32,12 +34,14 @@ struct generation_configuration {
     	float repetition_penalty = 1.0, 
     	bool use_cross_attn = true, 
     	std::string espeak_voice_id = "",
-    	bool sample = true): top_k(top_k), temperature(temperature), repetition_penalty(repetition_penalty), use_cross_attn(use_cross_attn), sample(sample), voice(voice), espeak_voice_id(espeak_voice_id) {};
+    	int max_tokens = 0,
+    	bool sample = true): top_k(top_k), temperature(temperature), repetition_penalty(repetition_penalty), use_cross_attn(use_cross_attn), sample(sample), voice(voice), espeak_voice_id(espeak_voice_id), max_tokens(max_tokens) {};
 
     bool use_cross_attn;
     float temperature;
     float repetition_penalty;
     int top_k;
+    int max_tokens;
     std::string voice = "";
     bool sample = true;
     std::string espeak_voice_id = "";

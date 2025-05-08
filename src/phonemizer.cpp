@@ -11,16 +11,6 @@ const std::unordered_set<std::string> inline_combine_sets(const std::vector<std:
 	return combined;
 }
 
-std::string strip(std::string target, std::string vals) {
-	target.erase(target.begin(), std::find_if(target.begin(), target.end(), [&vals](unsigned char ch) {
-        return vals.find(ch) == std::string::npos;
-    }));
-    target.erase(std::find_if(target.rbegin(), target.rend(), [&vals](unsigned char ch) {
-        return vals.find(ch) == std::string::npos;
-    }).base(), target.end());
-    return target;
-}
-
 std::string replace(std::string target, char to_replace, char replacement) {
 	for (int i = 0; i < target.size(); i++) {
 		if (target[i] == to_replace) {
@@ -81,50 +71,6 @@ std::string replace_accents(std::string word) {
 		i += grab;
 	}
 	return new_word;
-}
-
-std::vector<std::string> split(std::string target, std::string split_on, bool include_split_characters) {
-	std::vector<std::string> output;
-    size_t last = 0;
-
-    for (int i = 0; i < target.size(); i++) {
-    	if (i > last && split_on.find(target[i]) != std::string::npos) {
-    		std::string part(target.substr(last, i - last));
-    		output.push_back(part);
-    		if (include_split_characters) {
-    			output.push_back(target.substr(i, 1));
-    		}
-    		last = i+1;
-    	}
-    }
-    if (last < target.size()) {
-    	std::string part(target.substr(last));
-    	output.push_back(part);
-    }
-
-    return output;
-}
-
-std::vector<std::string> split(std::string target, const char split_on, bool include_split_characters) {
-	std::vector<std::string> output;
-    size_t last = 0;
-
-    for (int i = 0; i < target.size(); i++) {
-    	if (i > last && split_on == target[i]) {
-    		std::string part(target.substr(last, i - last));
-    		output.push_back(part);
-    		if (include_split_characters) {
-    			output.push_back(target.substr(i, 1));
-    		}
-    		last = i+1;
-    	}
-    }
-    if (last < target.size()) {
-    	std::string part(target.substr(last));
-    	output.push_back(part);
-    }
-
-    return output;
 }
 
 int upper_count(std::string word) {
