@@ -10,7 +10,7 @@ This simple example cli tool can be used to generate speach from a text prompt a
 ### Usage
 
 In order to get a detailed breakdown the functionality currently available you can call the cli with the `--help` parameter. This will return a breakdown of all parameters:
-```commandline
+```bash
 ./cli --help
 
 --temperature (-t):
@@ -21,6 +21,8 @@ In order to get a detailed breakdown the functionality currently available you c
     The number of cpu threads to run generation with. Defaults to hardware concurrency. If hardware concurrency cannot be determined then it defaults to 1.
 --topk (-tk):
     (OPTIONAL) When set to an integer value greater than 0 generation uses nucleus sampling over topk nucleaus size. Defaults to 50.
+--max-tokens (-mt):
+    (OPTIONAL) The max audio tokens to generate. Only applied to Dia generation. If set to zero as is its default then the default max generation size
 --use-metal (-m):
     (OPTIONAL) Whether to use metal acceleration
 --no-cross-attn (-ca):
@@ -42,20 +44,28 @@ In order to get a detailed breakdown the functionality currently available you c
 --voice (-v):
     (OPTIONAL) The voice to use to generate the audio. This is only used for models with voice packs.
 --espeak-voice-id (-eid):
-    (OPTIONAL) The espeak voice id to use for phonemization. This should only be specified when the correct espeak voice cannot be inferred from the kokoro voice (see MultiLanguage Configuration in the README for more info).
+    (OPTIONAL) The espeak voice id to use for phonemization. This should only be specified when the correct espeak voice cannot be inferred from the kokoro voice ( see MultiLanguage Configuration in the README for more info).
 ```
 
 General usage should follow from these possible parameters. E.G. The following command will save generated speech to the `/tmp/test.wav` file.
 
-```commandline
+```bash
 ./cli --model-path /model/path/to/gguf_file.gguf --prompt "I am saying some words" --save-path /tmp/test.wav
+```
+
+#### Dia Generation Arguments
+
+Currently the default cli arguments are not aligned with Dia's default sampling settings. Specifically the temperature and topk settings should be changed to  `1.3` and `35` respectively when generating with Dia like so:
+
+```base
+./cli --model-path /model/path/to/Dia.gguf --prompt "[S1] Hi, I am Dia, this is how I talk." --save-path /tmp/test.wav --topk 35 --temperature 1.3
 ```
 
 #### Conditional Generation
 
 By default the Parler TTS model is saved to the GGUF format with a pre-encoded conditional prompt (i.e. a prompt used to determine how to generate speech), but if the text encoder model, the T5-Encoder model, is avaiable in gguf format (see the [python convertion scripts](../../py-gguf/README.md) for more information on how to prepare the T5-Encoder model) then a new conditional prompt can be used for generation like so:
 
-```commandline
+```bash
 ./cli --model-path /model/path/to/gguf_file.gguf --prompt "I am saying some words" --save-path /tmp/test.wav --text-encoder-path /model/path/to/t5_encoder_file.gguf --consditional-prompt "deep voice"
 ```
 
@@ -88,7 +98,7 @@ Each voice has a language assigned and gender assigned to it where the first let
 
 By default when a voice of a specific language is used, phonemization for that language will be automatically detected. However, when multiple phonetic alphabets exist for a single language the default phonemization language might not be appropriate (e.g. Mandarin latin as english is standard for Mandarin, but Pinyin might be preferred). In such cases it is necessary to specify the specific espeak-ng voice file id via the `--espeak-voice-id` argument. A comprehensive list of viable voice ids for this field can be found under the `file` column via the following espeak command:
 
-```commandline
+```bash
 espeak-ng --voices
 ```
 

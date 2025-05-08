@@ -11,7 +11,7 @@ int main(int argc, const char ** argv) {
     int default_n_threads = std::max((int)std::thread::hardware_concurrency(), 1);
     int default_top_k = 50;
     int default_max_tokens = 0;
-    float default_repetition_penalty = 1.1f;
+    float default_repetition_penalty = 1.0f;
     arg_list args;
     args.add_argument(string_arg("--model-path", "(REQUIRED) The local path of the gguf model file for Parler TTS mini or large v1.", "-mp", true));
     args.add_argument(string_arg("--prompt", "(REQUIRED) The text prompt for which to generate audio in quotation markers.", "-p", true));
@@ -27,7 +27,7 @@ int main(int argc, const char ** argv) {
     args.add_argument(string_arg("--voice", "(OPTIONAL) The voice to use to generate the audio. This is only used for models with voice packs.", "-v", false, "af_alloy"));
     args.add_argument(bool_arg("--vad", "(OPTIONAL) whether to apply voice inactivity detection (VAD) and strip silence form the end of the output (particularly useful for Parler TSS). By default, no VAD is applied.", "-va"));
     args.add_argument(string_arg("--espeak-voice-id", "(OPTIONAL) The espeak voice id to use for phonemization. This should only be specified when the correct espeak voice cannot be inferred from the kokoro voice ( see MultiLanguage Configuration in the README for more info).", "-eid", false));
-    args.add_argument(int_arg("--max-tokens", "(OPTIONAL) The max audio tokens to generate. Only applied to Dia generation. If set to zero as is its default then the default max generation size", "-mt", false, &default_max_tokens));
+    args.add_argument(int_arg("--max-tokens", "(OPTIONAL) The max audio tokens or token batches to generate where each represents approximates 11 ms of audio. Only applied to Dia generation. If set to zero as is its default then the default max generation size. Warning values under 15 are not supported.", "-mt", false, &default_max_tokens));
     register_play_tts_response_args(args);
     args.parse(argc, argv);
     if (args.for_help) {

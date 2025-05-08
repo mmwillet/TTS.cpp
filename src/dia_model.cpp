@@ -241,6 +241,13 @@ void dia_model::prep_constants(gguf_context * meta) {
     if (max_delay_key != -1) {
         max_delay = gguf_get_val_u32(meta, max_delay_key);
     }
+
+    // please note that this value is not currently set in the gguf encoder as it effectively only exists as a default
+    // python parameter (rather than an attribute in the model config) for the python Dia model.
+    int cfg_scale_key = gguf_find_key(meta, "dia.cfg_scale");
+    if (cfg_scale_key != -1) {
+        cfg_scale = gguf_get_val_f32(meta, cfg_scale_key);
+    }
 }
 
 void dia_context::reset() {
@@ -248,6 +255,7 @@ void dia_context::reset() {
     prompt_size = 0;
     output_tokens.clear();
     delay_steps = -1;
+    max_generation_size = model->max_generation_size;
 }
 
 struct dia_context * build_new_dia_context(struct dia_model * model, int n_threads, bool use_cpu) {
@@ -712,7 +720,7 @@ void dia_runner::configure_generation(generation_configuration * config) {
     decode_sampler->repetition_penalty = config->repetition_penalty;
     decode_sampler->do_sample = config->sample;
     decode_sampler->top_k = config->top_k;
-    model->max_generation_size = config->max_tokens > model->max_delay ? config->max_tokens : model->max_generation_size;
+    dctx->max_generation_size = config->max_tokens > model->max_delay ? config->max_tokens : model->max_generation_size;
 }
 
 void dia_runner::set_inputs(dia_ubatch & batch) {
@@ -736,7 +744,6 @@ void dia_runner::set_inputs(dia_ubatch & batch) {
     ggml_backend_tensor_set(dctx->audio_inp_tokens, batch.audio_tokens.data(), batch.audio_tokens.size()*ggml_element_size(dctx->audio_inp_tokens), batch.audio_tokens.size()*ggml_element_size(dctx->audio_inp_tokens));
     ((int32_t*) dctx->positions->data)[0] = dctx->current_position;
 }
-
 
 int dia_runner::decode(dia_ubatch & batch) {
     if (batch.encoder_step) {
@@ -854,6 +861,7 @@ int dia_runner::generate_from_batch(dia_ubatch & batch, struct tts_response * ou
 
     std::vector<uint32_t> filtered_output_tokens;
     adjust_output_tokens(dctx->output_tokens, filtered_output_tokens);
+
     dac_runner->run(filtered_output_tokens.data(), (int32_t) filtered_output_tokens.size() / model->n_output_heads, output);
     return 0;
 }
