@@ -26,7 +26,7 @@ static const std::map<std::string, dac_tensor> DAC_TENSOR_GGUF_LOOKUP = {
 };
 
 void dac_model::prep_constants(gguf_context * meta) {
-    int output_heads_key = search_for_gguf_keys(meta, {"parler-tts.decoder.output_heads", "output_heads", "dia.decoder.outpu_heads"});
+    int output_heads_key = search_for_gguf_keys(meta, {"parler-tts.decoder.output_heads", "output_heads", "dia.decoder.output_heads"});
     if (output_heads_key != -1) {
         n_heads = gguf_get_val_u32(meta, output_heads_key);;
     }
