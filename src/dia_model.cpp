@@ -255,7 +255,6 @@ void dia_context::reset() {
     prompt_size = 0;
     output_tokens.clear();
     delay_steps = -1;
-    max_generation_size = model->max_generation_size;
 }
 
 struct dia_context * build_new_dia_context(struct dia_model * model, int n_threads, bool use_cpu) {
@@ -650,6 +649,9 @@ void dia_runner::tokenize_sentence(std::string sentence, dia_ubatch & batch) {
     if (start != "[S1]" && start != "[S2]") {
         sentence = "[S1] " + sentence;
     }
+    if (sentence[sentence.size() - 1] != '.') {
+        sentence += ".";
+    }
 
     // [S1] and [S2] are special character sequences that are replaced with the special tokens 0x01 and 0x02 respectively.
     std::string r1(1, 1);
@@ -671,6 +673,9 @@ void dia_runner::tokenize_sentence(std::string sentence, dia_ubatch & batch) {
         batch.tokens.push_back((uint32_t) character);
     }
     batch.sentence_length = batch.tokens.size();
+    if (batch.sentence_length <= model->max_delay) {
+        fprintf(stdout, "Your prompt has fewer than 16 tokens. Please note that Dia's generation with prompts that are fewer than 16 tokens is highly inconsistent.");
+    }
 
     for (int i = (int) batch.tokens.size(); i < model->max_encoder_context_length * 2; i++) {
         batch.tokens.push_back(0u);
