@@ -1,5 +1,6 @@
 #include "util.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <stdarg.h>
 #ifdef __APPLE__
