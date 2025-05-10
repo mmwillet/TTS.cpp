@@ -673,8 +673,9 @@ void dia_runner::tokenize_sentence(std::string sentence, dia_ubatch & batch) {
         batch.tokens.push_back((uint32_t) character);
     }
     batch.sentence_length = batch.tokens.size();
-    if (batch.sentence_length <= model->max_delay) {
-        fprintf(stdout, "Your prompt has fewer than 16 tokens. Please note that Dia's generation with prompts that are fewer than 16 tokens is highly inconsistent.");
+    // this 100 token warning is arbitrarily chosen based on spot checking small prompt performance
+    if (batch.sentence_length <= 100) {
+        fprintf(stdout, "Your prompt has fewer than 100 tokens. Please note that Dia's generation with prompts that are fewer than 100 tokens is highly inconsistent.\n");
     }
 
     for (int i = (int) batch.tokens.size(); i < model->max_encoder_context_length * 2; i++) {
