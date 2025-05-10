@@ -363,12 +363,13 @@ int main(int argc, const char ** argv) {
     float default_temperature = 1.0f;
     int default_top_k = 50;
     float default_repetition_penalty = 1.0f;
+    float default_top_p = 1.0f;
 
     arg_list args;
     args.add_argument(float_arg("--temperature", "(OPTIONAL) The temperature to use when generating outputs. Defaults to 1.0.", "-t", false, &default_temperature));
     args.add_argument(int_arg("--topk", "(OPTIONAL) when set to an integer value greater than 0 generation uses nucleus sampling over topk nucleaus size. Defaults to 50.", "-tk", false, &default_top_k));
     args.add_argument(float_arg("--repetition-penalty", "The by channel repetition penalty to be applied the sampled output of the model. defaults to 1.0.", "-r", false, &default_repetition_penalty));
-    args.add_argument(string_arg("--model-path", "(REQUIRED) The local path of the gguf model file for Parler TTS mini or large v1 or Kokoro.", "-mp", true));
+    args.add_argument(string_arg("--model-path", "(REQUIRED) The local path of the gguf model file for Parler TTS mini or large v1, Dia, or Kokoro.", "-mp", true));
     args.add_argument(int_arg("--n-threads", "The number of cpu threads to run generation with. Defaults to hardware concurrency.", "-nt", false, &default_n_threads));
     args.add_argument(bool_arg("--use-metal", "(OPTIONAL) Whether to use metal acceleration", "-m"));
     args.add_argument(bool_arg("--no-cross-attn", "(OPTIONAL) Whether to not include cross attention", "-ca"));
@@ -382,6 +383,7 @@ int main(int argc, const char ** argv) {
     args.add_argument(int_arg("--n-parallelism", "(OPTIONAL) the number of parallel models to run asynchronously. Deafults to 1.", "-np", false, &default_n_parallel));
     args.add_argument(string_arg("--voice", "(OPTIONAL) the default voice to use when generating audio. Only used with applicable models.", "-v", false, "af_alloy"));
     args.add_argument(string_arg("--espeak-voice-id", "(OPTIONAL) The espeak voice id to use for phonemization. This should only be specified when the correct espeak voice cannot be inferred from the kokoro voice (see #MultiLanguage Configuration in the cli README for more info).", "-eid", false));
+    args.add_argument(float_arg("--top-p", "(OPTIONAL) the default sum of probabilities to sample over. Must be a value between 0.0 and 1.0. Defaults to 1.0.", "-tp", false, &default_top_p));
 
     args.parse(argc, argv);
     if (args.for_help) {
@@ -390,7 +392,20 @@ int main(int argc, const char ** argv) {
     }
     args.validate();
 
-    generation_configuration * default_generation_config = new generation_configuration(args.get_string_param("--voice"), *args.get_int_param("--topk"), *args.get_float_param("--temperature"), *args.get_float_param("--repetition-penalty"), !args.get_bool_param("--no-cross-attn"), args.get_string_param("--espeak-voice-id"));
+    if (*args.get_float_param("--top-p") > 1.0f || *args.get_float_param("--top-p") <= 0.0f) {
+        fprintf(stderr, "The '--top-p' value must be between 0.0 and 1.0. It was set to '%.6f'.\n", *args.get_float_param("--top-p"));
+        exit(1);
+    }
+
+    generation_configuration * default_generation_config = new generation_configuration(
+        args.get_string_param("--voice"),
+        *args.get_int_param("--topk"),
+        *args.get_float_param("--temperature"),
+        *args.get_float_param("--repetition-penalty"),
+        !args.get_bool_param("--no-cross-attn"),
+        args.get_string_param("--espeak-voice-id"),
+        0,
+        *args.get_float_param("--top-p"));
 
     worker_pool * pool = nullptr;
     struct simple_task_queue * tqueue = new simple_task_queue;
@@ -534,6 +549,7 @@ int main(int argc, const char ** argv) {
         std::memcpy((void*)conf, default_generation_config, sizeof(generation_configuration));
         float temp;
         float rep_pen;
+        float top_p;
         int top_k;
         if (data.contains("temperature") && data.at("temperature").is_number()) {
             temp = data.at("temperature").get<float>();
@@ -543,6 +559,11 @@ int main(int argc, const char ** argv) {
         if (data.contains("top_k") && data.at("top_k").is_number()) {
             top_k = data.at("top_k").get<int>();
             conf->top_k = top_k;
+        }
+
+        if (data.contains("top_p") && data.at("top_p").is_number()) {
+            top_p = data.at("top_p").get<float>();
+            conf->top_p = top_p;
         }
 
         if (data.contains("repetition_penalty") && data.at("repetition_penalty").is_number()) {

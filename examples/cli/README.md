@@ -17,12 +17,14 @@ In order to get a detailed breakdown the functionality currently available you c
     The temperature to use when generating outputs. Defaults to 1.0.
 --repetition-penalty (-r):
     The by channel repetition penalty to be applied the sampled output of the model. defaults to 1.0.
+--top-p (tp):
+    (OPTIONAL) the sum of probabilities to sample over. Must be a value between 0.0 and 1.0. Defaults to 1.0.
 --n-threads (-nt):
     The number of cpu threads to run generation with. Defaults to hardware concurrency. If hardware concurrency cannot be determined then it defaults to 1.
 --topk (-tk):
     (OPTIONAL) When set to an integer value greater than 0 generation uses nucleus sampling over topk nucleaus size. Defaults to 50.
 --max-tokens (-mt):
-    (OPTIONAL) The max audio tokens to generate. Only applied to Dia generation. If set to zero as is its default then the default max generation size
+    (OPTIONAL) The max audio tokens or token batches to generate where each represents approximates 11 ms of audio. Only applied to Dia generation. If set to zero as is its default then the default max generation size. Warning values under 15 are not supported.
 --use-metal (-m):
     (OPTIONAL) Whether to use metal acceleration
 --no-cross-attn (-ca):
@@ -32,7 +34,7 @@ In order to get a detailed breakdown the functionality currently available you c
 --play:
     (OPTIONAL) Whether to play back the audio immediately instead of saving it to file.
 --model-path (-mp):
-    (REQUIRED) The local path of the gguf model file for Parler TTS mini or large v1.
+    (REQUIRED) The local path of the gguf model file for Parler TTS mini or large v1, Dia, or Kokoro.
 --prompt (-p):
     (REQUIRED) The text prompt for which to generate audio in quotation markers.
 --save-path (-sp):

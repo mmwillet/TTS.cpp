@@ -6,15 +6,17 @@ This script runs a simple restful HTTP server which supports an OpenAI like `/v1
 
 In order to get a detailed breakdown of the functionality currently available you can call the tts-server with the `--help` parameter. This will return a breakdown of all parameters:
 
-```commandline
+```bash
 ./build/bin/tts-server --help
 
 --temperature (-t):
-    (OPTIONAL) The temperature to use when generating outputs by default. Defaults to 1.0.
+    (OPTIONAL) The temperature to use when generating outputs. Defaults to 1.0.
 --repetition-penalty (-r):
-    The by channel repetition penalty to be applied to the sampled output of the model by default. defaults to 1.0.
+    The by channel repetition penalty to be applied the sampled output of the model. defaults to 1.0.
+--top-p (tp):
+    (OPTIONAL) the default sum of probabilities to sample over. Must be a value between 0.0 and 1.0. Defaults to 1.0.
 --topk (-tk):
-    (OPTIONAL) When set to an integer value greater than 0, generation uses nucleus sampling over topk nucleaus size by default. Defaults to 50.
+    (OPTIONAL) when set to an integer value greater than 0 generation uses nucleus sampling over topk nucleaus size. Defaults to 50.
 --n-threads (-nt):
     The number of cpu threads to run generation with. Defaults to hardware concurrency.
 --port (-p):
@@ -30,7 +32,7 @@ In order to get a detailed breakdown of the functionality currently available yo
 --no-cross-attn (-ca):
     (OPTIONAL) Whether to not include cross attention
 --model-path (-mp):
-    (REQUIRED) The local path of the gguf model file for Parler TTS mini or large v1.
+    (REQUIRED) The local path of the gguf model file for Parler TTS mini or large v1, Dia, or Kokoro.
 --text-encoder-path (-tep):
     (OPTIONAL) The local path of the text encoder gguf model for conditional generaiton.
 --ssl-file-cert (-sfc):
@@ -42,14 +44,14 @@ In order to get a detailed breakdown of the functionality currently available yo
 --voice (-v):
     (OPTIONAL) the default voice to use when generating audio. Only used with applicable models.
 --espeak-voice-id (-eid):
-    (OPTIONAL) The espeak voice id to use for phonemization. This should only be specified when the correct espeak voice cannot be inferred from the kokoro voice (see MultiLanguage Configuration in the cli README for more info).
+    (OPTIONAL) The espeak voice id to use for phonemization. This should only be specified when the correct espeak voice cannot be inferred from the kokoro voice (see #MultiLanguage Configuration in the cli README for more info).
 ```
 
 Important configuration here includes `--n-parallelism` which describes how may models for asynchronous processing and `--model-path` which describes from where to load the model locally.
 
 Simple local usage can be achieved via the following simple command:
 
-```commandline
+```bash
 ./build/bin/tts-server --model-path /path/to/model/gguf-file.gguf
 ```
 
@@ -66,7 +68,7 @@ The server currently supports three paths:
 
 The primary endpoint, `/v1/audio/speech`, can be interacted with like so:
 
-```commandline
+```bash
 curl http://127.0.0.1:8080/v1/audio/speech  \
   -H "Content-Type: application/json" \
   -d '{
