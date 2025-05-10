@@ -19,6 +19,7 @@ In this endeavor, MacOS and metal support will be treated as the primary platfor
 | [Parler TTS Mini](https://huggingface.co/parler-tts/parler-tts-mini-v1)  |&check;|&check;|&check;|[here](https://huggingface.co/mmwillet2/Parler_TTS_GGUF)|
 | [Parler TTS Large](https://huggingface.co/parler-tts/parler-tts-large-v1)|&check;|&check;|&check;|[here](https://huggingface.co/mmwillet2/Parler_TTS_GGUF)|
 | [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M)                      |&check;|&cross;|&cross;|[here](https://huggingface.co/mmwillet2/Kokoro_GGUF)    |
+| [Dia](https://github.com/nari-labs/dia)                                  |&check;|&check;|&cross;|[here](https://huggingface.co/mmwillet2/Dia_GGUF)       |
 
 Additional Model support will initially be added based on open source model performance in the [TTS model arena](https://huggingface.co/spaces/TTS-AGI/TTS-Arena) and the availability of said models' architectures and checkpoints.
 
@@ -62,7 +63,7 @@ The CLI executable and other exceutables will be in the `./build` directory (e.g
 
 If you wish to install TTS.cpp with Espeak-ng phonemization support, first [install Espeak-ng](https://github.com/espeak-ng/espeak-ng/blob/master/docs/guide.md). Depending on your installation method the path of the installed library will vary. Upon identifying the installation path to espeak-ng (it should contain `./lib`, `./bin`, `./include`, and `./share` directories), you can compile TTS.cpp with espeak phonemization support by running the follwing in the repositories base directory:
 
-```commandline
+```bash
 export ESPEAK_INSTALL_DIR=/absolute/path/to/espeak-ng/dir
 cmake -B build
 cmake --build build --config Release

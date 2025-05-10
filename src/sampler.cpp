@@ -1,6 +1,6 @@
 #include "sampler.h"
 
-void sampler::sample(float * logits, std::vector<uint32_t> & output_tokens) {
+void sampler::sample(float * logits, std::vector<uint32_t> & output_tokens) {\
     // assume that we are pointing to the start of the first token output;
     if (!do_sample) {
         return max(logits, output_tokens);

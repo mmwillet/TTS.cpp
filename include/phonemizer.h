@@ -309,9 +309,6 @@ enum phonemizer_type {
 std::string parse_voice_code(std::string voice_code);
 void update_voice(std::string voice_code);
 const std::unordered_set<std::string> inline_combine_sets(const std::vector<std::unordered_set<std::string>> sets);
-std::string strip(std::string target, std::string vals = " ");
-std::vector<std::string> split(std::string target, std::string split_on, bool include_split_characters = false);
-std::vector<std::string> split(std::string target, const char split_on, bool include_split_characters = false);
 int upper_count(std::string word);
 bool is_all_upper(std::string word);
 bool is_roman_numeral(char letter);

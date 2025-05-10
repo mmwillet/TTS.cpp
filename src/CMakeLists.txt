@@ -22,6 +22,7 @@ add_library(tts
             phonemizer.cpp
             tts_model.cpp
             kokoro_model.cpp
+            dia_model.cpp
             )
 
 target_include_directories(tts PUBLIC . ../include ../ggml/src/)

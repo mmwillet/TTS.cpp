@@ -531,7 +531,7 @@ int main(int argc, const char ** argv) {
         struct simple_text_prompt_task * task = new simple_text_prompt_task(TTS, prompt);
         int id = task->id;
         generation_configuration * conf = new generation_configuration();
-        std::memcpy(conf, default_generation_config, sizeof(generation_configuration));
+        std::memcpy((void*)conf, default_generation_config, sizeof(generation_configuration));
         float temp;
         float rep_pen;
         int top_k;
