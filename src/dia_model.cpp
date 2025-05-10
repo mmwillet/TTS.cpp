@@ -246,7 +246,7 @@ void dia_model::prep_constants(gguf_context * meta) {
     // python parameter (rather than an attribute in the model config) for the python Dia model.
     int cfg_scale_key = gguf_find_key(meta, "dia.cfg_scale");
     if (cfg_scale_key != -1) {
-        cfg_scale = gguf_get_val_f32(meta, cfg_scale_key);
+        cfg_scale_data[0] = gguf_get_val_f32(meta, cfg_scale_key);
     }
 }
 
@@ -367,7 +367,7 @@ static struct ggml_tensor * build_dia_head_outputs(struct ggml_context * ctx, di
     }
     struct ggml_tensor * cond = ggml_cont(ctx, ggml_view_2d(ctx, out, out->ne[0], out->ne[2], out->nb[2], 0));
     struct ggml_tensor * uncond = ggml_cont(ctx, ggml_view_2d(ctx, out, out->ne[0], out->ne[2], out->nb[2], out->nb[1]));
-    return ggml_map_custom2(ctx, cond, uncond, &cfg_scale, out->ne[0], &model->cfg_scale);
+    return ggml_map_custom2(ctx, cond, uncond, &cfg_scale, out->ne[0], &model->cfg_scale_data);
 }
 
 static struct ggml_tensor * build_dia_encoder(ggml_context * ctx, dia_model * model, dia_context * dctx, dia_ubatch & batch) {
@@ -838,11 +838,17 @@ void dia_runner::adjust_output_tokens(std::vector<uint32_t> & output_tokens, std
     size_t size = output_tokens.size();
     filtered.reserve(size);
     for (int i = 0; i < (size / model->n_output_heads) - model->max_delay; i++) {
+        bool skip_step = false;
         for (int ii = 0; ii < model->n_output_heads; ii++) {
             int next_index = i*model->n_output_heads+model->delay_pattern[ii]*model->n_output_heads+ii;
-            if (next_index > size) {
-                filtered.push_back(model->eos_token_id);
-            } else {
+            if (next_index > size || output_tokens[next_index] >= model->audio_vocab_size) {
+                skip_step = true;
+                break;
+            }
+        }
+        if (!skip_step) {
+            for (int ii = 0; ii < model->n_output_heads; ii++) {
+                int next_index = i*model->n_output_heads+model->delay_pattern[ii]*model->n_output_heads+ii;
                 filtered.push_back(output_tokens[next_index]);
             }
         }

@@ -70,7 +70,7 @@ struct dia_model : tts_model {
     uint32_t max_encoder_context_length = 1024;
 
 
-    float cfg_scale = 3.0;
+    float cfg_scale_data[2] = {3.0, 1024.0};
     uint32_t max_delay = 15;
     std::vector<uint32_t> delay_pattern = {0, 8, 9, 10, 11, 12, 13, 14, 15};
 

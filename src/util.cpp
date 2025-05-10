@@ -156,6 +156,7 @@ void uv_noise_compute(struct ggml_tensor * dst, const struct ggml_tensor * a, co
 // This is a custom map op for applying cfg scale. It is used at the terminus of logit generation in Dia.
 void cfg_scale(struct ggml_tensor * dst, const struct ggml_tensor * a, const struct ggml_tensor * b, int ith, int nth, void * userdata) {
     const float scale = ((float *) userdata)[0];
+    const float max_output = ((float*) userdata)[1];
     const int rpt = (b->ne[0] + nth - 1)/nth;
     const int start = ith * rpt;
     const int end = MIN((ith + 1) * rpt, b->ne[0]);
@@ -168,6 +169,10 @@ void cfg_scale(struct ggml_tensor * dst, const struct ggml_tensor * a, const str
         for (int h = 0; h < b->ne[1]; h++) {
             int i = (h * b->ne[0]) + (bt * b->ne[0] * b->ne[1]);
             for(int r = start; r < end; r++) {
+                // only let the output heads yield tokens up to EOS
+                if (r > max_output) {
+                    output[i+r] = -INFINITY;
+                }
                 const float cr = cond[i+r];
                 const float ur = uncond[i+r];
                 output[i+r] = cr + scale * (cr - ur);
