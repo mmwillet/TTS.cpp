@@ -14,7 +14,7 @@ This script converts a 32bit floating point TTS.cpp GGUF model file to a quantiz
 **Please note** Quantization and lower precision conversion is currently only supported for Parler TTS models. 
 
 In order to get a detailed breakdown of the functionality currently available you can call the cli with the `--help` parameter. This will return a breakdown of all parameters:
-```commandline
+```bash
 ./quantize --help
 
 --quantized-type (-qt):
@@ -37,12 +37,13 @@ In order to get a detailed breakdown of the functionality currently available yo
 
 General usage should follow from these possible parameters. E.G. The following command will save a quantized version of the model using Q4_0 quantization to `/model/path/to/new/gguf_file_q.gguf`:
 
-```commandline
+```bash
 ./quantize --model-path /model/path/to/gguf_file.gguf --quantized-model-path /model/path/to/new/gguf_file_q.gguf --quantized-type 2 
 ```
 Valid types passed to `--quantized-type` are described by the `ggml_type` enum in GGML:
 
 ```cpp
+        GGML_TYPE_F16     = 1,
         GGML_TYPE_Q4_0    = 2,
         GGML_TYPE_Q4_1    = 3,
         // GGML_TYPE_Q4_2 = 4, support has been removed
@@ -66,7 +67,6 @@ Valid types passed to `--quantized-type` are described by the `ggml_type` enum i
         GGML_TYPE_IQ2_S   = 22,
         GGML_TYPE_IQ4_XS  = 23,
         GGML_TYPE_I8      = 24,
-        GGML_TYPE_BF16    = 30,
         GGML_TYPE_Q4_0_4_4 = 31,
         GGML_TYPE_Q4_0_4_8 = 32,
         GGML_TYPE_Q4_0_8_8 = 33,

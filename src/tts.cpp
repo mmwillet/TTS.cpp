@@ -141,8 +141,16 @@ void update_conditional_prompt(tts_runner * runner, const std::string file_path,
     ((parler_tts_runner*)runner)->update_conditional_prompt(file_path, prompt, n_threads, cpu_only);
 }
 
+bool dia_is_quantizable(std::string name, struct quantization_params * params) {
+    // The DAC audio encoder / decoder is not compatible with quantization and normalization tensors should not be quantized.
+    bool quantizable = !has_prefix(name, "audio_encoder") && !has_suffix(name, "norm");
+    if (!params->quantize_output_heads) {
+        quantizable = quantizable && !has_prefix(name, "dia.decoder.heads");
+    }
+    return quantizable;
+}
 
-bool is_quanitizable(std::string name, struct quantization_params * params) {
+bool parler_is_quanitizable(std::string name, struct quantization_params * params) {
     // the DAC audio encoder / decoder is not compatible with quantization, normalization weight shouldn't be quantized, and the text encoding shouldn't be normalized.
     bool quantizable = !has_prefix(name, "audio_encoder") && !has_suffix(name, "norm.weight") && !has_suffix(name, "text_encoding") && !has_suffix(name, "positional_embed") && !has_suffix(name, "norm.bias");
     if (!params->quantize_output_heads) {
@@ -155,6 +163,17 @@ bool is_quanitizable(std::string name, struct quantization_params * params) {
         quantizable = quantizable && !has_suffix(name, "encoder_attn.k_proj.weight") && !has_suffix(name, "encoder_attn.v_proj.weight");   
     }
     return quantizable;
+}
+
+bool is_quanitizable(tts_arch arch, std::string name, struct quantization_params * params) {
+    switch(arch) {
+        case PARLER_TTS_ARCH:
+            return parler_is_quanitizable(name, params);
+        case DIA_ARCH:
+            return dia_is_quantizable(name, params);
+        default:
+            TTS_ABORT("%s failed. The architecture '%d' is not supported.", __func__, arch);
+    }
 }
 
 size_t quantize_tensor(void * new_data, struct ggml_tensor * tensor, const float * imatrix, enum ggml_type qtype, uint32_t n_threads) {
@@ -255,9 +274,16 @@ void quantize_gguf(const std::string & ifile, const std::string & ofile, struct 
     if (arch_key != -1) {
         arch = std::string(gguf_get_val_str(meta_ctx, arch_key));
     }
-    if (arch != "parler-tts") {
-        TTS_ABORT("ERROR: quantization for arch '%s' is not currently support\n", arch.c_str());
+    tts_arch arch_type = SUPPORTED_ARCHITECTURES.at(arch);
+    switch (arch_type) {
+        case KOKORO_ARCH:
+            TTS_ABORT("ERROR: quantization for arch '%s' is not currently support\n", arch.c_str());
+        default:
+            if (params->quantize_type != GGML_TYPE_Q5_0 && params->quantize_type != GGML_TYPE_Q8_0 && params->quantize_type != GGML_TYPE_F16) {
+                fprintf(stdout, "Warning, %s is untested for quantization type '%d'. Use at your own risk.\n", arch.c_str(), params->quantize_type);
+            }
     }
+
 
     const size_t align = GGUF_DEFAULT_ALIGNMENT;
     gguf_context_ptr ctx_out { gguf_init_empty() };
@@ -274,21 +300,6 @@ void quantize_gguf(const std::string & ifile, const std::string & ofile, struct 
     }
 
     std::vector<no_init<uint8_t>> work;
-
-    const std::unordered_map<std::string, std::vector<float>> * imatrix_data = nullptr;
-    if (params->imatrix) {
-        imatrix_data = static_cast<const std::unordered_map<std::string, std::vector<float>>*>(params->imatrix);
-        if (imatrix_data) {
-            // check imatrix for nans or infs
-            for (const auto & kv : *imatrix_data) {
-                for (float f : kv.second) {
-                    if (!std::isfinite(f)) {
-                        TTS_ABORT("ERROR: imatrix contains non-finite value %f\n", f);
-                    }
-                }
-            }
-        }
-    }
 
     std::ofstream fout;
     auto close_ofstream = [&]() {
@@ -320,29 +331,20 @@ void quantize_gguf(const std::string & ifile, const std::string & ofile, struct 
             continue;
         }
 
-        if (is_quanitizable(name, params)) {
+        if (is_quanitizable(arch_type, name, params)) {
             if ((cur->type) != GGML_TYPE_F32) {
                 TTS_ABORT("ERROR: All quantized tensors must be transformed from 32bit floats. Tensor, '%s', has impropert type, '%d'\n", cur->name, cur->type);
             }
             new_type = params->quantize_type;
-            if ((new_type >= GGML_TYPE_IQ2_XXS && new_type <= GGML_TYPE_IQ4_XS) && imatrix_data) {
+            if ((new_type >= GGML_TYPE_IQ2_XXS && new_type <= GGML_TYPE_IQ4_XS)) {
                 TTS_ABORT("ERROR: Quantization type '%d' requires an importance matrix.\n", new_type);
-            }
-            const float * imatrix = nullptr;
-            if (imatrix_data) {
-                auto it = imatrix_data->find(cur->name);
-                if (it == imatrix_data->end()) {
-                    TTS_ABORT("ERROR: importance matrix does not contain information for tensor, '%s.'\n", cur->name);
-                } else {
-                    imatrix = it->second.data();
-                }
             }
             const int64_t nelement_size = ggml_nelements(cur) * 4;
             if (work.size() < (size_t)nelement_size) {
                 work.resize(nelement_size); // upper bound on size
             }
             new_data = work.data();
-            new_size = quantize_tensor(new_data, cur, imatrix, new_type, params->n_threads);
+            new_size = quantize_tensor(new_data, cur, nullptr, new_type, params->n_threads);
         } else if (params->convert_dac_to_f16 && has_prefix(name, "audio_encoder") && !has_suffix(name, "alpha") && !has_suffix(name, "bias")) {
             if ((cur->type) != GGML_TYPE_F32) {
                 TTS_ABORT("ERROR: All converted tensors must be transformed from 32bit floats. Tensor, '%s', has impropert type, '%d'\n", cur->name, cur->type);

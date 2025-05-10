@@ -15,10 +15,9 @@ int generate(tts_runner * runner, std::string sentence, struct tts_response * re
 void update_conditional_prompt(tts_runner * runner, const std::string file_path, const std::string prompt, bool cpu_only = true);
 
 struct quantization_params {
-    quantization_params(uint32_t n_threads, enum ggml_type quantize_type, void * imatrix = nullptr): n_threads(n_threads), quantize_type(quantize_type), imatrix(imatrix) {};
+    quantization_params(uint32_t n_threads, enum ggml_type quantize_type): n_threads(n_threads), quantize_type(quantize_type) {};
     uint32_t n_threads;
     enum ggml_type quantize_type; // quantization type
-    void * imatrix = nullptr; // pointer to importance matrix data
     bool quantize_output_heads = false;
     bool quantize_text_embeddings = false;
     bool quantize_cross_attn_kv = false;
