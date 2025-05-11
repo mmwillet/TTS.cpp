@@ -45,7 +45,7 @@ Additional Model support will initially be added based on open source model perf
 #### Requirements:
 
 * Local GGUF format model file (see [py-gguf](./py-ggufs/README.md) for information on how to convert the hugging face models to GGUF).
-* C++17 and C17
+* C++23 and C11
   * XCode Command Line Tools (via `xcode-select --install`) should suffice for OS X
 * CMake (>=3.14) 
 * GGML pulled locally
