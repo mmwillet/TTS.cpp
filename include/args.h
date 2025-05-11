@@ -1,9 +1,9 @@
-#ifndef args_h
-#define args_h
+#pragma once
 
 #include <stdio.h>
 #include <iostream>
 #include <vector>
+#include "common.h"
 
 struct arg {
     std::string full_name;
@@ -102,7 +102,7 @@ struct arg_list {
 
     int find_and_parse(std::string name, int argc, const char ** argv);
 
-    std::string get_string_param(std::string full_name);
+    str get_string_param(str full_name);
 
     int * get_int_param(std::string full_name);
 
@@ -110,6 +110,3 @@ struct arg_list {
 
     bool get_bool_param(std::string full_name);
 };
-
-#endif
-

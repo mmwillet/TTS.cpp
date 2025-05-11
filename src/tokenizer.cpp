@@ -1,10 +1,10 @@
 #include "tokenizer.h"
 
-void token_trie::add(const std::string & gram, uint32_t token) {
+void token_trie::add(const string & gram, uint32_t token) {
     _add(gram, token, 0);
 }
 
-void token_trie::_add(const std::string & gram, uint32_t new_token, size_t index) {
+void token_trie::_add(const string & gram, uint32_t new_token, size_t index) {
     if (index >= gram.size()) {
         has_value = true;
         token = new_token;
@@ -36,31 +36,21 @@ size_t unicode_len_utf8(char src) {
     return lookup[highbits];
 }
 
-void unigram_tokenizer::initialize_tokenizer() {
-    for (const auto it : vocab) {
-        root_trie.add(it.first, it.second);
-    }
-    init = true;
-}
-
 // the general approach here is to find the character grams that sum to the max possible value over the entire text sequence.
 // The particular algorithm used here effectively works by walking the text and at each index storing the max value of all possible gram combinations
 // we can then reverse that sequence to pick the best possible tokens.
-void unigram_tokenizer::tokenize(const std::string & text, std::vector<uint32_t> & tokens) {
-    if (!init) {
-        TTS_ABORT("Error: %s\nTokenizer must be initialized before #tokenize is called.");
-    }
+void unigram_tokenizer::tokenize(const string & text, vector<uint32_t> & tokens) {
     // the parler tokenizer's normalizer (i.e. the bert normalizer implemented by huggingface tokenizers libs) only deduplicates and strips extra spaces and
     // optionally handles chinese characters and accents (neither of which are currently supported here).
-    std::string normalized = text;
+    string normalized = text;
     if (dedupe_spaces) {
-        normalized = " " + std::regex_replace(text, duped_spaces, " ");
+        normalized = " " + regex_replace(text, duped_spaces, " ");
     }
     
     size_t text_length = normalized.size();
 
     // initialize score_sum to neg infinity so it will be always lower than sums of token scores
-    std::vector<struct result> results(text_length + 1, {unk_token, 0, -INFINITY});
+    vector<struct result> results(text_length + 1, {unk_token, 0, -INFINITY});
     results[0] = { unk_token, 0, 0 };
     
     size_t offset = 0;
@@ -68,7 +58,7 @@ void unigram_tokenizer::tokenize(const std::string & text, std::vector<uint32_t>
     while (offset < text_length) {
         size_t current_offset = offset;
         // pulled this directly from llama.cpp; I suspect that this is for handling of non-utf8 steps (to be marked as unknown tokens)
-        size_t n_utf8_code_units = std::min<size_t>(unicode_len_utf8(normalized[offset]), text_length - offset);
+        size_t n_utf8_code_units = min<size_t>(unicode_len_utf8(normalized[offset]), text_length - offset);
 
         bool found_unknown = true;
         const struct result & current_best = results[offset];
@@ -123,46 +113,44 @@ void unigram_tokenizer::tokenize(const std::string & text, std::vector<uint32_t>
     }
 
     // reverse the tokens since we added tokens starting from the end of the input
-    std::reverse(tokens.begin(), tokens.end());
+    reverse(tokens.begin(), tokens.end());
 }
 
 // loading the vocab to the tokenizer from gguf file.
-unigram_tokenizer * unigram_tokenizer_from_gguf(gguf_context * meta) {
-    std::unordered_map<std::string, uint32_t> vocab;
-    std::vector<float> scores;
+unigram_tokenizer::unigram_tokenizer(gguf_context * meta) {
+    vector<float> scores;
     int vocab_key = gguf_find_key(meta, "tokenizer.ggml.tokens");
     int vocab_size = gguf_get_arr_n(meta, vocab_key);
     scores.reserve(vocab_size);
     for (int i = 0; i < vocab_size; i++) {
-        std::string val = gguf_get_arr_str(meta, vocab_key, i);
+        string val = gguf_get_arr_str(meta, vocab_key, i);
         vocab[val] = (uint32_t) i;
     }
     int scores_key = gguf_find_key(meta, "tokenizer.ggml.scores");
     int scores_size = gguf_get_arr_n(meta, scores_key);
     assert(scores_size == vocab_size);
-    float * data = (float*) gguf_get_arr_data(meta, scores_key);
-    for (int i = 0; i < scores_size; i++) {
-        scores.push_back(data[i]);
-    }
+    scores.reserve(scores_size);
+    scores.append_range(span{(float*) gguf_get_arr_data(meta, scores_key), scores_size});
     int unkown_token_key = gguf_find_key(meta, "tokenizer.ggml.unknown_token_id");
-    uint32_t token = gguf_get_val_u32(meta, unkown_token_key);
-
-    auto tokenizer =  new unigram_tokenizer(vocab, token, scores[token], scores);
-
+    unk_token = gguf_get_val_u32(meta, unkown_token_key);
+    unk_token_score = scores[unk_token];
     uint32_t eos_token_key = gguf_find_key(meta, "tokenizer.ggml.eos_token_id");
     if (eos_token_key != -1) {
         tokenizer->eos_token = gguf_get_val_u32(meta, eos_token_key);
     }
+    for (const auto it : vocab) {
+        root_trie.add(it.first, it.second);
+    }
     return tokenizer;
 }
 
-void single_pass_tokenizer::tokenize(const std::string & text, std::vector<uint32_t> & token_ids) {
-    std::string remaining = text;
+void single_pass_tokenizer::tokenize(const string & text, vector<uint32_t> & token_ids) {
+    string remaining = text;
     while (remaining.size() > 0) {
         uint32_t token_id = unknown_id;
-        for (int i = 1; i < std::min(remaining.size()+1, max_size+1); i++) {
-            std::string part = remaining.substr(0, i);
-            ptrdiff_t pos = std::distance(tokens.begin(), std::find(tokens.begin(), tokens.end(), part));
+        for (int i = 1; i < min(remaining.size()+1, max_size+1); i++) {
+            string part = remaining.substr(0, i);
+            ptrdiff_t pos = distance(tokens.begin(), find(tokens.begin(), tokens.end(), part));
             if (pos < tokens.size()) {
                 token_id = (uint32_t) pos;
                 remaining = remaining.substr(part.size(), remaining.size() - part.size());
@@ -176,13 +164,13 @@ void single_pass_tokenizer::tokenize(const std::string & text, std::vector<uint3
     }
 }
 
-void single_pass_tokenizer::token_split(const std::string & text, std::vector<std::string> & tokens) {
-    std::string remaining = text;
+void single_pass_tokenizer::token_split(const string & text, vector<string> & tokens) {
+    string remaining = text;
     while (remaining.size() > 0) {
-        // String copying is much slower than using a std::string_view, but the former is simpler to implement for now.
-        std::string token = remaining.substr(0, 1);
+        // String copying is much slower than using a string_view, but the former is simpler to implement for now.
+        string token = remaining.substr(0, 1);
         for (int i = 1; i < remaining.size(); i++) {
-            std::string part = remaining.substr(0, i+1);
+            string part = remaining.substr(0, i+1);
             if (token_vocab.find(part) == token_vocab.end()) {
                 break;
             }
@@ -193,12 +181,12 @@ void single_pass_tokenizer::token_split(const std::string & text, std::vector<st
     }
 }
 
-struct single_pass_tokenizer * single_pass_tokenizer_from_gguf(gguf_context * meta, std::string key_name) {
+struct single_pass_tokenizer * single_pass_tokenizer_from_gguf(gguf_context * meta, string key_name) {
     int tokens_key = gguf_find_key(meta, key_name.c_str());
     if (tokens_key == -1) {
         TTS_ABORT("The '%s' key must be set in order to support single pass tokenization.", key_name.c_str());
     }
-    std::vector<std::string> tokens;
+    vector<string> tokens;
     int token_count = gguf_get_arr_n(meta, tokens_key);
     for (int i = 0; i < token_count; i++) {
         tokens.push_back(gguf_get_arr_str(meta, tokens_key, i));

@@ -1,182 +1,91 @@
-#include "tts.h"
 #include <mutex>
+#include "dia_model.h"
+#include "kokoro_model.h"
+#include "parler_model.h"
+#include "tts.h"
 
-struct tts_runner * parler_tts_from_file(gguf_context * meta_ctx, ggml_context * weight_ctx, int n_threads, generation_configuration * config, tts_arch arch, bool cpu_only) {
-    parler_tts_model * model = new parler_tts_model;
-    dac_model * audio_model = new dac_model;
-    unigram_tokenizer * ut = unigram_tokenizer_from_gguf(meta_ctx);
-    ut->initialize_tokenizer();
-    model->use_cross_attn = config->use_cross_attn;
-    model->setup_from_file(meta_ctx, weight_ctx, cpu_only);
-    audio_model->setup_from_file(meta_ctx, weight_ctx, cpu_only);
-    struct sampler * samp = new sampler;
-    struct dac_context * dctx = build_new_dac_context(audio_model, n_threads, cpu_only);
-    struct dac_runner * audio_decoder = new dac_runner(audio_model, dctx);
-    struct parler_context * pctx = build_new_parler_context(model, n_threads, cpu_only);
-    struct parler_kv_cache * cache = new parler_kv_cache;
-    struct parler_tts_runner * runner = new parler_tts_runner(model, audio_decoder, pctx, ut, samp, cache);
+struct tts_runner_factory {
+    virtual unique_ptr<tts_runner> create(const gguf_context & meta, const ggml_context & weights,
+                                          const generation_configuration & config) = 0;
 
-    // TODO: change this weight assignment pattern to mirror llama.cpp
-    for (ggml_tensor * cur = ggml_get_first_tensor(weight_ctx); cur; cur = ggml_get_next_tensor(weight_ctx, cur)) {
-        runner->assign_weight(cur->name, cur);
+    virtual ~tts_runner_factory() = default;
+};
+
+template<typename T>
+    requires is_base_of_v<tts_runner, T> && is_base_of_v<tts_model, typename T::model_type>
+struct tts_runner_factory_impl final : tts_runner_factory {
+    unique_ptr<tts_runner> create(const gguf_context & meta, const ggml_context & weights,
+                                  const generation_configuration & config) override {
+        const shared_ptr<typename T::model_type> model{meta, weights};
+        model->buf_offset = 0;
+        // TODO: change this weight assignment pattern to mirror llama.cpp
+        model->assign_weights(weights);
+        return unique_ptr<tts_runner>{new T{model, config}};
     }
+};
 
-    if (config->use_cross_attn) {
-        runner->model->prep_cross_key_values(n_threads);
-    }
-
-    runner->prepare_post_load();
-
-    gguf_free(meta_ctx);
-    ggml_free(weight_ctx);
-    runner->arch = arch;
-
-    return (tts_runner*)runner;
-}
-
-struct tts_runner * kokoro_from_file(gguf_context * meta_ctx, ggml_context * weight_ctx, int n_threads, generation_configuration * config, tts_arch arch, bool cpu_only) {
-    kokoro_model * model = new kokoro_model;
-    single_pass_tokenizer * spt = single_pass_tokenizer_from_gguf(meta_ctx, "tokenizer.ggml.tokens");
-    model->setup_from_file(meta_ctx, weight_ctx, cpu_only);
-    struct kokoro_duration_context * kdctx = build_new_duration_kokoro_context(model, n_threads, cpu_only);
-    struct kokoro_duration_runner * duration_runner = new kokoro_duration_runner(model, kdctx, spt);
-    struct kokoro_context * kctx = build_new_kokoro_context(model, n_threads, cpu_only);
-    // if an espeak voice id wasn't specifically set infer it from the kokoro voice, if it was override it, otherwise fallback to American English.
-    std::string espeak_voice_id = config->espeak_voice_id;
-    if (espeak_voice_id.empty()) {
-        espeak_voice_id = !config->voice.empty() && KOKORO_LANG_TO_ESPEAK_ID.find(config->voice.at(0)) != KOKORO_LANG_TO_ESPEAK_ID.end() ? KOKORO_LANG_TO_ESPEAK_ID[config->voice.at(0)] : "gmw/en-US";
-    }
-    struct phonemizer * phmzr = phonemizer_from_gguf(meta_ctx, espeak_voice_id);
-    struct kokoro_runner * runner = new kokoro_runner(model, kctx, spt, duration_runner, phmzr);
-
-    // TODO: change this weight assignment pattern to mirror llama.cpp
-    for (ggml_tensor * cur = ggml_get_first_tensor(weight_ctx); cur; cur = ggml_get_next_tensor(weight_ctx, cur)) {
-        runner->assign_weight(cur->name, cur);
-    }
-
-    runner->prepare_post_load();
-
-    gguf_free(meta_ctx);
-    ggml_free(weight_ctx);
-    runner->arch = arch;
-
-    return (tts_runner*)runner;
-}
-
-struct tts_runner * dia_from_file(gguf_context * meta_ctx, ggml_context * weight_ctx, int n_threads, generation_configuration * config, tts_arch arch, bool cpu_only) {
-    dia_model * model = new dia_model;
-    dac_model * audio_model = new dac_model;
-    model->setup_from_file(meta_ctx, weight_ctx, cpu_only);
-    audio_model->setup_from_file(meta_ctx, weight_ctx, cpu_only);
-    struct sampler * samp = new sampler;
-    struct dac_context * dctx = build_new_dac_context(audio_model, n_threads, cpu_only);
-    struct dac_runner * audio_decoder = new dac_runner(audio_model, dctx);
-    struct dia_context * diactx = build_new_dia_context(model, n_threads, cpu_only);
-    struct dia_kv_cache * cache = new dia_kv_cache;
-    struct dia_runner * runner = new dia_runner(model, audio_decoder, diactx, samp, cache);
-
-    for (ggml_tensor * cur = ggml_get_first_tensor(weight_ctx); cur; cur = ggml_get_next_tensor(weight_ctx, cur)) {
-        runner->assign_weight(cur->name, cur);
-    }
-
-    runner->prepare_post_load();
-
-    gguf_free(meta_ctx);
-    ggml_free(weight_ctx);
-    runner->arch = arch;
-
-    return (tts_runner*)runner;
-}
+static constexpr array<pair<str, unique_ptr<tts_runner_factory>>, 3> MODEL_FACTORIES{{
+    {"dia", make_unique<tts_runner_factory_impl<dia_runner>>()},
+    {"kokoro", make_unique<tts_runner_factory_impl<kokoro_runner>>()},
+    {"parler-tts", make_unique<tts_runner_factory_impl<parler_tts_runner>>()},
+}};
 
 // currently only metal and cpu devices are supported, so cpu_only only describes whether or not to try to load and run on metal.
-struct tts_runner * runner_from_file(const std::string & fname, int n_threads, generation_configuration * config, bool cpu_only) {
-    ggml_context * weight_ctx = NULL;
-
-    struct gguf_init_params params = {
-        /*.no_alloc   =*/ false,
-        /*.ctx        =*/ &weight_ctx,
-    };
-    gguf_context * meta_ctx = gguf_init_from_file(fname.c_str(), params);
-    if (!meta_ctx) {
-        TTS_ABORT("%s failed for file %s\n", __func__, fname.c_str());
+unique_ptr<tts_runner> runner_from_file(str fname, int n_threads, generation_configuration * config, bool cpu_only) {
+    ggml_context * weight_ctx_{};
+    const gguf_context_ptr meta{gguf_init_from_file(fname, {
+        .no_alloc   = false,
+        .ctx        = &weight_ctx_,
+    })};
+    const ggml_context_ptr weights{weight_ctx_};
+    if (!meta) {
+        TTS_ABORT(__func__ " failed for file %s\n");
     }
-    int arch_key = gguf_find_key(meta_ctx, "general.architecture");
+    const int arch_key{gguf_find_key(&*meta, "general.architecture")};
     if (arch_key == -1) {
-        TTS_ABORT("%s failed for file %s. No architecture is set.\n", __func__, fname.c_str());
+        TTS_ABORT(__func__ " failed for file %s. No architecture is set.\n", fname);
     }
-    std::string arch = std::string(gguf_get_val_str(meta_ctx, arch_key));
-    if (SUPPORTED_ARCHITECTURES.find(arch) == SUPPORTED_ARCHITECTURES.end()) {
-        TTS_ABORT("%s failed for file %s. The architecture '%s' is not supported.", __func__, fname.c_str(), arch.c_str());
+    const sv arch{gguf_get_val_str(&*meta, arch_key)};
+    const auto found{binary_search_idx(MODEL_FACTORIES, arch, pair_first_cmp_sv)};
+    if (!~found) {
+        TTS_ABORT(__func__ " failed for file %s. The architecture '%s' is not supported.", fname, arch);
     }
-    tts_arch arch_type = SUPPORTED_ARCHITECTURES.at(arch);
-    switch(arch_type) {
-        case PARLER_TTS_ARCH:
-            return parler_tts_from_file(meta_ctx, weight_ctx, n_threads, config, arch_type, cpu_only);
-        case KOKORO_ARCH:
-            return kokoro_from_file(meta_ctx, weight_ctx, n_threads, config, arch_type, cpu_only);
-        case DIA_ARCH:
-            return dia_from_file(meta_ctx, weight_ctx, n_threads, config, arch_type, cpu_only);
-        default:
-            TTS_ABORT("%s failed for file %s. The architecture '%s' is not supported.", __func__, fname.c_str(), arch.c_str());
-    }
+    return MODEL_FACTORIES[found].second.create(*meta, *weights, config);
 }
 
-int generate(tts_runner * runner, std::string sentence, struct tts_response * response, generation_configuration * config) {
-    switch(runner->arch) {
-        case PARLER_TTS_ARCH:
-            ((parler_tts_runner*)runner)->configure_generation(config);
-            return ((parler_tts_runner*)runner)->generate(sentence, response);
-        case KOKORO_ARCH:
-            return ((kokoro_runner*)runner)->generate(sentence, response, config->voice, config->espeak_voice_id);
-        case DIA_ARCH:
-            ((dia_runner*)runner)->configure_generation(config);
-            return ((dia_runner*)runner)->generate(sentence, response);
-        default:
-            TTS_ABORT("%s failed. The architecture '%d' is not supported.", __func__, runner->arch);
-    }
+static bool dac_is_quantizable(sv name, const quantization_params & params) {
+    // The DAC audio encoder / decoder is not compatible with quantization
+    return !name.starts_with("audio_encoder");
 }
 
-void update_conditional_prompt(tts_runner * runner, const std::string file_path, const std::string prompt, bool cpu_only) {
-    int n_threads = ((parler_tts_runner*)runner)->pctx->n_threads;
-    ((parler_tts_runner*)runner)->update_conditional_prompt(file_path, prompt, n_threads, cpu_only);
+static bool dia_is_quantizable(sv name, const quantization_params & params) {
+    // Normalization tensors should not be quantized.
+    return dac_is_quantizable(name, params) && !name.ends_with("norm") &&
+           (params.quantize_output_heads || !name.ends_with("dia.decoder.heads"));
 }
 
-bool dia_is_quantizable(std::string name, struct quantization_params * params) {
-    // The DAC audio encoder / decoder is not compatible with quantization and normalization tensors should not be quantized.
-    bool quantizable = !has_prefix(name, "audio_encoder") && !has_suffix(name, "norm");
-    if (!params->quantize_output_heads) {
-        quantizable = quantizable && !has_prefix(name, "dia.decoder.heads");
-    }
-    return quantizable;
+static bool parler_is_quanitizable(sv name, const quantization_params & params) {
+    // Normalization weights shouldn't be quantized, and the text encoding shouldn't be normalized.
+    return dac_is_quantizable(name, params) && !name.ends_with("norm.weight") && !name.ends_with("text_encoding") &&
+           !name.ends_with("positional_embed") && !name.ends_with("norm.bias") &&
+           (params.quantize_output_heads || !name.ends_with("weight.head")) &&
+           (params.quantize_text_embeddings || !name.ends_with("embed_prompts")) &&
+           (params.quantize_cross_attn_kv ||
+               !name.ends_with("encoder_attn.k_proj.weight") && !name.ends_with("encoder_attn.v_proj.weight"));
 }
 
-bool parler_is_quanitizable(std::string name, struct quantization_params * params) {
-    // the DAC audio encoder / decoder is not compatible with quantization, normalization weight shouldn't be quantized, and the text encoding shouldn't be normalized.
-    bool quantizable = !has_prefix(name, "audio_encoder") && !has_suffix(name, "norm.weight") && !has_suffix(name, "text_encoding") && !has_suffix(name, "positional_embed") && !has_suffix(name, "norm.bias");
-    if (!params->quantize_output_heads) {
-        quantizable = quantizable && !has_suffix(name, "weight.head");
-    }
-    if (!params->quantize_text_embeddings) {
-        quantizable = quantizable && !has_suffix(name, "embed_prompts");
-    }
-    if (!params->quantize_cross_attn_kv) {
-        quantizable = quantizable && !has_suffix(name, "encoder_attn.k_proj.weight") && !has_suffix(name, "encoder_attn.v_proj.weight");   
-    }
-    return quantizable;
-}
-
-bool is_quanitizable(tts_arch arch, std::string name, struct quantization_params * params) {
+bool is_quanitizable(char arch, sv name, const quantization_params & params) {
     switch(arch) {
-        case PARLER_TTS_ARCH:
+        case 'p':
             return parler_is_quanitizable(name, params);
-        case DIA_ARCH:
+        case 'd':
             return dia_is_quantizable(name, params);
         default:
-            TTS_ABORT("%s failed. The architecture '%d' is not supported.", __func__, arch);
+            TTS_ABORT(__func__ " failed. The architecture '%d' is not supported.", arch);
     }
 }
 
-size_t quantize_tensor(void * new_data, struct ggml_tensor * tensor, const float * imatrix, enum ggml_type qtype, uint32_t n_threads) {
+size_t quantize_tensor(void * new_data, ggml_tensor * tensor, const float * imatrix, enum ggml_type qtype, uint32_t n_threads) {
     // much of this is form copied from llama.cpp
     int chunk_size_multiplier = 1;
     if (qtype == GGML_TYPE_Q4_0_4_4 || qtype == GGML_TYPE_Q4_0_4_8 || qtype == GGML_TYPE_Q4_0_8_8) {
@@ -191,8 +100,8 @@ size_t quantize_tensor(void * new_data, struct ggml_tensor * tensor, const float
     const int32_t nrows = tensor->ne[1];
     static const int32_t min_chunk_size = 32 * 512;
     const int32_t chunk_size = (n_per_row >= min_chunk_size ? n_per_row : n_per_row * ((min_chunk_size + n_per_row - 1)/n_per_row)) * chunk_size_multiplier;
-    uint32_t thread_count = std::max(1, std::min((int)n_threads, (int)(d3_step + chunk_size - 1) / chunk_size));
-    std::mutex mutex;
+    uint32_t thread_count = max(1, min((int)n_threads, (int)(d3_step + chunk_size - 1) / chunk_size));
+    mutex mutex;
 
     for (int32_t d3_index = 0; d3_index < tensor->ne[2]; d3_index++) {
         const float * f32_data_d3 = ((float *) tensor->data) + d3_index * d3_step;
@@ -202,7 +111,7 @@ size_t quantize_tensor(void * new_data, struct ggml_tensor * tensor, const float
             // not threaded
             out_size += ggml_quantize_chunk(qtype, f32_data_d3, new_data_d3, 0, nrows, n_per_row, imatrix);
         } else {
-            std::vector <std::thread> threads;
+            vector <thread> threads;
             int64_t counter = 0;
             size_t new_size = 0;
             bool valid = true;
@@ -211,7 +120,7 @@ size_t quantize_tensor(void * new_data, struct ggml_tensor * tensor, const float
                     const int64_t nrows_per_chunk = chunk_size / n_per_row;
                     size_t local_size = 0;
                     while (true) {
-                        std::unique_lock<std::mutex> lock(mutex);
+                        unique_lock<mutex> lock(mutex);
                         int64_t first_row = counter; 
                         counter += nrows_per_chunk;
                         if (first_row >= nrows) {
@@ -221,7 +130,7 @@ size_t quantize_tensor(void * new_data, struct ggml_tensor * tensor, const float
                             break;
                         }
                         lock.unlock();
-                        const int64_t this_nrow = std::min(nrows - first_row, nrows_per_chunk);
+                        const int64_t this_nrow = min(nrows - first_row, nrows_per_chunk);
                         size_t this_size = ggml_quantize_chunk(qtype, f32_data_d3, new_data_d3, first_row * n_per_row, this_nrow, n_per_row, imatrix);
                         local_size += this_size;
 
@@ -229,13 +138,13 @@ size_t quantize_tensor(void * new_data, struct ggml_tensor * tensor, const float
                         const size_t row_size  = ggml_row_size(qtype, n_per_row);
                         void * this_data = (char *) new_data_d3 + first_row * row_size;
                         if (!ggml_validate_row_data(qtype, this_data, this_size)) {
-                            std::unique_lock<std::mutex> lock(mutex);
+                            unique_lock<mutex> lock(mutex);
                             valid = false;
                             break;
                         }
                     }
                 };
-                threads.push_back(std::thread(func));
+                threads.push_back(thread(func));
             }
             for (auto & t : threads) t.join();
 
@@ -248,7 +157,7 @@ size_t quantize_tensor(void * new_data, struct ggml_tensor * tensor, const float
     return out_size;
 }
 
-static void zeros(std::ofstream & file, size_t n) {
+static void zeros(ofstream & file, size_t n) {
     char zero = 0;
     for (size_t i = 0; i < n; ++i) {
         file.write(&zero, 1);
@@ -258,84 +167,82 @@ static void zeros(std::ofstream & file, size_t n) {
 template <typename T>
 struct no_init {
     T value;
-    no_init() { /* do nothing */ }
 };
 
-void quantize_gguf(const std::string & ifile, const std::string & ofile, struct quantization_params * params) {
+void quantize_gguf(str ifile, str ofile, const quantization_params & params) {
     ggml_context * weight_ctx = NULL;
-    struct gguf_init_params gguf_params = {
+    gguf_init_params gguf_params = {
         /*.no_alloc   =*/ false,
         /*.ctx        =*/ &weight_ctx,
     };
-    gguf_context * meta_ctx = gguf_init_from_file(ifile.c_str(), gguf_params);
-    std::string arch = "parler-tts"; // only parler-tts gguf files should lack an explicit architecture.
-
-    int arch_key = gguf_find_key(meta_ctx, "general.architecture");
-    if (arch_key != -1) {
-        arch = std::string(gguf_get_val_str(meta_ctx, arch_key));
+    gguf_context * meta_ctx = gguf_init_from_file(ifile, gguf_params);
+    str arch{"parler-tts"}; // only parler-tts gguf files should lack an explicit architecture.
+    if (const int arch_key{gguf_find_key(meta_ctx, "general.architecture")}; ~arch_key) {
+        arch = gguf_get_val_str(meta_ctx, arch_key);
     }
-    tts_arch arch_type = SUPPORTED_ARCHITECTURES.at(arch);
-    switch (arch_type) {
-        case KOKORO_ARCH:
-            TTS_ABORT("ERROR: quantization for arch '%s' is not currently support\n", arch.c_str());
+    if (arch == "kokoro"sv) {
+        TTS_ABORT("ERROR: quantization for arch 'kokoro' is not currently support\n");
+    }
+    switch (params.quantize_type) {
+        case GGML_TYPE_Q5_0:
+        case GGML_TYPE_Q8_0:
+        case GGML_TYPE_F16:
+            break;
         default:
-            if (params->quantize_type != GGML_TYPE_Q5_0 && params->quantize_type != GGML_TYPE_Q8_0 && params->quantize_type != GGML_TYPE_F16) {
-                fprintf(stdout, "Warning, %s is untested for quantization type '%d'. Use at your own risk.\n", arch.c_str(), params->quantize_type);
-            }
+            fprintf(stdout, "Warning, %s is untested for quantization type '%d'. Use at your own risk.\n", arch, params.quantize_type);
     }
-
 
     const size_t align = GGUF_DEFAULT_ALIGNMENT;
-    gguf_context_ptr ctx_out { gguf_init_empty() };
+    gguf_context_ptr ctx_out{gguf_init_empty()};
 
     // copy the KV pairs from the input file
     gguf_set_kv(ctx_out.get(), meta_ctx);
     gguf_set_val_u32(ctx_out.get(), "general.quantization_version", GGML_QNT_VERSION);
     gguf_set_val_u32(ctx_out.get(), "general.quantization_type", params->quantize_type);
     for (ggml_tensor * tensor = ggml_get_first_tensor(weight_ctx); tensor; tensor = ggml_get_next_tensor(weight_ctx, tensor)) {
-        std::string name = ggml_get_name(tensor);
+        string name = ggml_get_name(tensor);
         if (name.size() != 0) {
             gguf_add_tensor(ctx_out.get(), tensor);
         }
     }
 
-    std::vector<no_init<uint8_t>> work;
+    vector<no_init<uint8_t>> work;
 
-    std::ofstream fout;
+    ofstream fout;
     auto close_ofstream = [&]() {
         // Write metadata and close file handler
         if (fout.is_open()) {
             fout.seekp(0);
-            std::vector<uint8_t> data(gguf_get_meta_size(ctx_out.get()));
+            vector<uint8_t> data(gguf_get_meta_size(ctx_out.get()));
             gguf_get_meta_data(ctx_out.get(), data.data());
             fout.write((const char *) data.data(), data.size());
             fout.close();
         }
     };
     auto new_ofstream = [&]() {
-        std::string fname = ofile;
-        fout = std::ofstream(fname, std::ios::binary);
-        fout.exceptions(std::ofstream::failbit); // fail fast on write errors
+        string fname = ofile;
+        fout = ofstream(fname, ios::binary);
+        fout.exceptions(ofstream::failbit); // fail fast on write errors
         const size_t meta_size = gguf_get_meta_size(ctx_out.get());
         // placeholder for the meta data
         ::zeros(fout, meta_size);
     };
     new_ofstream();
     for (ggml_tensor * cur = ggml_get_first_tensor(weight_ctx); cur; cur = ggml_get_next_tensor(weight_ctx, cur)) {
-        enum ggml_type new_type;
+        ggml_type new_type;
         void * new_data;
         size_t new_size;
-        std::string name = ggml_get_name(cur);
+        string name = ggml_get_name(cur);
         
         if (name.size() == 0) {
             continue;
         }
 
-        if (is_quanitizable(arch_type, name, params)) {
+        if (is_quanitizable(arch[0], name, params)) {
             if ((cur->type) != GGML_TYPE_F32) {
-                TTS_ABORT("ERROR: All quantized tensors must be transformed from 32bit floats. Tensor, '%s', has impropert type, '%d'\n", cur->name, cur->type);
+                TTS_ABORT("ERROR: All quantized tensors must be transformed from 32bit floats. Tensor, '%s', has improper type, '%d'\n", cur->name, cur->type);
             }
-            new_type = params->quantize_type;
+            new_type = params.quantize_type;
             if ((new_type >= GGML_TYPE_IQ2_XXS && new_type <= GGML_TYPE_IQ4_XS)) {
                 TTS_ABORT("ERROR: Quantization type '%d' requires an importance matrix.\n", new_type);
             }
@@ -344,10 +251,10 @@ void quantize_gguf(const std::string & ifile, const std::string & ofile, struct 
                 work.resize(nelement_size); // upper bound on size
             }
             new_data = work.data();
-            new_size = quantize_tensor(new_data, cur, nullptr, new_type, params->n_threads);
-        } else if (params->convert_dac_to_f16 && has_prefix(name, "audio_encoder") && !has_suffix(name, "alpha") && !has_suffix(name, "bias")) {
+            new_size = quantize_tensor(new_data, cur, nullptr, new_type, params.n_threads);
+        } else if (params.convert_dac_to_f16 && name.starts_with("audio_encoder") && !name.ends_with("alpha") && !name.ends_with("bias")) {
             if ((cur->type) != GGML_TYPE_F32) {
-                TTS_ABORT("ERROR: All converted tensors must be transformed from 32bit floats. Tensor, '%s', has impropert type, '%d'\n", cur->name, cur->type);
+                TTS_ABORT("ERROR: All converted tensors must be transformed from 32bit floats. Tensor, '%s', has improper type, '%d'\n", cur->name, cur->type);
             }
             new_type = GGML_TYPE_F16;
             const int64_t nelement_size = ggml_nelements(cur) * 4;
@@ -355,7 +262,7 @@ void quantize_gguf(const std::string & ifile, const std::string & ofile, struct 
                 work.resize(nelement_size); // upper bound on size
             }
             new_data = work.data();
-            new_size = quantize_tensor(new_data, cur, nullptr, new_type, params->n_threads);
+            new_size = quantize_tensor(new_data, cur, nullptr, new_type, params.n_threads);
         } else {
             new_type = cur->type;
             new_data = cur->data;

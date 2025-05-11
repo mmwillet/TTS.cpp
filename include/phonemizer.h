@@ -450,7 +450,7 @@ struct phoneme_dictionary * phoneme_dictionary_from_gguf(gguf_context * meta);
  * effecively like a simple router lexer. It will only support utf-8 encoded text and english IPA conversion.
  */
 struct phonemizer {
-	phonemizer(struct phoneme_dictionary * dict, struct word_phonemizer * phonetic_phonemizer, bool preserve_punctuation = true): dict(dict), phonetic_phonemizer(phonetic_phonemizer), preserve_punctuation(preserve_punctuation) {};
+	phonemizer(phoneme_dictionary * dict, word_phonemizer * phonetic_phonemizer, bool preserve_punctuation = true): dict(dict), phonetic_phonemizer(phonetic_phonemizer), preserve_punctuation(preserve_punctuation) {};
 	~phonemizer() {
 		delete dict;
 		delete phonetic_phonemizer;

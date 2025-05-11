@@ -514,7 +514,7 @@ void parler_tts_runner::assign_weight(std::string name, ggml_tensor * tensor) {
     }
 }
 
-void parler_tts_runner::update_conditional_prompt(const std::string file_path, const std::string prompt, int n_threads, bool cpu_only) {
+void parler_tts_runner::update_conditional_prompt(str file_path, str prompt, int n_threads, bool cpu_only) {
     t5_runner * text_encoder = text_encoder_from_file(file_path, n_threads, tokenizer, cpu_only);
     tts_response* response;
     text_encoder->generate(prompt, response);
@@ -620,12 +620,12 @@ struct ggml_cgraph * parler_tts_runner::build_parler_graph(parler_ubatch & batch
     return gf;
 }
 
-void parler_tts_runner::configure_generation(generation_configuration * config) {
-    sampler->temperature = config->temperature;
-    sampler->repetition_penalty = config->repetition_penalty;
-    sampler->do_sample = config->sample;
-    sampler->top_k = config->top_k;
-    model->use_cross_attn = config->use_cross_attn;
+void parler_tts_runner::configure_generation(const generation_configuration & config) {
+    sampler->temperature = config.temperature;
+    sampler->repetition_penalty = config.repetition_penalty;
+    sampler->do_sample = config.sample;
+    sampler->top_k = config.top_k;
+    model->use_cross_attn = config.use_cross_attn;
 }
 
 void parler_tts_runner::set_inputs(parler_ubatch & batch) {
@@ -717,6 +717,10 @@ parler_ubatch parler_tts_runner::build_worst_case_batch()  {
 }
 
 void parler_tts_runner::prepare_post_load() {
+
+    if (config->use_cross_attn) {
+        runner->model->prep_cross_key_values(n_threads);
+    }
     dac_runner->prepare_post_load();
     parler_kv_cache_init(kv_self, model, pctx, std::mt19937(std::random_device{}())());
     auto batch = build_worst_case_batch();

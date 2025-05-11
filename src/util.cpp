@@ -10,46 +10,20 @@
 #else
 // windows stuff
 #endif
-
-void tts_abort(const char * file, int line, const char * fmt, ...) {
-    fflush(stdout);
-    fprintf(stderr, "%s:%d: ", file, line);
-    va_list args;
-    va_start(args, fmt);
-    vfprintf(stderr, fmt, args);
-    va_end(args);
-    abort();
-}
+#include "tts_ggml_iterator.h"
 
 // Simple helper function for getting layer count from tensor name
-std::pair<int, std::string> parse_layer_count(std::string name, int skip) {
-    bool found = false;
-    bool after_layer = false;
-    std::string digit_chars = "";
-    std::string after_layer_name = "";
-    int count = 0;
-    for (char& c : name) {
-        if (count < skip) {
-            count += 1;
-            continue;
-        }
-        count += 1;
-        if (after_layer) {
-            after_layer_name += c;
-        } else if (std::isdigit(c)) {
-            found = true;
-            digit_chars += c;
-        } else if (!found) {
-            
-        } else {
-            after_layer = true;
-            after_layer_name += c;
-        }
+pair<uint32_t, sv> parse_layer_count(sv name) {
+    const size_t start{name.find_first_of("0123456789")};
+    if (!~start) {
+        return {~0, {}};
     }
-    if (digit_chars.size() == 0) {
-        return std::make_pair(-1, name);
+    name.remove_prefix(start);
+    const size_t end{name.find_first_not_of("0123456789")};
+    if (!~end) {
+        return {sv_int(name), {}};
     }
-    return std::make_pair(std::stoi(digit_chars), after_layer_name);
+    return {sv_int(name.substr(0, end)), name.substr(end)};
 }
 
 int search_for_gguf_keys(gguf_context * meta, std::vector<std::string> possible_keys) {
@@ -62,7 +36,6 @@ int search_for_gguf_keys(gguf_context * meta, std::vector<std::string> possible_
     }
     return gguf_key;
 }
-
 void random_gen(int count, float * tgt, float min, float max) {
     static std::default_random_engine e;
     static std::uniform_real_distribution<float> dis(min, max);
@@ -198,83 +171,26 @@ void compute_window_squared_sum(size_t n_fft, size_t hop, size_t n_frames, float
     }
 }
 
-std::vector<std::string> split(std::string target, std::string split_on, bool include_split_characters) {
-    std::vector<std::string> output;
-    size_t last = 0;
-
-    for (int i = 0; i < target.size(); i++) {
-        if (i > last && split_on.find(target[i]) != std::string::npos) {
-            std::string part(target.substr(last, i - last));
-            output.push_back(part);
-            if (include_split_characters) {
-                output.push_back(target.substr(i, 1));
-            }
-            last = i+1;
-        }
-    }
-    if (last < target.size()) {
-        std::string part(target.substr(last));
-        output.push_back(part);
-    }
-
-    return output;
-}
-
-std::vector<std::string> split(std::string target, const char split_on, bool include_split_characters) {
-    std::vector<std::string> output;
-    size_t last = 0;
-
-    for (int i = 0; i < target.size(); i++) {
-        if (i > last && split_on == target[i]) {
-            std::string part(target.substr(last, i - last));
-            output.push_back(part);
-            if (include_split_characters) {
-                output.push_back(target.substr(i, 1));
-            }
-            last = i+1;
-        }
-    }
-    if (last < target.size()) {
-        std::string part(target.substr(last));
-        output.push_back(part);
-    }
-
-    return output;
-}
-
-std::string strip(std::string target, std::string vals) {
-    target.erase(target.begin(), std::find_if(target.begin(), target.end(), [&vals](unsigned char ch) {
+string strip(const string & target, const string & vals) {
+	string result{target};
+    result.erase(result.begin(), std::find_if(result.begin(), result.end(), [&vals](unsigned char ch) {
         return vals.find(ch) == std::string::npos;
     }));
-    target.erase(std::find_if(target.rbegin(), target.rend(), [&vals](unsigned char ch) {
+    result.erase(std::find_if(result.rbegin(), result.rend(), [&vals](unsigned char ch) {
         return vals.find(ch) == std::string::npos;
-    }).base(), target.end());
-    return target;
+    }).base(), result.end());
+    return result;
 }
 
-std::string replace_any(std::string target, std::string to_replace, std::string replacement) {
-    for (int i = 0; i < to_replace.size(); i++) {
-        size_t position = target.find(to_replace[i]);
-        while (position != std::string::npos) {
-            target.replace(position, 1, replacement);
-            position = target.find(to_replace[i]);
+model_tensor_meta::model_tensor_meta(ggml_context * weight_ctx, sv name_prefix,
+                                     uint8_t size_multiplier_percent,
+                                     uint32_t dedicated_add_on_size) : n_tensors{}, buf_size{} {
+    for (const ggml_tensor & tensor: ggml_tensor_iterator{weight_ctx}) {
+        if (const sv name{tensor.name}; name.starts_with(name_prefix) && name[name_prefix.size()] == '.') {
+            n_tensors += 1;
+            buf_size += ggml_nbytes_pad(&tensor);
         }
     }
-    return target;
-}
-
-struct model_tensor_meta compute_tensor_meta(std::string name_prefix, ggml_context * weight_ctx, std::function<void(ggml_tensor*)>* callback) {
-    model_tensor_meta meta;
-    for (ggml_tensor * cur = ggml_get_first_tensor(weight_ctx); cur; cur = ggml_get_next_tensor(weight_ctx, cur)) {
-        if (callback) {
-            (*callback)(cur);
-        }
-        std::string::size_type pos = std::string(cur->name).find(".", 0);
-        std::string top_level(std::string(cur->name).substr(0, pos));
-        if (top_level == name_prefix) {
-            meta.n_tensors += 1;
-            meta.n_bytes += ggml_nbytes_pad(cur);
-        }
-    }
-    return meta;
+    buf_size += dedicated_add_on_size;
+    mem_size = ggml_tensor_overhead() * n_tensors * size_multiplier_percent / 100;
 }

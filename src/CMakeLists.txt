@@ -23,7 +23,8 @@ add_library(tts
             tts_model.cpp
             kokoro_model.cpp
             dia_model.cpp
-            )
+        tts_ggml_iterator.h
+)
 
 target_include_directories(tts PUBLIC . ../include ../ggml/src/)
 

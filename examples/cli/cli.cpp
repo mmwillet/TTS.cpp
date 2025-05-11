@@ -61,7 +61,7 @@ int main(int argc, const char ** argv) {
 
     generate(runner, args.get_string_param("--prompt"), &data, config);
     if (data.n_outputs == 0) {
-        fprintf(stderr, "Got empty response for prompt, '%s'.\n", args.get_string_param("--prompt").c_str());
+        fprintf(stderr, "Got empty response for prompt, '%s'.\n", args.get_string_param("--prompt"));
         exit(1);
     }
     if (args.get_bool_param("--vad")) {

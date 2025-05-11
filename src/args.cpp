@@ -126,10 +126,10 @@ int arg_list::find_and_parse(std::string name, int argc, const char ** argv) {
     exit(1);
 }
 
-std::string arg_list::get_string_param(std::string full_name) {
+str arg_list::get_string_param(str full_name) {
     for (auto arg : sargs) {
         if (arg.full_name == full_name) {
-            return arg.value;
+            return arg.value.c_str();
         }
     }
     return "";
