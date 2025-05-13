@@ -30,16 +30,16 @@ int main(int argc, const char ** argv) {
         return 0;
     }
     args.validate();
-    enum ggml_type qtype = static_cast<ggml_type>(*args.get_int_param("--quantized-type"));
+    ggml_type qtype = static_cast<ggml_type>(*args.get_int_param("--quantized-type"));
     if (std::find(valid_quantization_types.begin(), valid_quantization_types.end(), qtype) == valid_quantization_types.end()) {
     	fprintf(stderr, "ERROR: %d is not a valid quantization type.\n", qtype);
         exit(1);
     }
-    struct quantization_params * qp = new quantization_params((uint32_t) *args.get_int_param("--n-threads"), qtype);
-    qp->quantize_output_heads = args.get_bool_param("--quantize-output-heads");
-    qp->quantize_text_embeddings = args.get_bool_param("--quantize-text-embedding");
-    qp->quantize_cross_attn_kv = args.get_bool_param("--quantize-cross-attn-kv");
-    qp->convert_dac_to_f16 = args.get_bool_param("--convert-dac-to-f16");
-  	quantize_gguf(args.get_string_param("--model-path"), args.get_string_param("--quantized-model-path"), qp);
+    quantization_params qp{static_cast<uint32_t>(*args.get_int_param("--n-threads")), qtype};
+    qp.quantize_output_heads = args.get_bool_param("--quantize-output-heads");
+    qp.quantize_text_embeddings = args.get_bool_param("--quantize-text-embedding");
+    qp.quantize_cross_attn_kv = args.get_bool_param("--quantize-cross-attn-kv");
+    qp.convert_dac_to_f16 = args.get_bool_param("--convert-dac-to-f16");
+    quantize_gguf(args.get_string_param("--model-path"), args.get_string_param("--quantized-model-path"), qp);
     return 0;
 }
