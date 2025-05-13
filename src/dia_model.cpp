@@ -726,6 +726,7 @@ void dia_runner::configure_generation(generation_configuration * config) {
     decode_sampler->repetition_penalty = config->repetition_penalty;
     decode_sampler->do_sample = config->sample;
     decode_sampler->top_k = config->top_k;
+    decode_sampler->top_p = config->top_p;
     dctx->max_generation_size = config->max_tokens > model->max_delay ? config->max_tokens : model->max_generation_size;
 }
 

@@ -625,6 +625,7 @@ void parler_tts_runner::configure_generation(generation_configuration * config) 
     sampler->repetition_penalty = config->repetition_penalty;
     sampler->do_sample = config->sample;
     sampler->top_k = config->top_k;
+    sampler->top_p = config->top_p;
     model->use_cross_attn = config->use_cross_attn;
 }
 

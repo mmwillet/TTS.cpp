@@ -35,11 +35,13 @@ struct generation_configuration {
     	bool use_cross_attn = true, 
     	std::string espeak_voice_id = "",
     	int max_tokens = 0,
-    	bool sample = true): top_k(top_k), temperature(temperature), repetition_penalty(repetition_penalty), use_cross_attn(use_cross_attn), sample(sample), voice(voice), espeak_voice_id(espeak_voice_id), max_tokens(max_tokens) {};
+    	float top_p = 1.0,
+    	bool sample = true): top_k(top_k), temperature(temperature), repetition_penalty(repetition_penalty), use_cross_attn(use_cross_attn), sample(sample), voice(voice), espeak_voice_id(espeak_voice_id), max_tokens(max_tokens), top_p(top_p) {};
 
     bool use_cross_attn;
     float temperature;
     float repetition_penalty;
+    float top_p;
     int top_k;
     int max_tokens;
     std::string voice = "";

@@ -1,11 +1,14 @@
 #include "sampler.h"
 
-void sampler::sample(float * logits, std::vector<uint32_t> & output_tokens) {\
+void sampler::sample(float * logits, std::vector<uint32_t> & output_tokens) {
     // assume that we are pointing to the start of the first token output;
     if (!do_sample) {
         return max(logits, output_tokens);
     }
     std::vector<uint32_t> max_vals;
+    // the max_head_probs variable is used when top-p is applied but exists to address the case in which top-k and top-p cause the cumulative probability of the nucleus to beless than or 
+    // equal to top_p;
+    std::vector<float> max_head_probs;
 
     // This allows us to perform an effective softmax without logarithms or big number calculations.
     // Additionally by avoiding large number division we drastically improve the stability of
@@ -14,12 +17,29 @@ void sampler::sample(float * logits, std::vector<uint32_t> & output_tokens) {\
 
     std::vector<std::vector<size_t>> picks;
     bool use_nucleus_sampling = false;
+    bool performed_softmax = false;
+
+    if (top_p < 1.0) {
+        // if we are nucleus sampling via top-p then we need to perform softmax over the samples before getting top_k samples, so that we don't trim beyond top_p.
+        // Otherwise, if we are not performing top-p sampling then it is more efficient to perform softmax after getting the top_k nucleus.
+        softmax(logits, picks, max_vals);
+        performed_softmax = true;
+    }
     if (top_k > 0 && top_k < vocab_size) {
-        picks = topk(logits);
+        picks = topk(logits, performed_softmax);
         use_nucleus_sampling = true;
     }
 
-    softmax(logits, picks, max_vals);
+    if (top_p >= 1.0) {
+        softmax(logits, picks, max_vals);
+        performed_softmax = true;
+    }
+
+    if (top_p < 1.0) {
+        topp(logits, picks, max_head_probs);
+        use_nucleus_sampling = true;
+    }
+
     bool has_repetition_penalty = repetition_penalty != 1.0;
     if (has_repetition_penalty && (last_token_ids.size() == 0 || repetition_counts.size() == 0)) {
         reset();
@@ -27,12 +47,13 @@ void sampler::sample(float * logits, std::vector<uint32_t> & output_tokens) {\
     std::minstd_rand gen(std::random_device{}());
     std::uniform_real_distribution<float> dist(0.0f, 1.0f);
     for (int i = 0; i < n_output_heads; i++) {
-        float assignment = dist(gen);
+        float assignment =  top_p < 1.0 ? dist(gen) * max_head_probs[i] : dist(gen);
         float cumulative = 0.0f;
-        for (uint32_t j = 0; j < (use_nucleus_sampling ? top_k : vocab_size); j++) {
+        for (uint32_t j = 0; j < (use_nucleus_sampling ? picks[i].size() : vocab_size); j++) {
             int ii = use_nucleus_sampling ? (int) picks[i][j] : j;
             cumulative += *(logits+(i*vocab_size+ii));
-            if ((assignment <= cumulative) || (ii >= vocab_size + 1)) {
+            // with top_k and top_p it is possible for the assignment to be greater than the cumulative value
+            if (assignment <= cumulative || ii >= vocab_size + 1 || j >= picks[i].size() - 1) {
                 if (has_repetition_penalty) {
                     if (last_token_ids[i] != ii) {
                         repetition_counts[i] = 0;
@@ -94,7 +115,41 @@ void sampler::softmax(float * logits, std::vector<std::vector<size_t>> picks, st
     }
 }
 
-std::vector<std::vector<size_t>> sampler::topk(float* logits) {
+void sampler::topp(float * logits, std::vector<std::vector<size_t>> & picks, std::vector<float> & max_head_probs) {
+    if (picks.empty()) {
+        // we need to get the softmaxed logits ordered
+        for (int i = 0; i < n_output_heads; i++) {
+            std::vector<size_t> head_picks(vocab_size);
+            iota(head_picks.begin(), head_picks.end(), 0);
+            // have to sort with repetition penalty applied so not to inavertently trim our nucleus size.
+            std::sort(head_picks.begin(), head_picks.end(), [&logits, &i, this](size_t s1, size_t s2) {
+                float v1 = logits[i*vocab_size+s1];
+                float v2 = logits[i*vocab_size+s2];
+                return v1 > v2;
+            });
+
+            picks.push_back(head_picks);
+        }
+    }
+    // if we didn't already perform topk or if the probable sum of topk logits is greater than top_p then we need to trim.
+    for (int i = 0; i < n_output_heads; i++) {
+        float prob_sum = 0.0f;
+        int trim_to = -1;
+        for (int ii = 0; ii < picks[i].size(); ii++) {
+            prob_sum += logits[i*vocab_size+picks[i][ii]];
+            if (prob_sum >= top_p) {
+                trim_to = ii+1;
+                break;
+            }
+        }
+        max_head_probs.push_back(std::min(prob_sum, top_p));
+        if (trim_to > 0) {
+            picks[i] = std::vector<size_t>(picks[i].begin(), picks[i].begin()+trim_to);
+        }
+    }
+}
+
+std::vector<std::vector<size_t>> sampler::topk(float * logits, bool performed_softmax) {
     bool has_repetition_penalty = repetition_penalty != 1.0f;
     std::vector<std::vector<size_t>> head_picks;
     if (vocab_size < top_k) {
@@ -110,17 +165,19 @@ std::vector<std::vector<size_t>> sampler::topk(float* logits) {
         std::vector<size_t> picks(vocab_size);
         iota(picks.begin(), picks.end(), 0);
         // have to sort with repetition penalty applied so not to inavertently trim our nucleus size.
-        std::sort(picks.begin(), picks.end(), [&logits, &i, &has_repetition_penalty, this](size_t s1, size_t s2) {
+        std::sort(picks.begin(), picks.end(), [&logits, &i, &has_repetition_penalty, &performed_softmax, this](size_t s1, size_t s2) {
             float v1 = logits[i*vocab_size+s1];
             float v2 = logits[i*vocab_size+s2];
-            if (has_repetition_penalty && last_token_ids[i] == s1) {
-                v1 /= (pow(repetition_penalty, repetition_counts[i]));
-            } else if (has_repetition_penalty && last_token_ids[i] == s2) {
-                v2 /= (pow(repetition_penalty, repetition_counts[i]));
+            if (!performed_softmax) {
+                if (has_repetition_penalty && last_token_ids[i] == s1) {
+                    v1 /= (pow(repetition_penalty, repetition_counts[i]));
+                } else if (has_repetition_penalty && last_token_ids[i] == s2) {
+                    v2 /= (pow(repetition_penalty, repetition_counts[i]));
+                }
             }
-            return v1 < v2;
+            return v1 > v2;
         });
-        head_picks.push_back(std::vector<size_t>(picks.end() - top_k, picks.end()));
+        head_picks.push_back(std::vector<size_t>(picks.begin(), picks.begin() + top_k));
     }
     return head_picks;
 }
