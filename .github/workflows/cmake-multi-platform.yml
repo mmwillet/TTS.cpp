@@ -25,6 +25,7 @@ jobs:
       id: cache-builds
       uses: actions/cache@v4
       with:
+        key: ${{ runner.os }}-build
         path: ${{ steps.strings.outputs.build-output-dir }}
 
     - name: Configure CMake
