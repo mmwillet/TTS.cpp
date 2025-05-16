@@ -56,5 +56,5 @@ jobs:
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: ubuntu-latest-build
+        name: ${{ runner.os }}-${{ matrix.c_compiler }}-build
         path: ${{ steps.strings.outputs.build-output-dir }}
