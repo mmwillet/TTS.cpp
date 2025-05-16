@@ -8,6 +8,15 @@ on:
 
 jobs:
   build:
+    strategy:
+      matrix:
+        c_compiler: [gcc, clang]
+        include:
+          - c_compiler: gcc
+            cpp_compiler: g++
+          - c_compiler: clang
+            cpp_compiler: clang++
+
     runs-on: ubuntu-latest
 
     steps:
@@ -27,7 +36,7 @@ jobs:
       id: cache-builds
       uses: actions/cache@v4
       with:
-        key: ${{ runner.os }}-build
+        key: ${{ runner.os }}-${{ matrix.c_compiler }}-build
         path: ${{ steps.strings.outputs.build-output-dir }}
 
     - name: Configure CMake
@@ -35,8 +44,8 @@ jobs:
       # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
       run: >
         cmake -B ${{ steps.strings.outputs.build-output-dir }}
-        -DCMAKE_CXX_COMPILER=clang++
-        -DCMAKE_C_COMPILER=clang
+        -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
+        -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
         -DCMAKE_BUILD_TYPE=Release
         -S ${{ github.workspace }}
 
