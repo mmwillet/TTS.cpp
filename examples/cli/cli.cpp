@@ -6,7 +6,21 @@
 #include "write_file.h"
 #include <thread>
 
+class tts_timing_printer {
+    const int64_t start_us{[] {
+        ggml_time_init();
+        return ggml_time_us();
+    }()};
+public:
+    ~tts_timing_printer() {
+        const int64_t end_us{ggml_time_us()};
+        // Just a simple "total time" for now before adding "load" / "prompt eval" / "eval" from llama_print_timings
+        printf("total time = %.2f ms\n", (end_us - start_us) / 1000.0f);
+    }
+};
+
 int main(int argc, const char ** argv) {
+    const tts_timing_printer _{};
     float default_temperature = 1.0f;
     int default_n_threads = std::max((int)std::thread::hardware_concurrency(), 1);
     int default_top_k = 50;
@@ -34,7 +48,7 @@ int main(int argc, const char ** argv) {
     args.parse(argc, argv);
     if (args.for_help) {
         args.help();
-        return 0;
+        exit(0);
     }
     args.validate();
 
