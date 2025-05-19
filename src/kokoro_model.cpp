@@ -88,42 +88,45 @@ static struct ggml_tensor * build_ada_residual_conv(ggml_context * ctx, struct g
 
 	gamma = ggml_add(ctx, ggml_mul_mat(ctx, block->norm1_gamma, style), block->norm1_gamma_bias);
 	beta  = ggml_add(ctx, ggml_mul_mat(ctx, block->norm1_beta, style), block->norm1_beta_bias);
-	cur   = ggml_cont(ctx, ggml_transpose(ctx, ggml_norm(ctx, ggml_cont(ctx, ggml_transpose(ctx, cur)), 0.00001)));
+	cur   = ggml_norm(ctx, x, 0.00001);
 
 	// The addition between gamma * x and x is performed here because ggml doesn't support scalar multiplication without initializing the scalars in advance.
 	// An optimal remedy to this would be to increment the gamma bias above by one when preparing the gguf file for the model.
-	cur   = ggml_add(ctx, ggml_add(ctx, cur, ggml_mul(ctx, cur, gamma)), beta);
-	cur   = ggml_leaky_relu(ctx, cur, 0.2f, false);
+	cur = ggml_add(ctx, cur, ggml_mul(ctx, cur, ggml_transpose(ctx, gamma)));
+	cur = ggml_add(ctx, cur, ggml_transpose(ctx, beta));
+	cur = ggml_leaky_relu(ctx, cur, 0.2f, false);
 
 	if (block->pool) {
-		cur = ggml_conv_transpose_1d(ctx, block->pool, ggml_cont(ctx, ggml_transpose(ctx, cur)), 2, 1, 1, 1, cur->ne[0]);
+		cur = ggml_conv_transpose_1d(ctx, block->pool, cur, 2, 1, 1, 1, cur->ne[1]);
 		cur = ggml_add(ctx, cur, block->pool_bias);
-		cur = ggml_cont(ctx, ggml_transpose(ctx, cur));
 	}
 
- 	cur = ggml_conv_1d(ctx, block->conv1, ggml_cont(ctx, ggml_transpose(ctx, cur)), 1, 1, 1);
+ 	cur = ggml_conv_1d(ctx, block->conv1, cur, 1, 1, 1);
 
 	cur   = ggml_add(ctx, cur, block->conv1_bias);
 	gamma = ggml_add(ctx, ggml_mul_mat(ctx, block->norm2_gamma, style), block->norm2_gamma_bias);
 	beta  = ggml_add(ctx, ggml_mul_mat(ctx, block->norm2_beta, style), block->norm2_beta_bias);
-	cur   = ggml_cont(ctx, ggml_transpose(ctx, ggml_norm(ctx, cur, 0.00001)));
+	cur   = ggml_norm(ctx, cur, 0.00001);
 
 	// The addition between gamma * x and x is performed here because ggml doesn't support scalar multiplication without initializing the scalars in advance.
 	// An optimal remedy to this would be to increment the gamma bias above by one when preparing the gguf file for the model.
-	cur   = ggml_add(ctx, ggml_add(ctx, cur, ggml_mul(ctx, cur, gamma)), beta);
-	cur   = ggml_leaky_relu(ctx, cur, 0.2f, false);
-	cur   = ggml_add(ctx, ggml_conv_1d(ctx, block->conv2, ggml_cont(ctx, ggml_transpose(ctx, cur)), 1, 1, 1), block->conv2_bias);
+	cur = ggml_add(ctx, cur, ggml_mul(ctx, cur, ggml_transpose(ctx, gamma)));
+	cur = ggml_add(ctx, cur, ggml_transpose(ctx, beta));
+	cur = ggml_leaky_relu(ctx, cur, 0.2f, false);
+	cur = ggml_add(ctx, ggml_conv_1d(ctx, block->conv2, cur, 1, 1, 1), block->conv2_bias);
 
-	struct ggml_tensor * res = cur;	
-	cur = ggml_cont(ctx, ggml_transpose(ctx, x));
+	struct ggml_tensor * res = cur;
+	cur = x;
 	if (block->upsample) {
+		cur = ggml_cont(ctx, ggml_transpose(ctx, cur));
 		if (block->pool) {
-			cur = ggml_upscale_ext(ctx, cur, cur->ne[0]*2, cur->ne[1], cur->ne[2], cur->ne[3]);
+			cur = ggml_upscale_ext(ctx, cur, cur->ne[0], cur->ne[1]*2, cur->ne[2], cur->ne[3]);
 		}
-		cur = ggml_conv_1d(ctx, block->upsample, cur, 1, 0, 1);
+		cur = ggml_mul_mat(ctx, block->upsample, cur);
+		cur = ggml_cont(ctx, ggml_transpose(ctx, cur));
 	}
-
-	return ggml_cont(ctx, ggml_transpose(ctx, ggml_div(ctx, ggml_add(ctx, res, cur), sqrt_tensor)));
+	cur = ggml_div(ctx, ggml_add(ctx, res, cur), sqrt_tensor);
+	return cur;
 }
 
 static struct ggml_tensor * build_kokoro_generator_res_block(ggml_context * ctx, struct ggml_tensor * x, struct ggml_tensor * style, kokoro_generator_residual_block * block) {
@@ -158,6 +161,7 @@ static struct ggml_tensor * build_kokoro_generator_res_block(ggml_context * ctx,
 }
 
 static struct ggml_tensor * build_noise_block(ggml_context * ctx, kokoro_noise_residual_block * block, struct ggml_tensor * x, struct ggml_tensor * style) {
+	// This conv_1d seems replaceable with squeezed and transposed ggml_mul_mut, but s0 and p0 are dynamic
 	ggml_tensor * cur = ggml_add(ctx, ggml_conv_1d(ctx, block->input_conv, x, block->input_conv_stride, block->input_conv_padding, 1), block->input_conv_bias);
 	return build_kokoro_generator_res_block(ctx, cur, style, block->res_block);
 }
@@ -510,6 +514,16 @@ void kokoro_model::assign_gen_resblock(kokoro_generator_residual_block * block, 
 	}
 }
 
+/**
+ * Removes the last axis, for cases where it's redundantly of length 1.
+ * assert x.ndim == 3; numpy.squeeze(x, axis=-1)
+ */
+static ggml_tensor * squeeze_3d_2d_e0(ggml_context * ctx, ggml_tensor * x) {
+	TTS_ASSERT(x->ne[0] == 1);
+	TTS_ASSERT(ggml_is_contiguous(x));
+	return ggml_reshape_2d(ctx, x, x->ne[1], x->ne[2]);
+}
+
 void kokoro_model::assign_ada_res_block(ada_residual_conv_block * block, std::string name, ggml_tensor * tensor) {
 	if (name == "norm1_gamma_weight") {
 		block->norm1_gamma = ggml_dup_tensor(ctx, tensor);
@@ -554,6 +568,7 @@ void kokoro_model::assign_ada_res_block(ada_residual_conv_block * block, std::st
 		block->pool_bias = ggml_dup_tensor(ctx, ggml_transpose(ctx, tensor));
 		set_tensor(block->pool_bias, tensor);		
 	} else if (name == "conv1x1_weight") {
+		tensor = squeeze_3d_2d_e0(ctx, tensor);
 		block->upsample = ggml_dup_tensor(ctx, tensor);
 		set_tensor(block->upsample, tensor);
 	} else if (name == "conv1x1_bias") {
@@ -576,6 +591,7 @@ void kokoro_model::assign_decoder_weight(std::string name, ggml_tensor * tensor)
 		decoder->n_conv_bias = ggml_dup_tensor(ctx, ggml_transpose(ctx, tensor));
 		set_tensor(decoder->n_conv_bias, tensor);
 	} else if (name == "asr_conv_weight") {
+		tensor = squeeze_3d_2d_e0(ctx, tensor);
 		decoder->asr_conv = ggml_dup_tensor(ctx, tensor);
 		set_tensor(decoder->asr_conv, tensor);
 	} else if (name == "asr_conv_bias") {
@@ -607,12 +623,14 @@ void kokoro_model::assign_duration_weight(std::string name, ggml_tensor * tensor
 		prosody_pred->duration_proj_bias = ggml_dup_tensor(ctx, tensor);
 		set_tensor(prosody_pred->duration_proj_bias, tensor);
 	} else if (name == "n_proj_kernel") {
+		tensor = squeeze_3d_2d_e0(ctx, tensor);
 		prosody_pred->n_proj_kernel = ggml_dup_tensor(ctx, tensor);
 		set_tensor(prosody_pred->n_proj_kernel, tensor);
 	} else if (name == "n_proj_bias") {
 		prosody_pred->n_proj_bias = ggml_dup_tensor(ctx, ggml_transpose(ctx, tensor));
 		set_tensor(prosody_pred->n_proj_bias, tensor);
 	} else if (name == "f0_proj_kernel") {
+		tensor = squeeze_3d_2d_e0(ctx, tensor);
 		prosody_pred->f0_proj_kernel = ggml_dup_tensor(ctx, tensor);
 		set_tensor(prosody_pred->f0_proj_kernel, tensor);
 	} else if (name == "f0_proj_bias") {
@@ -1147,20 +1165,27 @@ struct ggml_cgraph * kokoro_runner::build_kokoro_graph(kokoro_ubatch & batch) {
 
     cur = build_lstm(ctx, cur, model->prosody_pred->shared_lstm, cur->ne[1]);
 
-    ggml_build_forward_expand(gf, cur);
 
     struct ggml_tensor * f0_curve = cur;
+    f0_curve = ggml_cont(ctx, ggml_transpose(ctx, f0_curve));
     for (auto block : model->prosody_pred->f0_blocks) {
     	f0_curve = build_ada_residual_conv(ctx, f0_curve, block, style_half, model->sqrt_tensor);
     }
-    f0_curve = ggml_add(ctx, ggml_conv_1d(ctx, model->prosody_pred->f0_proj_kernel, ggml_cont(ctx, ggml_transpose(ctx, f0_curve)), 1, 0, 1), model->prosody_pred->f0_proj_bias);
+    f0_curve = ggml_cont(ctx, ggml_transpose(ctx, f0_curve));
+    f0_curve = ggml_mul_mat(ctx, model->prosody_pred->f0_proj_kernel, f0_curve);
+    f0_curve = squeeze_3d_2d_e0(ctx, f0_curve);
+    f0_curve = ggml_add(ctx, f0_curve, model->prosody_pred->f0_proj_bias);
     ggml_set_name(f0_curve, "f0_out");
 
     struct ggml_tensor * n = cur;
+    n = ggml_cont(ctx, ggml_transpose(ctx, n));
     for (auto block : model->prosody_pred->n_blocks) {
 		n = build_ada_residual_conv(ctx, n, block, style_half, model->sqrt_tensor);
     }
-	n = ggml_add(ctx, ggml_conv_1d(ctx, model->prosody_pred->n_proj_kernel, ggml_cont(ctx, ggml_transpose(ctx, n)), 1, 0, 1), model->prosody_pred->n_proj_bias);
+    n = ggml_cont(ctx, ggml_transpose(ctx, n));
+	n = ggml_mul_mat(ctx, model->prosody_pred->n_proj_kernel, n);
+	n = squeeze_3d_2d_e0(ctx, n);
+	n = ggml_add(ctx, n, model->prosody_pred->n_proj_bias);
 	ggml_set_name(n, "n_out");
 	ggml_build_forward_expand(gf, n);
     
@@ -1188,17 +1213,20 @@ struct ggml_cgraph * kokoro_runner::build_kokoro_graph(kokoro_ubatch & batch) {
 	struct ggml_tensor * style_half2 = ggml_view_1d(ctx, voice, voice->ne[0]/2, (batch.n_tokens - 3) * voice->nb[1]);
 
 	{
-		f0 = ggml_cont(ctx, ggml_transpose(ctx, ggml_add(ctx, ggml_conv_1d(ctx, model->decoder->f0_conv, f0_curve, 2, 1, 1), model->decoder->f0_conv_bias)));
-		n_base = ggml_cont(ctx, ggml_transpose(ctx, ggml_add(ctx, ggml_conv_1d(ctx, model->decoder->n_conv, n, 2, 1, 1), model->decoder->n_conv_bias)));
-		cur = ggml_concat(ctx, ggml_concat(ctx, asr, f0, 0), n_base, 0);
-
+		f0 = ggml_add(ctx, ggml_conv_1d(ctx, model->decoder->f0_conv, f0_curve, 2, 1, 1), model->decoder->f0_conv_bias);
+		n_base = ggml_add(ctx, ggml_conv_1d(ctx, model->decoder->n_conv, n, 2, 1, 1), model->decoder->n_conv_bias);
+		cur = ggml_concat(ctx, ggml_concat(ctx, ggml_cont(ctx, ggml_transpose(ctx, asr)), f0, 1), n_base, 1);
 		cur = build_ada_residual_conv(ctx, cur, model->decoder->encoder_block, style_half2, model->sqrt_tensor);
-		asr_res = ggml_cont(ctx, ggml_transpose(ctx, ggml_add(ctx, ggml_conv_1d(ctx, model->decoder->asr_conv, ggml_cont(ctx, ggml_transpose(ctx, asr)), 1, 0, 1), model->decoder->asr_conv_bias)));
 
+		asr_res = ggml_mul_mat(ctx, model->decoder->asr_conv, asr);
+		asr_res = ggml_add(ctx, asr_res, ggml_transpose(ctx, model->decoder->asr_conv_bias));
+
+		asr_res = ggml_cont(ctx, ggml_transpose(ctx, asr_res));
 		for (auto l : model->decoder->decoder_blocks) {
-			cur = ggml_concat(ctx, ggml_concat(ctx, ggml_concat(ctx, cur, asr_res, 0), f0, 0), n_base, 0);
+			cur = ggml_concat(ctx, ggml_concat(ctx, ggml_concat(ctx, cur, asr_res, 1), f0, 1), n_base, 1 );
 			cur = build_ada_residual_conv(ctx, cur, l, style_half2, model->sqrt_tensor);
 		}
+		cur = ggml_cont(ctx, ggml_transpose(ctx, cur));
 	}
 
 	kctx->window_sq_sum = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, kctx->total_duration*model->up_sampling_factor);
