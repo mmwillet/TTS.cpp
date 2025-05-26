@@ -82,10 +82,10 @@ set(GGML_FATAL_WARNINGS     ${TTS_FATAL_WARNINGS})
 # Increase GGML_MAX_NAME to support longer tensor names from TTS models
 add_compile_definitions(GGML_MAX_NAME=128)
 
-# build lib - Updated to use llama.cpp instead of mmwillet/ggml
+# build lib - Updated to use standalone ggml-org/ggml instead of llama.cpp bundled version
 if (NOT TARGET ggml)
-    # Add llama.cpp which provides the official GGML implementation
-    add_subdirectory(llama.cpp)
+    # Add standalone GGML which provides the latest GGML implementation
+    add_subdirectory(ggml)
     # ... otherwise assume ggml is added by a parent CMakeLists.txt
 endif()
 add_subdirectory(src)

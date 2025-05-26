@@ -5,7 +5,7 @@ if (WIN32)
     endif()
 endif()
 
-# Using llama.cpp/ggml as the base GGML implementation
+# Using standalone ggml-org/ggml as the base GGML implementation
 
 # TTS
 
@@ -29,9 +29,9 @@ add_library(tts
             ggml-tts-ext.cpp
             )
 
-target_include_directories(tts PUBLIC . ../include ../llama.cpp/ggml/include/)
+target_include_directories(tts PUBLIC . ../include ../ggml/include/)
 
-# Using standard llama.cpp/ggml - no custom extensions needed
+# Using standalone ggml-org/ggml - with TTS extensions
 
 target_compile_features   (tts PUBLIC cxx_std_11) # don't bump
 
@@ -40,10 +40,10 @@ if (ESPEAK_INCLUDE_DIRS)
     set_source_files_properties(phonemizer.cpp PROPERTIES INCLUDE_DIRECTORIES "${ESPEAK_INCLUDE_DIRS}")
     target_link_libraries(tts PUBLIC ${ESPEAK_LIBRARIES})
 endif()
-target_link_libraries(tts PUBLIC llama)
+target_link_libraries(tts PUBLIC ggml)
 
 if (BUILD_SHARED_LIBS)
     set_target_properties(tts PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    target_compile_definitions(tts PRIVATE LLAMA_BUILD)
-    target_compile_definitions(tts PUBLIC  LLAMA_SHARED)
+    target_compile_definitions(tts PRIVATE GGML_BUILD)
+    target_compile_definitions(tts PUBLIC  GGML_SHARED)
 endif()
