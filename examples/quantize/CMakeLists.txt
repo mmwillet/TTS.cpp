@@ -1,2 +1,2 @@
 add_executable(quantize quantize.cpp)
-target_link_libraries(quantize PRIVATE ggml tts)
+target_link_libraries(quantize PRIVATE tts)

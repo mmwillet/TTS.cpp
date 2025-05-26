@@ -1,2 +1,2 @@
 add_executable(phonemize phonemize.cpp)
-target_link_libraries(phonemize PRIVATE ggml tts)
+target_link_libraries(phonemize PRIVATE tts)

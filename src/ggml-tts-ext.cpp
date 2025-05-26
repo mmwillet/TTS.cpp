@@ -1,60 +1,24 @@
 #include "ggml-tts-ext.h"
+#include <algorithm>
 #include <cmath>
-#include <complex>
 #include <cstring>
-#include <vector>
 
-// Helper functions for FFT computation
-static void fft(std::vector<std::complex<float>> &x) {
-  const size_t N = x.size();
-  if (N <= 1)
-    return;
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define CACHE_LINE_SIZE_F32 (64 / sizeof(float))
 
-  // Divide
-  std::vector<std::complex<float>> even(N / 2), odd(N / 2);
-  for (size_t i = 0; i < N / 2; i++) {
-    even[i] = x[i * 2];
-    odd[i] = x[i * 2 + 1];
-  }
+// Custom operation implementations using ggml_map_custom
 
-  // Conquer
-  fft(even);
-  fft(odd);
-
-  // Combine
-  for (size_t i = 0; i < N / 2; i++) {
-    std::complex<float> t =
-        std::polar(1.0f, -2.0f * (float)M_PI * (float)i / (float)N) * odd[i];
-    x[i] = even[i] + t;
-    x[i + N / 2] = even[i] - t;
-  }
-}
-
-static void ifft(std::vector<std::complex<float>> &x) {
-  // Conjugate the complex numbers
-  for (auto &val : x) {
-    val = std::conj(val);
-  }
-
-  // Forward FFT
-  fft(x);
-
-  // Conjugate the complex numbers again and scale
-  for (auto &val : x) {
-    val = std::conj(val) / static_cast<float>(x.size());
-  }
-}
-
-// Custom compute functions for map operations
+// Modulo operation
 static void ggml_compute_mod_f32(struct ggml_tensor *dst,
-                                 const struct ggml_tensor *src, int ith,
+                                 const struct ggml_tensor *src0, int ith,
                                  int nth, void *userdata) {
-  const float mod_val = *(float *)userdata;
-  const int n = ggml_nrows(src);
-  const int nc = src->ne[0];
+  float mod_val = *(float *)userdata;
+  const int n = ggml_nrows(src0);
+  const int nc = src0->ne[0];
 
   for (int i = ith; i < n; i += nth) {
-    const float *src_row = (float *)((char *)src->data + i * src->nb[1]);
+    const float *src_row = (float *)((char *)src0->data + i * src0->nb[1]);
     float *dst_row = (float *)((char *)dst->data + i * dst->nb[1]);
 
     for (int j = 0; j < nc; j++) {
@@ -63,34 +27,48 @@ static void ggml_compute_mod_f32(struct ggml_tensor *dst,
   }
 }
 
+struct ggml_tensor *ggml_mod(struct ggml_context *ctx, struct ggml_tensor *a,
+                             float b) {
+  float *mod_val = (float *)malloc(sizeof(float));
+  *mod_val = b;
+
+  return ggml_map_custom1(ctx, a, ggml_compute_mod_f32, 1, mod_val);
+}
+
+// Cumulative sum operation
 static void ggml_compute_cumsum(struct ggml_tensor *dst,
-                                const struct ggml_tensor *src, int ith, int nth,
-                                void *userdata) {
-  const int n = ggml_nrows(src);
-  const int nc = src->ne[0];
+                                const struct ggml_tensor *src0, int ith,
+                                int nth, void *userdata) {
+  const int n = ggml_nrows(src0);
+  const int nc = src0->ne[0];
 
   for (int i = ith; i < n; i += nth) {
-    const float *src_row = (float *)((char *)src->data + i * src->nb[1]);
+    const float *src_row = (float *)((char *)src0->data + i * src0->nb[1]);
     float *dst_row = (float *)((char *)dst->data + i * dst->nb[1]);
 
-    float sum = 0.0f;
+    float cumsum = 0.0f;
     for (int j = 0; j < nc; j++) {
-      sum += src_row[j];
-      dst_row[j] = sum;
+      cumsum += src_row[j];
+      dst_row[j] = cumsum;
     }
   }
 }
 
+struct ggml_tensor *ggml_cumsum(struct ggml_context *ctx,
+                                struct ggml_tensor *a) {
+  return ggml_map_custom1(ctx, a, ggml_compute_cumsum, 1, NULL);
+}
+
+// Linear upscaling operation
 static void ggml_compute_upscale_linear(struct ggml_tensor *dst,
-                                        const struct ggml_tensor *src,
-                                        const struct ggml_tensor *param,
-                                        int ith, int nth, void *userdata) {
-  const int scale_factor = *(int *)param->data;
-  const int n = ggml_nrows(src);
-  const int nc = src->ne[0];
+                                        const struct ggml_tensor *src0, int ith,
+                                        int nth, void *userdata) {
+  int scale_factor = *(int *)userdata;
+  const int n = ggml_nrows(src0);
+  const int nc = src0->ne[0];
 
   for (int i = ith; i < n; i += nth) {
-    const float *src_row = (float *)((char *)src->data + i * src->nb[1]);
+    const float *src_row = (float *)((char *)src0->data + i * src0->nb[1]);
     float *dst_row = (float *)((char *)dst->data + i * dst->nb[1]);
 
     for (int j = 0; j < nc; j++) {
@@ -101,14 +79,28 @@ static void ggml_compute_upscale_linear(struct ggml_tensor *dst,
   }
 }
 
-static void ggml_compute_round(struct ggml_tensor *dst,
-                               const struct ggml_tensor *src, int ith, int nth,
-                               void *userdata) {
-  const int n = ggml_nrows(src);
-  const int nc = src->ne[0];
+struct ggml_tensor *ggml_upscale_linear(struct ggml_context *ctx,
+                                        struct ggml_tensor *a,
+                                        int scale_factor) {
+  int *scale_val = (int *)malloc(sizeof(int));
+  *scale_val = scale_factor;
+
+  // Create output tensor with scaled dimensions
+  int64_t ne[4] = {a->ne[0] * scale_factor, a->ne[1], a->ne[2], a->ne[3]};
+  struct ggml_tensor *result = ggml_new_tensor(ctx, GGML_TYPE_F32, 4, ne);
+
+  return ggml_map_custom1(ctx, a, ggml_compute_upscale_linear, 1, scale_val);
+}
+
+// Round operation
+static void ggml_compute_round_f32(struct ggml_tensor *dst,
+                                   const struct ggml_tensor *src0, int ith,
+                                   int nth, void *userdata) {
+  const int n = ggml_nrows(src0);
+  const int nc = src0->ne[0];
 
   for (int i = ith; i < n; i += nth) {
-    const float *src_row = (float *)((char *)src->data + i * src->nb[1]);
+    const float *src_row = (float *)((char *)src0->data + i * src0->nb[1]);
     float *dst_row = (float *)((char *)dst->data + i * dst->nb[1]);
 
     for (int j = 0; j < nc; j++) {
@@ -117,218 +109,344 @@ static void ggml_compute_round(struct ggml_tensor *dst,
   }
 }
 
-// STFT computation parameters
-struct stft_params {
+struct ggml_tensor *ggml_round(struct ggml_context *ctx,
+                               struct ggml_tensor *a) {
+  return ggml_map_custom1(ctx, a, ggml_compute_round_f32, 1, NULL);
+}
+
+// ============================================================================
+// STFT/ISTFT Implementation - Exact copy from original ggml fork
+// ============================================================================
+
+// Helper functions for calculating STFT dimensions
+static int calculate_number_of_frames(int signal_length, int hop_length) {
+  return (signal_length + hop_length - 1) / hop_length;
+}
+
+static int calculate_original_length(int n_frames, int hop_length) {
+  return (n_frames - 1) * hop_length;
+}
+
+// Simple O(N*N) DFT implementation for odd-sized FFTs
+static void simple_dft(float *mdst, float *phdst, float *buffer, size_t n_fft,
+                       size_t step) {
+  float base_k = M_PI * -2.0f / (float)n_fft;
+  for (int i = 0; i < n_fft; i++) {
+    float tm = 0.0f;
+    float tph = 0.0f;
+    for (int ii = 0; ii < n_fft; ii++) {
+      float k = base_k * (float)ii * (float)i;
+      float m = cosf(k);
+      float expk = sinf(k);
+      tm += mdst[ii * step] * m - phdst[ii * step] * expk;
+      tph += mdst[ii * step] * expk + phdst[ii * step] * m;
+    }
+    buffer[i * 2] = tm;
+    buffer[i * 2 + 1] = tph;
+  }
+  // assign magnitude and phase values from the accumulated buffer;
+  for (int i = 0; i < n_fft; i++) {
+    mdst[i * step] = buffer[i * 2];
+    phdst[i * step] = buffer[i * 2 + 1];
+  }
+}
+
+// Radix-2 FFT implementation - O(N log N) for power-of-2 sizes
+static void radix2_fft(float *mdst, float *phdst, float *buffer, size_t n_fft,
+                       size_t step) {
+  if (n_fft == 1) {
+    return;
+  } else if (n_fft % 2 != 0) {
+    // Fall back to DFT when we have a size that isn't factorable by 2
+    simple_dft(mdst, phdst, buffer, n_fft, step);
+    return;
+  }
+
+  radix2_fft(mdst, phdst, buffer, (size_t)n_fft / 2, step * 2);
+  radix2_fft((float *)((char *)mdst + step * sizeof(float)),
+             (float *)((char *)phdst + step * sizeof(float)), buffer,
+             (size_t)n_fft / 2, step * 2);
+
+  float km = M_PI * -2.0f / (float)n_fft;
+
+  for (int i = 0; 2 * i < n_fft; i++) {
+    float k = km * (float)i;
+    float k1 = cosf(k);
+    float k2 = sinf(k);
+
+    float mp = mdst[i * 2 * step];
+    float php = phdst[i * 2 * step];
+    float mq = mdst[(i * 2 + 1) * step] * k1 - k2 * phdst[(i * 2 + 1) * step];
+    float phq = mdst[(i * 2 + 1) * step] * k2 + k1 * phdst[(i * 2 + 1) * step];
+
+    buffer[i + n_fft] = php + phq;
+    buffer[i] = mp + mq;
+    buffer[(i + (n_fft / 2)) + n_fft] = php - phq;
+    buffer[(i + (n_fft / 2))] = mp - mq;
+  }
+  for (int i = 0; i < n_fft; i++) {
+    mdst[i * step] = buffer[i];
+    phdst[i * step] = buffer[i + n_fft];
+  }
+}
+
+// STFT compute function parameters
+struct stft_compute_params {
   int filter_length;
   int hop_length;
   bool compute_abs_and_angle;
+  bool center;
 };
 
-static void ggml_compute_stft(struct ggml_tensor *dst,
-                              const struct ggml_tensor *src,
-                              const struct ggml_tensor *window, int ith,
-                              int nth, void *userdata) {
-  const stft_params *params = (const stft_params *)userdata;
-  const int filter_length = params->filter_length;
-  const int hop_length = params->hop_length;
-  const bool compute_abs_and_angle = params->compute_abs_and_angle;
+// STFT computation function
+static void ggml_compute_stft_f32(struct ggml_tensor *dst,
+                                  const struct ggml_tensor *src0,
+                                  const struct ggml_tensor *src1, int ith,
+                                  int nth, void *userdata) {
+  struct stft_compute_params *params = (struct stft_compute_params *)userdata;
 
-  const int input_length = src->ne[0];
-  const int n_frames = (input_length - filter_length) / hop_length + 1;
-  const int freq_bins = filter_length;
+  const float *w = (float *)src1->data;
+  size_t n_fft = params->filter_length;
+  size_t hop = params->hop_length;
+  bool compute_abs_and_angle = params->compute_abs_and_angle;
+  bool center = params->center;
 
-  const float *input = (const float *)src->data;
-  const float *win = (const float *)window->data;
-  float *output = (float *)dst->data;
+  const int half = n_fft / 2;
 
-  // Process each frame
-  for (int frame = ith; frame < n_frames; frame += nth) {
-    const int start_idx = frame * hop_length;
+  // Get tensor dimensions
+  const int64_t ne00 = src0->ne[0]; // signal length
+  const int64_t ne01 = src0->ne[1]; // batch size
+  const int64_t ne1 = dst->ne[1];   // number of frames
 
-    // Prepare windowed frame for FFT
-    std::vector<std::complex<float>> frame_data(filter_length);
-    for (int i = 0; i < filter_length; i++) {
-      if (start_idx + i < input_length) {
-        frame_data[i] =
-            std::complex<float>(input[start_idx + i] * win[i], 0.0f);
-      } else {
-        frame_data[i] = std::complex<float>(0.0f, 0.0f);
+  const size_t nb01 = src0->nb[1];
+  const size_t nb1 = dst->nb[1];
+  const size_t nb2 = dst->nb[2];
+  const size_t nb3 = dst->nb[3];
+
+  // Allocate work buffer for FFT computation
+  // Use maximum possible memory for the buffer rather than calculating the
+  // largest uneven half
+  float *buffer =
+      (float *)malloc((n_fft * 2 + CACHE_LINE_SIZE_F32) * sizeof(float));
+
+  // Zero the destination tensor
+  memset(dst->data, 0.0f, ggml_nbytes(dst));
+
+  // Process frames per thread
+  const int hpt = (ne1 + nth - 1) / nth;
+  const int ir0 = hpt * ith;
+  const int ir1 = MIN(ir0 + hpt, ne1);
+
+  for (int b = 0; b < ne01; b++) {
+    for (int i1 = ir0; i1 < ir1; i1++) {
+      const int ch = i1 * hop;
+      float *mdst_data = (float *)((char *)dst->data + i1 * nb1 + b * nb2);
+      float *phdst_data =
+          (float *)((char *)dst->data + i1 * nb1 + nb3 + b * nb2);
+      float *tgt_data = (float *)((char *)src0->data + b * nb01);
+
+      // Pre-initialize the magnitude data with the window applied
+      for (int i = 0; i < n_fft; i++) {
+        int ai = center ? (ch - half + i) : (ch + i);
+
+        // Handle reflective padding for center mode
+        if (center) {
+          if (ai < 0) {
+            mdst_data[i] = tgt_data[-1 * ai] * w[i];
+          } else if (ai >= ne00) {
+            mdst_data[i] = tgt_data[ne00 - (ai - ne00 + 1)] * w[i];
+          } else {
+            mdst_data[i] = tgt_data[ai] * w[i];
+          }
+        } else {
+          if (ai >= 0 && ai < ne00) {
+            mdst_data[i] = tgt_data[ai] * w[i];
+          } else {
+            mdst_data[i] = 0.0f;
+          }
+        }
+        phdst_data[i] = 0.0f; // Initialize phase to zero
       }
-    }
 
-    // Compute FFT
-    fft(frame_data);
+      // Perform FFT
+      radix2_fft(mdst_data, phdst_data, buffer, n_fft, 1);
 
-    // Store results
-    for (int freq = 0; freq < freq_bins; freq++) {
+      // Convert to magnitude/phase if requested
       if (compute_abs_and_angle) {
-        // Store magnitude and phase
-        float magnitude = std::abs(frame_data[freq]);
-        float phase = std::arg(frame_data[freq]);
-        output[freq * n_frames * 2 + frame * 2 + 0] = magnitude;
-        output[freq * n_frames * 2 + frame * 2 + 1] = phase;
-      } else {
-        // Store real and imaginary parts
-        output[freq * n_frames * 2 + frame * 2 + 0] = frame_data[freq].real();
-        output[freq * n_frames * 2 + frame * 2 + 1] = frame_data[freq].imag();
+        for (int i = 0; i < n_fft; i++) {
+          float abs = sqrtf(mdst_data[i] * mdst_data[i] +
+                            phdst_data[i] * phdst_data[i]);
+          float agl = atan2f(phdst_data[i], mdst_data[i]);
+          mdst_data[i] = abs;
+          phdst_data[i] = agl;
+        }
       }
     }
   }
+
+  free(buffer);
 }
 
-// ISTFT computation parameters
-struct istft_params {
-  int filter_length;
-  int hop_length;
-  bool from_abs_and_angle;
-};
-
-static void ggml_compute_istft(struct ggml_tensor *dst,
-                               const struct ggml_tensor *src,
-                               const struct ggml_tensor *window, int ith,
-                               int nth, void *userdata) {
-  const istft_params *params = (const istft_params *)userdata;
-  const int filter_length = params->filter_length;
-  const int hop_length = params->hop_length;
-  const bool from_abs_and_angle = params->from_abs_and_angle;
-
-  const int n_frames = src->ne[1];
-  const int freq_bins = src->ne[0];
-  const int output_length = (n_frames - 1) * hop_length + filter_length;
-
-  const float *input = (const float *)src->data;
-  const float *win = (const float *)window->data;
-  float *output = (float *)dst->data;
-
-  // Initialize output to zero
-  if (ith == 0) {
-    memset(output, 0, output_length * sizeof(float));
-  }
-
-  // Process each frame
-  for (int frame = ith; frame < n_frames; frame += nth) {
-    const int start_idx = frame * hop_length;
-
-    // Prepare frequency domain data for IFFT
-    std::vector<std::complex<float>> frame_data(filter_length);
-    for (int freq = 0; freq < freq_bins && freq < filter_length; freq++) {
-      if (from_abs_and_angle) {
-        // Convert from magnitude and phase
-        float magnitude = input[freq * n_frames * 2 + frame * 2 + 0];
-        float phase = input[freq * n_frames * 2 + frame * 2 + 1];
-        frame_data[freq] = std::polar(magnitude, phase);
-      } else {
-        // Use real and imaginary parts
-        float real = input[freq * n_frames * 2 + frame * 2 + 0];
-        float imag = input[freq * n_frames * 2 + frame * 2 + 1];
-        frame_data[freq] = std::complex<float>(real, imag);
-      }
-    }
-
-    // Fill remaining frequencies with conjugate symmetry for real output
-    for (int freq = freq_bins; freq < filter_length; freq++) {
-      int mirror_freq = filter_length - freq;
-      if (mirror_freq < freq_bins) {
-        frame_data[freq] = std::conj(frame_data[mirror_freq]);
-      } else {
-        frame_data[freq] = std::complex<float>(0.0f, 0.0f);
-      }
-    }
-
-    // Compute IFFT
-    ifft(frame_data);
-
-    // Apply window and overlap-add
-    for (int i = 0; i < filter_length; i++) {
-      if (start_idx + i < output_length) {
-        output[start_idx + i] += frame_data[i].real() * win[i];
-      }
-    }
-  }
-}
-
-// Modulo operation: a % b
-struct ggml_tensor *ggml_mod(struct ggml_context *ctx, struct ggml_tensor *a,
-                             float b) {
-  float *mod_val = (float *)malloc(sizeof(float));
-  *mod_val = b;
-
-  return ggml_map_custom1(ctx, a, ggml_compute_mod_f32, 1, mod_val);
-}
-
-// Cumulative sum along the first dimension
-struct ggml_tensor *ggml_cumsum(struct ggml_context *ctx,
-                                struct ggml_tensor *a) {
-  return ggml_map_custom1(ctx, a, ggml_compute_cumsum, 1, nullptr);
-}
-
-// Linear upscaling (repeat elements)
-struct ggml_tensor *ggml_upscale_linear(struct ggml_context *ctx,
-                                        struct ggml_tensor *a,
-                                        int scale_factor) {
-  // Store scale factor in a parameter tensor
-  struct ggml_tensor *scale_param = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, 1);
-  *(int *)scale_param->data = scale_factor;
-
-  return ggml_map_custom2(ctx, a, scale_param, ggml_compute_upscale_linear, 1,
-                          nullptr);
-}
-
-// Round to nearest integer
-struct ggml_tensor *ggml_round(struct ggml_context *ctx,
-                               struct ggml_tensor *a) {
-  return ggml_map_custom1(ctx, a, ggml_compute_round, 1, nullptr);
-}
-
-// Helper function to calculate number of frames
-static int64_t calculate_number_of_frames(int64_t length, size_t hop_length) {
-  return (int64_t)(length / (int64_t)hop_length) + 1;
-}
-
-// Helper function to calculate original length
-static int64_t calculate_original_length(int64_t frames, size_t hop_length) {
-  return (frames - 1) * (int64_t)hop_length;
-}
-
-// STFT implementation - adapted from ggml fork
+// STFT implementation
 struct ggml_tensor *stft(struct ggml_context *ctx, struct ggml_tensor *a,
-                         struct ggml_tensor *window, size_t n_fft, size_t hop,
-                         bool abs_and_angle, bool one_sided) {
-  // Calculate output dimensions
-  int64_t n_frames = calculate_number_of_frames(a->ne[0], hop);
-  int64_t freq_bins = one_sided ? (n_fft / 2 + 1) : n_fft;
+                         struct ggml_tensor *window, int filter_length,
+                         int hop_length, bool compute_abs_and_angle,
+                         bool center) {
 
-  // Output tensor: [freq_bins, n_frames, 2] where last dim is real/imag or
-  // mag/phase
-  int64_t ne[4] = {freq_bins, n_frames, 2, 1};
+  // Calculate output dimensions exactly like original ggml
+  const int64_t ne[4] = {
+      filter_length, calculate_number_of_frames(a->ne[0], hop_length),
+      a->ne[1], // batch dimension
+      2         // real/imaginary or magnitude/phase
+  };
+
   struct ggml_tensor *result = ggml_new_tensor(ctx, GGML_TYPE_F32, 4, ne);
 
   // Create parameters
-  stft_params *params = (stft_params *)malloc(sizeof(stft_params));
-  params->filter_length = n_fft;
-  params->hop_length = hop;
-  params->compute_abs_and_angle = abs_and_angle;
+  struct stft_compute_params *params =
+      (struct stft_compute_params *)malloc(sizeof(struct stft_compute_params));
+  params->filter_length = filter_length;
+  params->hop_length = hop_length;
+  params->compute_abs_and_angle = compute_abs_and_angle;
+  params->center = center;
 
-  return ggml_map_custom2(ctx, a, window, ggml_compute_stft, 1, params);
+  return ggml_map_custom2(ctx, a, window, ggml_compute_stft_f32, 1, params);
 }
 
-// ISTFT implementation - adapted from ggml fork
+// ISTFT compute function parameters
+struct istft_compute_params {
+  int filter_length;
+  int hop_length;
+  bool from_abs_and_angle;
+  bool center;
+};
+
+// Proper inverse FFT implementation
+static void radix2_ifft(float *mdst, float *phdst, float *buffer, float *tgt,
+                        float *window, size_t n_fft, size_t step,
+                        int min_length, int max_length, int index, int offset) {
+  // For inverse FFT, we need to conjugate the input, apply forward FFT, then
+  // conjugate and scale Conjugate the input (negate imaginary part)
+  for (int i = 0; i < n_fft; i++) {
+    phdst[i] = -phdst[i];
+  }
+
+  // Apply forward FFT
+  radix2_fft(mdst, phdst, buffer, n_fft, step);
+
+  // Conjugate the output and apply overlap-add with proper scaling
+  for (int i = 0; i < n_fft; i++) {
+    int base_index = i;                // Don't reverse for proper IFFT
+    float real_part = mdst[i] / n_fft; // Scale by 1/N for IFFT
+    float w = window[base_index];
+    int tgt_index = base_index - offset;
+    int location = index + tgt_index;
+    if (location >= min_length && location < max_length) {
+      tgt[location] += real_part * w;
+    }
+  }
+}
+
+// ISTFT computation function
+static void ggml_compute_istft_f32(struct ggml_tensor *dst,
+                                   const struct ggml_tensor *src0,
+                                   const struct ggml_tensor *src1,
+                                   const struct ggml_tensor *src2, int ith,
+                                   int nth, void *userdata) {
+  struct istft_compute_params *params = (struct istft_compute_params *)userdata;
+
+  const float *window = (float *)src2->data;
+  size_t n_fft = params->filter_length;
+  size_t hop = params->hop_length;
+  bool from_abs_and_angle = params->from_abs_and_angle;
+  bool center = params->center;
+
+  const int half = n_fft / 2;
+
+  // Get tensor dimensions
+  const int64_t ne1 = src0->ne[1]; // number of frames
+  const int64_t ne2 = src0->ne[2]; // batch size
+  const int64_t ne0 = dst->ne[0];  // output signal length
+
+  const size_t nb1 = src0->nb[1];
+  const size_t nb2 = src0->nb[2];
+  const size_t nb3 = src0->nb[3];
+  const size_t nb01 = dst->nb[1];
+
+  // Allocate work buffer
+  float *buffer =
+      (float *)malloc((n_fft * 2 + CACHE_LINE_SIZE_F32) * sizeof(float));
+  float *frame_buffer = (float *)malloc(n_fft * sizeof(float));
+  float *phase_buffer = (float *)malloc(n_fft * sizeof(float));
+
+  // Zero the destination tensor
+  memset(dst->data, 0.0f, ggml_nbytes(dst));
+
+  // Process batches per thread
+  const int bpt = (ne2 + nth - 1) / nth;
+  const int ib0 = bpt * ith;
+  const int ib1 = MIN(ib0 + bpt, ne2);
+
+  for (int b = ib0; b < ib1; b++) {
+    float *tgt_data = (float *)((char *)dst->data + b * nb01);
+
+    for (int i1 = 0; i1 < ne1; i1++) {
+      const int ch = i1 * hop;
+      float *msrc_data = (float *)((char *)src0->data + i1 * nb1 + b * nb2);
+      float *phsrc_data =
+          (float *)((char *)src0->data + i1 * nb1 + nb3 + b * nb2);
+
+      // Copy frame data to work buffers
+      for (int i = 0; i < n_fft; i++) {
+        frame_buffer[i] = msrc_data[i];
+        phase_buffer[i] = phsrc_data[i];
+      }
+
+      // Convert from magnitude/phase if needed
+      if (from_abs_and_angle) {
+        for (int i = 0; i < n_fft; i++) {
+          float magnitude = frame_buffer[i];
+          float phase = phase_buffer[i];
+          frame_buffer[i] = magnitude * cosf(phase);
+          phase_buffer[i] = magnitude * sinf(phase);
+        }
+      }
+
+      // Perform inverse FFT with overlap-add
+      int offset = center ? half : 0;
+      int index = center ? (ch - half) : ch;
+      radix2_ifft(frame_buffer, phase_buffer, buffer, tgt_data, (float *)window,
+                  n_fft, 1, 0, ne0, index, offset);
+    }
+  }
+
+  free(buffer);
+  free(frame_buffer);
+  free(phase_buffer);
+}
+
+// ISTFT implementation
 struct ggml_tensor *istft(struct ggml_context *ctx, struct ggml_tensor *a,
                           struct ggml_tensor *window_squared_sum,
-                          struct ggml_tensor *window, size_t n_fft, size_t hop,
-                          bool abs_and_angle, bool one_sided) {
-  // Calculate output dimensions
-  int64_t n_frames = a->ne[1];
-  int64_t output_length = calculate_original_length(n_frames, hop) + n_fft;
+                          struct ggml_tensor *window, int filter_length,
+                          int hop_length, bool from_abs_and_angle,
+                          bool center) {
 
-  int64_t ne[4] = {output_length, 1, 1, 1};
-  struct ggml_tensor *result = ggml_new_tensor(ctx, GGML_TYPE_F32, 1, ne);
+  // Calculate output dimensions exactly like original ggml
+  const int64_t ne[4] = {calculate_original_length(a->ne[1], hop_length),
+                         a->ne[2], // batch dimension
+                         1, 1};
+
+  struct ggml_tensor *result = ggml_new_tensor(ctx, GGML_TYPE_F32, 4, ne);
 
   // Create parameters
-  istft_params *params = (istft_params *)malloc(sizeof(istft_params));
-  params->filter_length = n_fft;
-  params->hop_length = hop;
-  params->from_abs_and_angle = abs_and_angle;
+  struct istft_compute_params *params = (struct istft_compute_params *)malloc(
+      sizeof(struct istft_compute_params));
+  params->filter_length = filter_length;
+  params->hop_length = hop_length;
+  params->from_abs_and_angle = from_abs_and_angle;
+  params->center = center;
 
-  return ggml_map_custom2(ctx, a, window, ggml_compute_istft, 1, params);
+  return ggml_map_custom3(ctx, a, window_squared_sum, window,
+                          ggml_compute_istft_f32, 1, params);
 }

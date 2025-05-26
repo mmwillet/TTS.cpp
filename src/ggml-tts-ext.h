@@ -27,15 +27,17 @@ GGML_API struct ggml_tensor *ggml_upscale_linear(struct ggml_context *ctx,
 GGML_API struct ggml_tensor *ggml_round(struct ggml_context *ctx,
                                         struct ggml_tensor *a);
 
-// STFT wrapper functions (using standard GGML operations)
+// STFT with 7 parameters to match kokoro_model.cpp usage
 struct ggml_tensor *stft(struct ggml_context *ctx, struct ggml_tensor *a,
-                         struct ggml_tensor *window, size_t n_fft, size_t hop,
-                         bool abs_and_angle, bool one_sided);
+                         struct ggml_tensor *window, int filter_length,
+                         int hop_length, bool compute_abs_and_angle,
+                         bool center);
 
+// ISTFT with 8 parameters to match kokoro_model.cpp usage
 struct ggml_tensor *istft(struct ggml_context *ctx, struct ggml_tensor *a,
                           struct ggml_tensor *window_squared_sum,
-                          struct ggml_tensor *window, size_t n_fft, size_t hop,
-                          bool abs_and_angle, bool one_sided);
+                          struct ggml_tensor *window, int filter_length,
+                          int hop_length, bool from_abs_and_angle, bool center);
 
 #ifdef __cplusplus
 }

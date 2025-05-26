@@ -40,7 +40,7 @@ if (ESPEAK_INCLUDE_DIRS)
     set_source_files_properties(phonemizer.cpp PROPERTIES INCLUDE_DIRECTORIES "${ESPEAK_INCLUDE_DIRS}")
     target_link_libraries(tts PUBLIC ${ESPEAK_LIBRARIES})
 endif()
-target_link_libraries(tts PUBLIC ggml)
+target_link_libraries(tts PUBLIC llama)
 
 if (BUILD_SHARED_LIBS)
     set_target_properties(tts PROPERTIES POSITION_INDEPENDENT_CODE ON)
