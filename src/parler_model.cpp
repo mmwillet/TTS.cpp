@@ -114,7 +114,7 @@ void parler_tts_model::prep_cross_key_values(int n_threads, struct tts_response 
     ggml_backend_cpu_set_n_threads(backend_cpu, n_threads);
     std::vector<ggml_backend_buffer_type_t> bufs = {backend_cpu_buffer};
     std::vector<ggml_backend_t> backs = {backend_cpu};
-    ggml_backend_sched_t sched = ggml_backend_sched_new(backs.data(), bufs.data(), 1, max_cross_nodes*n_layers, false);
+    ggml_backend_sched_t sched = ggml_backend_sched_new(backs.data(), bufs.data(), 1, max_cross_nodes*n_layers, false, true);
     
     std::vector<uint8_t> buf_compute_meta;
     buf_compute_meta.resize(max_cross_nodes*n_layers*ggml_tensor_overhead() + ggml_graph_overhead_custom(max_cross_nodes*n_layers, false));
@@ -686,7 +686,7 @@ int parler_tts_runner::decode(parler_ubatch & batch) {
     ggml_cgraph * gf = build_parler_graph(batch);
 
     // the output is always the last tensor in the graph
-    struct ggml_tensor * res = gf->nodes[gf->n_nodes - 1];
+    struct ggml_tensor * res = ggml_graph_node(gf, -1);
     ggml_backend_sched_alloc_graph(pctx->sched, gf);
     
     // use the sequence_length variable here so that audio input tokens are handled correctly.

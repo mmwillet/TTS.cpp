@@ -1,4 +1,3 @@
-
 cmake_minimum_required(VERSION 3.14)
 project("tts.cpp" C CXX)
 include(CheckIncludeFileCXX)
@@ -76,14 +75,17 @@ option(TTS_BUILD_EXAMPLES "TTS.cpp: build examples" ON)
 # Required for relocatable CMake package
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/build-info.cmake)
 
-# override ggml options
+# override ggml options for llama.cpp
 set(GGML_ALL_WARNINGS       ${TTS_ALL_WARNINGS})
 set(GGML_FATAL_WARNINGS     ${TTS_FATAL_WARNINGS})
 
+# Increase GGML_MAX_NAME to support longer tensor names from TTS models
+add_compile_definitions(GGML_MAX_NAME=128)
 
-# build lib
+# build lib - Updated to use llama.cpp instead of mmwillet/ggml
 if (NOT TARGET ggml)
-    add_subdirectory(ggml)
+    # Add llama.cpp which provides the official GGML implementation
+    add_subdirectory(llama.cpp)
     # ... otherwise assume ggml is added by a parent CMakeLists.txt
 endif()
 add_subdirectory(src)

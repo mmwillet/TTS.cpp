@@ -343,7 +343,7 @@ void t5_runner::run(uint32_t * input_tokens, uint32_t sequence_length, struct tt
     struct ggml_cgraph * gf = NULL;
     gf = build_t5_graph(batch);
     // the output is always the last tensor in the graph
-    struct ggml_tensor * result = gf->nodes[gf->n_nodes - 1];
+    struct ggml_tensor * result = ggml_graph_node(gf, -1);
     ggml_backend_sched_alloc_graph(t5ctx->sched, gf);
     set_inputs(batch);
 

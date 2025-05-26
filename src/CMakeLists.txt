@@ -5,6 +5,8 @@ if (WIN32)
     endif()
 endif()
 
+# Using llama.cpp/ggml as the base GGML implementation
+
 # TTS
 
 add_library(tts
@@ -23,9 +25,13 @@ add_library(tts
             tts_model.cpp
             kokoro_model.cpp
             dia_model.cpp
+            ggml-tts-ext.h
+            ggml-tts-ext.cpp
             )
 
-target_include_directories(tts PUBLIC . ../include ../ggml/src/)
+target_include_directories(tts PUBLIC . ../include ../llama.cpp/ggml/include/)
+
+# Using standard llama.cpp/ggml - no custom extensions needed
 
 target_compile_features   (tts PUBLIC cxx_std_11) # don't bump
 

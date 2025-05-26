@@ -5,6 +5,7 @@
 #include "tts_model.h"
 #include "tokenizer.h"
 #include "phonemizer.h"
+#include "ggml-tts-ext.h"
 
 // Rather than using ISO 639-2 language codes, Kokoro voice pack specify their corresponding language via their first letter.
 // Below is a map that describes the relationship between those designations and espeak-ng's voice identifiers so that the 

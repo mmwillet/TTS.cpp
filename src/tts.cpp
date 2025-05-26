@@ -179,11 +179,11 @@ bool is_quanitizable(tts_arch arch, std::string name, struct quantization_params
 size_t quantize_tensor(void * new_data, struct ggml_tensor * tensor, const float * imatrix, enum ggml_type qtype, uint32_t n_threads) {
     // much of this is form copied from llama.cpp
     int chunk_size_multiplier = 1;
-    if (qtype == GGML_TYPE_Q4_0_4_4 || qtype == GGML_TYPE_Q4_0_4_8 || qtype == GGML_TYPE_Q4_0_8_8) {
-        if ((qtype == GGML_TYPE_Q4_0_8_8) && (tensor->ne[1] % 8 != 0)) qtype = GGML_TYPE_Q4_0;
-        else if (tensor->ne[1] % 4 != 0) qtype = GGML_TYPE_Q4_0;
-        if (qtype == GGML_TYPE_Q4_0_8_8) chunk_size_multiplier = 8;
-        else if (qtype == GGML_TYPE_Q4_0_4_4 || qtype == GGML_TYPE_Q4_0_4_8) chunk_size_multiplier = 4;
+    // Note: GGML_TYPE_Q4_0_4_4, GGML_TYPE_Q4_0_4_8, GGML_TYPE_Q4_0_8_8 have been removed from llama.cpp
+    // Fallback to standard GGML_TYPE_Q4_0 for compatibility
+    if (qtype == GGML_TYPE_Q4_0) {
+        // Use standard Q4_0 quantization
+        chunk_size_multiplier = 1;
     }
     size_t out_size = 0;
     const int32_t d3_step = tensor->ne[0] * tensor->ne[1];
@@ -363,7 +363,7 @@ void quantize_gguf(const std::string & ifile, const std::string & ofile, struct 
         }
 
         gguf_set_tensor_type(ctx_out.get(), name.c_str(), new_type);
-        gguf_set_tensor_data(ctx_out.get(), name.c_str(), new_data, new_size);
+        gguf_set_tensor_data(ctx_out.get(), name.c_str(), new_data);
         fprintf(stdout, "At tensor: '%s' with new size: %zu bytes\n", name.c_str(), new_size);
         // write tensor data + padding
         fout.write((const char *) new_data, new_size);

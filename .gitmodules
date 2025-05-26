@@ -2,3 +2,6 @@
 	path = ggml
 	url = https://github.com/mmwillet/ggml.git
 	branch = support-for-tts
+[submodule "llama.cpp"]
+	path = llama.cpp
+	url = https://github.com/ggml-org/llama.cpp.git
