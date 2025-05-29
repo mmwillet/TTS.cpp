@@ -79,7 +79,7 @@ struct ggml_tensor * reciprocal(ggml_context * ctx, struct ggml_tensor * x) {
     TTS_ASSERT(x->ne[0] == 1);
     static constexpr float one = 1.0f;
     ggml_tensor * numerator = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, 1, x->ne[1]);
-    // stride hack so that the scalar numerator can be divided by x;
+    // stride trick so that the scalar numerator can be divided by x.
     numerator->nb[1] = 0;
     numerator->data = const_cast<float *>(&one);
     return ggml_div(ctx, numerator, x);
