@@ -50,7 +50,13 @@ Additional Model support will initially be added based on open source model perf
 * CMake (>=3.14) 
 * GGML pulled locally
   * this can be accomplished via `git clone -b support-for-tts git@github.com:mmwillet/ggml.git`
-  
+
+#### GGML Patch
+
+The local GGML library includes several required patches to the main branch of GGML (making the current TTS ggml branch out of date with modern GGML). Specifically these patches include major modifications to the convolutional transposition operation as well as several new GGML operations which have been implemented for TTS specific purposes; these include `ggml_reciprocal`, `ggml_round`, `ggml_mod`, `ggml_cumsum`, STFT, and iSTFT operations.
+
+We are currently [working on upstreaming some of these operations inorder to deprecate this patch requirement going forward](https://github.com/mmwillet/TTS.cpp/issues/66).
+
 #### Build:
 
 Assuming that the above requirements are met the library and basic CLI example can be built by running the following command in the repository's base directory:
