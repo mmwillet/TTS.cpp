@@ -286,6 +286,9 @@ void terminate(worker_pool * pool) {
         (*pool)[0]->task_queue->terminate();
         (*pool)[0]->response_map->terminate();
     }
+}
+
+void complete(worker_pool * pool) {
     for (auto w : *pool) {
         if (w->thread) {
             w->thread->join();
@@ -665,30 +668,18 @@ int main(int argc, const char ** argv) {
     svr->wait_until_ready();
     fprintf(stdout, "%s: HTTP server is listening, hostname: %s, port: %d, http threads: %d\n", __func__, args.get_string_param("--host").c_str(), *args.get_int_param("--port"), *args.get_int_param("--n-http-threads"));
 
-    // load the model
-    fprintf(stdout, "%s: loading model and initializing main loop\n", __func__);
 
-    // It might make sense in the long run to have the primary thread run clean up on the response map and keep the model workers parallel.
-    // pool = initialize_workers(args, tqueue, rmap);
     pool = new worker_pool;
-    for (int i = *args.get_int_param("--n-parallelism"); i > 0; i--) {
-        if (i == 1) {
-            fprintf(stdout, "%s: server is listening on http://%s:%d\n", __func__, args.get_string_param("--host").c_str(), *args.get_int_param("--port"));
-            worker * w = new worker(tqueue, rmap, args.get_string_param("--text-encoder-path"), *args.get_int_param("--timeout"));
-            state.store(READY);
-            pool->push_back(w);
-            init_worker(args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), !args.get_bool_param("--use-metal"), default_generation_config, w);
-        } else {
-            worker * w = new worker(tqueue, rmap, args.get_string_param("--text-encoder-path"), *args.get_int_param("--timeout"));
-            w->thread = new std::thread(init_worker, args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), !args.get_bool_param("--use-metal"), default_generation_config, w);
-            pool->push_back(w);
-        }
-    }
+    shutdown_handler = [&](int) {
+        // this should unblock the primary thread;
+        terminate(pool);
+        return;
+    };
 
 #if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
     struct sigaction sigint_action;
     sigint_action.sa_handler = signal_handler;
-    sigemptyset (&sigint_action.sa_mask);
+    sigemptyset(&sigint_action.sa_mask);
     sigint_action.sa_flags = 0;
     sigaction(SIGINT, &sigint_action, NULL);
     sigaction(SIGTERM, &sigint_action, NULL);
@@ -699,10 +690,27 @@ int main(int argc, const char ** argv) {
     SetConsoleCtrlHandler(reinterpret_cast<PHANDLER_ROUTINE>(console_ctrl_handler), true);
 #endif
 
-    clean_up();
+    fprintf(stdout, "%s: loading model and initializing main loop\n", __func__);
+    // It might make sense in the long run to have the primary thread run clean up on the response map and keep the model workers parallel.    
+    for (int i = *args.get_int_param("--n-parallelism"); i > 0; i--) {
+        if (i == 1) {
+            fprintf(stdout, "%s: HTTP server is listening on http://%s:%d\n", __func__, args.get_string_param("--host").c_str(), *args.get_int_param("--port"));
+            worker * w = new worker(tqueue, rmap, args.get_string_param("--text-encoder-path"), *args.get_int_param("--timeout"));
+            state.store(READY);
+            pool->push_back(w);
+            init_worker(args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), !args.get_bool_param("--use-metal"), default_generation_config, w);
+        } else {
+            worker * w = new worker(tqueue, rmap, args.get_string_param("--text-encoder-path"), *args.get_int_param("--timeout"));
+            w->thread = new std::thread(init_worker, args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), !args.get_bool_param("--use-metal"), default_generation_config, w);
+            pool->push_back(w);
+        }
+    }
+    fprintf(stdout, "%s: HTTP server listening on hostname: %s and port: %d, is shutting down.\n", __func__, args.get_string_param("--host").c_str(), *args.get_int_param("--port"));
+    svr->stop();
     t.join();
-    terminate(pool);
+    complete(pool);
     rmap->cleanup_thread->join();
+
 
     return 0;
 }
