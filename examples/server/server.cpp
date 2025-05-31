@@ -286,6 +286,9 @@ void terminate(worker_pool * pool) {
         (*pool)[0]->task_queue->terminate();
         (*pool)[0]->response_map->terminate();
     }
+}
+
+void complete(worker_pool * pool) {
     for (auto w : *pool) {
         if (w->thread) {
             w->thread->join();
@@ -705,7 +708,9 @@ int main(int argc, const char ** argv) {
     fprintf(stdout, "%s: HTTP server listening on hostname: %s and port: %d, is shutting down.\n", __func__, args.get_string_param("--host").c_str(), *args.get_int_param("--port"));
     svr->stop();
     t.join();
+    complete(pool);
     rmap->cleanup_thread->join();
+
 
     return 0;
 }
