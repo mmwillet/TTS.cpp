@@ -366,9 +366,6 @@ inline void signal_handler(int signal) {
 
 std::string format_model_id(std::filesystem::path path) {
     std::string stem = path.stem();
-    std::transform(stem.begin(), stem.end(), stem.begin(), ::tolower);
-    stem = replace_any(stem, " ", "-");
-    stem = replace_any(stem, "_", "-");
     return stem;
 }
 
@@ -452,16 +449,10 @@ int main(int argc, const char ** argv) {
     std::unordered_map<std::string, std::string> model_map = {};
     const std::string model_path = args.get_string_param("--model-path");
     if (std::filesystem::is_directory(model_path)) {
-        for (auto const &entry : std::filesystem::recursive_directory_iterator(model_path)) {
+        for (auto const &entry : std::filesystem::directory_iterator(model_path)) {
             if (!entry.is_directory()) {
                 const std::string id = format_model_id(entry.path());
-                int index = 1;
-                std::string final_id = std::format("{}-{}", id, index);
-                while (model_map.contains(final_id)) {
-                    index++;
-                    final_id = std::format("{}-{}", id, index);
-                }
-                model_map[final_id] = entry.path().string();
+                model_map[id] = entry.path().string();
             }
         }
         if (model_map.size() == 0) {
@@ -470,7 +461,7 @@ int main(int argc, const char ** argv) {
         }
     } else {
         const std::filesystem::path path = model_path;
-        model_map[format_model_id(path) + "-1"] = path;
+        model_map[format_model_id(path)] = path;
     }
     auto model_creation = std::chrono::duration_cast<std::chrono::seconds>(
                               std::chrono::system_clock::now().time_since_epoch())
