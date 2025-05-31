@@ -668,8 +668,27 @@ int main(int argc, const char ** argv) {
     // load the model
     fprintf(stdout, "%s: loading model and initializing main loop\n", __func__);
 
+    shutdown_handler = [&](int) {
+        // this should unblock the primary thread;
+        terminate(pool);
+        return;
+    };
+
+#if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
+    struct sigaction sigint_action;
+    sigint_action.sa_handler = signal_handler;
+    sigemptyset(&sigint_action.sa_mask);
+    sigint_action.sa_flags = 0;
+    sigaction(SIGINT, &sigint_action, NULL);
+    sigaction(SIGTERM, &sigint_action, NULL);
+#elif defined (_WIN32)
+    auto console_ctrl_handler = +[](DWORD ctrl_type) -> BOOL {
+        return (ctrl_type == CTRL_C_EVENT) ? (signal_handler(SIGINT), true) : false;
+    };
+    SetConsoleCtrlHandler(reinterpret_cast<PHANDLER_ROUTINE>(console_ctrl_handler), true);
+#endif
+
     // It might make sense in the long run to have the primary thread run clean up on the response map and keep the model workers parallel.
-    // pool = initialize_workers(args, tqueue, rmap);
     pool = new worker_pool;
     for (int i = *args.get_int_param("--n-parallelism"); i > 0; i--) {
         if (i == 1) {
@@ -684,24 +703,9 @@ int main(int argc, const char ** argv) {
             pool->push_back(w);
         }
     }
-
-#if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
-    struct sigaction sigint_action;
-    sigint_action.sa_handler = signal_handler;
-    sigemptyset (&sigint_action.sa_mask);
-    sigint_action.sa_flags = 0;
-    sigaction(SIGINT, &sigint_action, NULL);
-    sigaction(SIGTERM, &sigint_action, NULL);
-#elif defined (_WIN32)
-    auto console_ctrl_handler = +[](DWORD ctrl_type) -> BOOL {
-        return (ctrl_type == CTRL_C_EVENT) ? (signal_handler(SIGINT), true) : false;
-    };
-    SetConsoleCtrlHandler(reinterpret_cast<PHANDLER_ROUTINE>(console_ctrl_handler), true);
-#endif
-
-    clean_up();
+    fprintf(stdout, "HTTP server listening on hostname: %s and port: %d, is shutting down.\n", args.get_string_param("--host").c_str(), *args.get_int_param("--port"));
+    svr->stop();
     t.join();
-    terminate(pool);
     rmap->cleanup_thread->join();
 
     return 0;
