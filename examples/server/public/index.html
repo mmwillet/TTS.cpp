@@ -514,6 +514,7 @@
                 for (const model of models) {
                     const option = document.createElement('option');
                     option.textContent = model.id;
+                    option.value = model.id;
                     modelSelect.add(option);
                 }
             } catch (err) {
