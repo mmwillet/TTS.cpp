@@ -26,16 +26,16 @@ Additional Model support will initially be added based on open source model perf
 #### Functionality
 
 | Planned Functionality | OS X       | Linux | Windows |
-|----------------------|------------|---|---|
-| Basic CPU Generation | &check;    |&check;|&cross;|
-| Metal Acceleration   | &check; | _ | _ |
-| CUDA support         | _          |&cross;|&cross;|
-| Quantization         | &check;_*_ |&cross;|&cross;|
-| Layer Offloading     | &cross;    |&cross;|&cross;|
-| Server Support       | &check;    |&cross;|&cross;|
-| Vulkan Support       | _          |&cross;|&cross;|
-| Kompute Support      | _          |&cross;|&cross;|
-| Streaming Audio      | &cross;    |&cross;|&cross;|
+|-----------------------|------------|-------|---------|
+| Basic CPU Generation  | &check;    |&check;| &cross; |
+| Metal Acceleration    | &check;    | _     | _       |
+| CUDA support          | _          |&cross;| &cross; |
+| Quantization          | &check;_*_ |&cross;| &cross; |
+| Layer Offloading      | &cross;    |&cross;| &cross; |
+| Server Support        | &check;    |&check;| &cross; |
+| Vulkan Support        | _          |&cross;| &cross; |
+| Kompute Support       | _          |&cross;| &cross; |
+| Streaming Audio       | &cross;    |&cross;| &cross; |
 
  _*_ Currently only the generative model supports these.
 ### Installation
