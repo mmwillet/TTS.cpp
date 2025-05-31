@@ -466,8 +466,7 @@
         }
 
         // Start: Refresh Logic
-        async function refreshModels(event) {
-            event.preventDefault();
+        async function refreshModels() {
             refreshBtn.disabled = true;
             refreshIcon.classList.toggle('refreshing');
             const getURL = new URL("/v1/models", getBaseURL())
@@ -503,7 +502,7 @@
         }
 
         refreshBtn.addEventListener('click', refreshModels);
-        refreshModels(new Event('click'));
+        refreshModels();
         // End: Refresh Logic
 
         // Update slider values in real-time
