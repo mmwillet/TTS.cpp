@@ -475,6 +475,18 @@ int main(int argc, const char ** argv) {
     auto model_creation = std::chrono::duration_cast<std::chrono::seconds>(
                               std::chrono::system_clock::now().time_since_epoch())
                               .count();
+    const std::string default_model = model_map.begin()->first;
+    std::vector<json> models = {};
+    for (const auto &[id, _] : model_map) {
+      json model = {{"id", ""},
+                    {"object", "model"},
+                    {"created", 0},
+                    {"owned_by", "tts.cpp"}};
+      model["id"] = id;
+      model["created"] = model_creation;
+      models.push_back(model);
+    }
+    const json models_json = {{"object", "list"}, {"data", models}};
 
     std::atomic<server_state> state{LOADING};
 
@@ -567,7 +579,8 @@ int main(int argc, const char ** argv) {
         &res_error,
         &res_ok_audio,
         &default_generation_config,
-        &model_map
+        &model_map,
+        &default_model
     ](const httplib::Request &req, httplib::Response & res) {
         json data = json::parse(req.body);
         if (!data.contains("input") || !data.at("input").is_string()) {
@@ -638,7 +651,7 @@ int main(int argc, const char ** argv) {
             }
             task->model = data.at("model").get<std::string>();
         } else {
-            task->model = model_map.begin()->first;
+            task->model = default_model;
         }
 
         task->gen_config = conf;
@@ -702,20 +715,9 @@ int main(int argc, const char ** argv) {
         &args,
         &res_error,
         &res_ok_json,
-        &model_map,
-        &model_creation
+        &models_json
     ](const httplib::Request & _, httplib::Response & res) {
-        std::vector<json> models = {};
-        for (const auto &[id, _] : model_map) {
-          json model = {{"id", ""},
-                        {"object", "model"},
-                        {"created", 0},
-                        {"owned_by", "tts.cpp"}};
-          model["id"] = id;
-          model["created"] = model_creation;
-          models.push_back(model);
-        }
-        res_ok_json(res, {{"object", "list"}, {"data", models}});
+        res_ok_json(res, models_json);
     };
 
     // register API routes
