@@ -1120,7 +1120,7 @@ struct phonemizer * phonemizer_from_gguf(gguf_context * meta, const std::string 
 
     if ((phonemizer_type) ph_type == ESPEAK) {
 #ifdef ESPEAK_INSTALL
-    	espeak_Initialize(AUDIO_OUTPUT_SYNCHRONOUS, 0, ESPEAK_DATA_PATH, 0);
+    	espeak_wrapper::get_instance()->initialize(AUDIO_OUTPUT_SYNCHRONOUS, 0, ESPEAK_DATA_PATH, 0);
 
     	update_voice(espeak_voice_code);
 
@@ -1146,7 +1146,7 @@ struct phonemizer * phonemizer_from_gguf(gguf_context * meta, const std::string 
 
 struct phonemizer * espeak_phonemizer(bool use_espeak_phonemes, std::string espeak_voice_code) {
 #ifdef ESPEAK_INSTALL
-	espeak_Initialize(AUDIO_OUTPUT_SYNCHRONOUS, 0, ESPEAK_DATA_PATH, 0);
+	espeak_wrapper::get_instance()->initialize(AUDIO_OUTPUT_SYNCHRONOUS, 0, ESPEAK_DATA_PATH, 0);
 	
 	update_voice(espeak_voice_code);
 
