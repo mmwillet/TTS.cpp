@@ -1,6 +1,7 @@
 #include "httplib.h"
 #include "ggml.h"
 #include "util.h"
+#include <cstdio>
 #include <format>
 #include <string>
 #define JSON_ASSERT GGML_ASSERT
@@ -462,6 +463,10 @@ int main(int argc, const char ** argv) {
                 }
                 model_map[final_id] = entry.path().string();
             }
+        }
+        if (model_map.size() == 0) {
+            fprintf(stderr, "No model found in directory %s", model_path.c_str());
+            return 1;
         }
     } else {
         const std::filesystem::path path = model_path;

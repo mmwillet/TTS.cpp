@@ -501,16 +501,7 @@
                     modelSelect.remove(0)
                 }
 
-                if (models.length === 0) {
-                    /** @type{HTMLOptionElement} */
-                    const option = document.createElement('option');
-                    option.selected = true;
-                    option.disabled = true;
-                    option.textContent = "N/A";
-                    modelSelect.add(option);
-                    return;
-                }
-
+                // There should be atleast one model
                 for (const model of models) {
                     const option = document.createElement('option');
                     option.textContent = model.id;
