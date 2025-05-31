@@ -665,9 +665,8 @@ int main(int argc, const char ** argv) {
     svr->wait_until_ready();
     fprintf(stdout, "%s: HTTP server is listening, hostname: %s, port: %d, http threads: %d\n", __func__, args.get_string_param("--host").c_str(), *args.get_int_param("--port"), *args.get_int_param("--n-http-threads"));
 
-    // load the model
-    fprintf(stdout, "%s: loading model and initializing main loop\n", __func__);
 
+    pool = new worker_pool;
     shutdown_handler = [&](int) {
         // this should unblock the primary thread;
         terminate(pool);
@@ -688,11 +687,11 @@ int main(int argc, const char ** argv) {
     SetConsoleCtrlHandler(reinterpret_cast<PHANDLER_ROUTINE>(console_ctrl_handler), true);
 #endif
 
-    // It might make sense in the long run to have the primary thread run clean up on the response map and keep the model workers parallel.
-    pool = new worker_pool;
+    fprintf(stdout, "%s: loading model and initializing main loop\n", __func__);
+    // It might make sense in the long run to have the primary thread run clean up on the response map and keep the model workers parallel.    
     for (int i = *args.get_int_param("--n-parallelism"); i > 0; i--) {
         if (i == 1) {
-            fprintf(stdout, "%s: server is listening on http://%s:%d\n", __func__, args.get_string_param("--host").c_str(), *args.get_int_param("--port"));
+            fprintf(stdout, "%s: HTTP server is listening on http://%s:%d\n", __func__, args.get_string_param("--host").c_str(), *args.get_int_param("--port"));
             worker * w = new worker(tqueue, rmap, args.get_string_param("--text-encoder-path"), *args.get_int_param("--timeout"));
             state.store(READY);
             pool->push_back(w);
@@ -703,7 +702,7 @@ int main(int argc, const char ** argv) {
             pool->push_back(w);
         }
     }
-    fprintf(stdout, "HTTP server listening on hostname: %s and port: %d, is shutting down.\n", args.get_string_param("--host").c_str(), *args.get_int_param("--port"));
+    fprintf(stdout, "%s: HTTP server listening on hostname: %s and port: %d, is shutting down.\n", __func__, args.get_string_param("--host").c_str(), *args.get_int_param("--port"));
     svr->stop();
     t.join();
     rmap->cleanup_thread->join();
