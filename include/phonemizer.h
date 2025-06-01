@@ -320,10 +320,6 @@ public:
     const char * text_to_phonemes(const void ** textptr, int textmode, int phonememode);
     void initialize(espeak_AUDIO_OUTPUT output, int buflength, const char * path, int options);
 };
-
-// non-const static members must be initialized out of line
-espeak_wrapper* espeak_wrapper::instance{nullptr};
-std::mutex espeak_wrapper::mutex;
 #endif
 
 enum lookup_code {

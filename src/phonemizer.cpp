@@ -2,10 +2,15 @@
 
 #ifdef ESPEAK_INSTALL
 /**
- * espeak_wrapper functions
+ * espeak_wrapper functions and assignments
  * 
  * The espeak_wrapper is a singleton which wraps threaded calls to espeak-ng with a shared mutex
  */
+
+// non-const static members must be initialized out of line
+espeak_wrapper* espeak_wrapper::instance{nullptr};
+std::mutex espeak_wrapper::mutex;
+
 espeak_wrapper * espeak_wrapper::get_instance() {
 	if (!instance) {
 		instance = new espeak_wrapper;
