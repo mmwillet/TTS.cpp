@@ -14,6 +14,7 @@
 #include <unordered_set>
 #include "tokenizer.h"
 #include <algorithm>
+#include <mutex>
 
 static const std::string ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 static const std::string ACCENTED_A = "àãâäáåÀÃÂÄÁÅ";
@@ -288,6 +289,38 @@ static const std::map<std::string, std::string> CONTRACTION_PHONEMES = {
 
 // characters that Espeak-ng treats as stopping tokens.
 static std::string STOPPING_TOKENS = ".,:;!?";
+
+#ifdef ESPEAK_INSTALL
+/**
+ * espeak-ng uses globals to persist and manage its state so it is not compatible with 
+ * threaded parallelism (https://github.com/espeak-ng/espeak-ng/issues/1527).
+ * This singleton acts as a mutex wrapped provider for all espeak phonemization methods such
+ * that multiple instances of the kokoro_runner can be initialized and called in parallel.
+ */
+class espeak_wrapper {
+private:
+    static espeak_wrapper * instance;
+    static std::mutex mutex;
+
+protected:
+    espeak_wrapper() {};
+    ~espeak_wrapper() {};
+    bool espeak_initialized = false;
+
+public:
+	// singletons aren't copyable
+    espeak_wrapper(espeak_wrapper &other) = delete;
+
+    // singletons aren't assignable
+    void operator=(const espeak_wrapper &) = delete;
+
+    static espeak_wrapper * get_instance();
+    const espeak_VOICE ** list_voices();
+    espeak_ERROR set_voice(const char * voice_code);
+    const char * text_to_phonemes(const void ** textptr, int textmode, int phonememode);
+    void initialize(espeak_AUDIO_OUTPUT output, int buflength, const char * path, int options);
+};
+#endif
 
 enum lookup_code {
 	SUCCESS = 100,
