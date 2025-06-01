@@ -364,11 +364,6 @@ inline void signal_handler(int signal) {
     shutdown_handler(signal);
 }
 
-std::string format_model_id(std::filesystem::path path) {
-    std::string stem = path.stem();
-    return stem;
-}
-
 int main(int argc, const char ** argv) {
     int default_n_threads = std::max((int)std::thread::hardware_concurrency(), 1);
     int default_http_threads = std::max((int)std::thread::hardware_concurrency() - 1, 3);
@@ -451,7 +446,7 @@ int main(int argc, const char ** argv) {
     if (std::filesystem::is_directory(model_path)) {
         for (auto const &entry : std::filesystem::directory_iterator(model_path)) {
             if (!entry.is_directory()) {
-                const std::string id = format_model_id(entry.path());
+                const std::string id = entry.path().stem();
                 model_map[id] = entry.path().string();
             }
         }
@@ -461,7 +456,7 @@ int main(int argc, const char ** argv) {
         }
     } else {
         const std::filesystem::path path = model_path;
-        model_map[format_model_id(path)] = path;
+        model_map[path.stem()] = path;
     }
     auto model_creation = std::chrono::duration_cast<std::chrono::seconds>(
                               std::chrono::system_clock::now().time_since_epoch())
