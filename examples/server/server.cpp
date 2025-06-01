@@ -445,7 +445,7 @@ int main(int argc, const char ** argv) {
     const std::string model_path = args.get_string_param("--model-path");
     if (std::filesystem::is_directory(model_path)) {
         for (auto const &entry : std::filesystem::directory_iterator(model_path)) {
-            if (!entry.is_directory()) {
+            if (!entry.is_directory() && entry.path().extension() == ".gguf") {
                 const std::string id = entry.path().stem();
                 model_map[id] = entry.path().string();
             }
