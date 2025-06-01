@@ -22,6 +22,7 @@ struct quantization_params {
     bool quantize_text_embeddings = false;
     bool quantize_cross_attn_kv = false;
     bool convert_dac_to_f16 = false;
+    bool convert_non_quantizable_to_f16 = false;
 };
 
 void quantize_gguf(const std::string & ifile, const std::string & ofile, struct quantization_params * params);

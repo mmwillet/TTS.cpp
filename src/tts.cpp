@@ -141,6 +141,32 @@ void update_conditional_prompt(tts_runner * runner, const std::string file_path,
     ((parler_tts_runner*)runner)->update_conditional_prompt(file_path, prompt, n_threads, cpu_only);
 }
 
+bool kokoro_is_f16_compatible(std::string name) {
+    return name.find("voice_tensors") == std::string::npos && 
+           name.find("bias") == std::string::npos &&
+           name.find("gamma") == std::string::npos &&
+           name.find("beta") == std::string::npos &&
+           name.find("alpha") == std::string::npos &&
+           !has_suffix(name, "embd") &&
+           !has_suffix(name, "norm");
+}
+
+bool kokoro_is_quantizable(std::string name, struct quantization_params * params) {
+    if (kokoro_is_f16_compatible(name)) {
+        if (has_prefix(name, "kokoro.albert") || has_prefix(name, "kokoro.text_encoder.lstm")) {
+            return true;
+        } else if (has_prefix(name, "kokoro.duration_predictor.")) {
+            std::vector<std::string> parts = split(name, ".");
+            for (std::string part : DURATION_PREDICTOR_QUANTIZATION_COMPATIBLE_PARTS) {
+                if (part == parts[2]) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
 bool dia_is_quantizable(std::string name, struct quantization_params * params) {
     // The DAC audio encoder / decoder is not compatible with quantization and normalization tensors should not be quantized.
     bool quantizable = !has_prefix(name, "audio_encoder") && !has_suffix(name, "norm");
@@ -165,12 +191,14 @@ bool parler_is_quanitizable(std::string name, struct quantization_params * param
     return quantizable;
 }
 
-bool is_quanitizable(tts_arch arch, std::string name, struct quantization_params * params) {
+bool is_quantizable(tts_arch arch, std::string name, struct quantization_params * params) {
     switch(arch) {
         case PARLER_TTS_ARCH:
             return parler_is_quanitizable(name, params);
         case DIA_ARCH:
             return dia_is_quantizable(name, params);
+        case KOKORO_ARCH:
+            return kokoro_is_quantizable(name, params);
         default:
             TTS_ABORT("%s failed. The architecture '%d' is not supported.", __func__, arch);
     }
@@ -275,15 +303,10 @@ void quantize_gguf(const std::string & ifile, const std::string & ofile, struct 
         arch = std::string(gguf_get_val_str(meta_ctx, arch_key));
     }
     tts_arch arch_type = SUPPORTED_ARCHITECTURES.at(arch);
-    switch (arch_type) {
-        case KOKORO_ARCH:
-            TTS_ABORT("ERROR: quantization for arch '%s' is not currently support\n", arch.c_str());
-        default:
-            if (params->quantize_type != GGML_TYPE_Q5_0 && params->quantize_type != GGML_TYPE_Q8_0 && params->quantize_type != GGML_TYPE_F16) {
-                fprintf(stdout, "Warning, %s is untested for quantization type '%d'. Use at your own risk.\n", arch.c_str(), params->quantize_type);
-            }
-    }
 
+    if (params->quantize_type != GGML_TYPE_Q5_0 && params->quantize_type != GGML_TYPE_Q8_0 && params->quantize_type != GGML_TYPE_F16 && params->quantize_type != GGML_TYPE_Q4_0) {
+        fprintf(stdout, "Warning, %s is untested for quantization type '%d'. Use at your own risk.\n", arch.c_str(), params->quantize_type);
+    }
 
     const size_t align = GGUF_DEFAULT_ALIGNMENT;
     gguf_context_ptr ctx_out { gguf_init_empty() };
@@ -331,7 +354,7 @@ void quantize_gguf(const std::string & ifile, const std::string & ofile, struct 
             continue;
         }
 
-        if (is_quanitizable(arch_type, name, params)) {
+        if (is_quantizable(arch_type, name, params)) {
             if ((cur->type) != GGML_TYPE_F32) {
                 TTS_ABORT("ERROR: All quantized tensors must be transformed from 32bit floats. Tensor, '%s', has impropert type, '%d'\n", cur->name, cur->type);
             }
@@ -345,7 +368,7 @@ void quantize_gguf(const std::string & ifile, const std::string & ofile, struct 
             }
             new_data = work.data();
             new_size = quantize_tensor(new_data, cur, nullptr, new_type, params->n_threads);
-        } else if (params->convert_dac_to_f16 && has_prefix(name, "audio_encoder") && !has_suffix(name, "alpha") && !has_suffix(name, "bias")) {
+        } else if ((params->convert_non_quantizable_to_f16 && kokoro_is_f16_compatible(name)) || (params->convert_dac_to_f16 && has_prefix(name, "audio_encoder") && !has_suffix(name, "alpha"))) {
             if ((cur->type) != GGML_TYPE_F32) {
                 TTS_ABORT("ERROR: All converted tensors must be transformed from 32bit floats. Tensor, '%s', has impropert type, '%d'\n", cur->name, cur->type);
             }
