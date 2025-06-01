@@ -666,7 +666,15 @@ int main(int argc, const char ** argv) {
         res_ok_audio(res, audio, mime_type);
     };
 
-    const auto handle_conditional = [&args, &tqueue, &rmap, &res_error, &res_ok_json](const httplib::Request & req, httplib::Response & res) {
+    const auto handle_conditional = [
+        &args,
+        &tqueue,
+        &rmap,
+        &res_error,
+        &res_ok_json,
+        &model_map,
+        &default_model
+    ](const httplib::Request & req, httplib::Response & res) {
         if (args.get_string_param("--text-encoder-path").size() == 0) {
             json formatted_error = format_error_response("A '--text-encoder-path' must be specified for conditional generation.", ERROR_TYPE_NOT_SUPPORTED);
             res_error(res, formatted_error);
@@ -685,6 +693,20 @@ int main(int argc, const char ** argv) {
         }
         std::string prompt = data.at("input").get<std::string>();
         struct simple_text_prompt_task * task = new simple_text_prompt_task(CONDITIONAL_PROMPT, prompt);
+
+        if (data.contains("model") && data.at("model").is_string()) {
+            const std::string model = data.at("model");
+            if (!model_map.contains(model)) {
+                const std::string message = std::format("Invalid Model: {0}", model);
+                json formatted_error = format_error_response(message, ERROR_TYPE_INVALID_REQUEST);
+                res_error(res, formatted_error);
+                return;
+            }
+            task->model = data.at("model").get<std::string>();
+        } else {
+            task->model = default_model;
+        }
+
         int id = task->id;
         tqueue->push(task);
         struct simple_text_prompt_task * rtask = rmap->get(id);
