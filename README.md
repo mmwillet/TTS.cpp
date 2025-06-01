@@ -18,7 +18,7 @@ In this endeavor, MacOS and metal support will be treated as the primary platfor
 |--------------------------------------------------------------------------|-------|-------|-------|--------------------------------------------------------|
 | [Parler TTS Mini](https://huggingface.co/parler-tts/parler-tts-mini-v1)  |&check;|&check;|&check;|[here](https://huggingface.co/mmwillet2/Parler_TTS_GGUF)|
 | [Parler TTS Large](https://huggingface.co/parler-tts/parler-tts-large-v1)|&check;|&check;|&check;|[here](https://huggingface.co/mmwillet2/Parler_TTS_GGUF)|
-| [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M)                      |&check;|&cross;|&cross;|[here](https://huggingface.co/mmwillet2/Kokoro_GGUF)    |
+| [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M)                      |&check;|&cross;|&check;|[here](https://huggingface.co/mmwillet2/Kokoro_GGUF)    |
 | [Dia](https://github.com/nari-labs/dia)                                  |&check;|&check;|&check;|[here](https://huggingface.co/mmwillet2/Dia_GGUF)       |
 
 Additional Model support will initially be added based on open source model performance in the [TTS model arena](https://huggingface.co/spaces/TTS-AGI/TTS-Arena) and the availability of said models' architectures and checkpoints.
@@ -56,7 +56,7 @@ Additional Model support will initially be added based on open source model perf
 The local GGML library includes several required patches to the main branch of GGML (making the current TTS ggml branch out of date with modern GGML). Specifically these patches include major modifications to the convolutional transposition operation as well as several new GGML operations which have been implemented for TTS specific purposes; these include `ggml_reciprocal`, `ggml_round`, `ggml_mod`, `ggml_cumsum`, STFT, and iSTFT operations.
 
 We are currently [working on upstreaming some of these operations inorder to deprecate this patch requirement going forward](https://github.com/mmwillet/TTS.cpp/issues/66).
-  
+
 #### Build:
 
 Assuming that the above requirements are met the library and basic CLI example can be built by running the following command in the repository's base directory:

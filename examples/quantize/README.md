@@ -96,7 +96,7 @@ The following approaches were experimented with:
   
 #### Performance Observations
 
-A clear improvement in tokens per second via the generative model is observed with quantization. Seen below with Q5_0 quantization, the model is now capable of completing its generation in real time (it generates tokens faster than it takes to listen to them), and the model's TPS has improved from ~693 to ~986.
+A clear improvement in tokens per second via the generative model is observed with quantization. Seen below Parler TTS mini with Q5_0 quantization, the model is capable of completing its generation in real time (it generates tokens faster than it takes to listen to them), and the model's TPS has improved from ~693 to ~986.
 
 ```
 Mean Stats:
