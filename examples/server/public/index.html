@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -54,7 +55,88 @@
             font-size: 0.875rem;
         }
 
-        textarea, input[type="text"] {
+        .model-selection-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        select {
+            appearance: base-select;
+            flex-grow: 1;
+            box-sizing: border-box;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            background: none;
+            font-family: inherit;
+            font-size: 0.875rem;
+            transition:
+                border-color 0.2s,
+                box-shadow 0.2s;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+
+        ::picker(select) {
+            appearance: base-select;
+            flex-grow: 1;
+            box-sizing: border-box;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 0.875rem;
+            transition:
+                border-color 0.2s,
+                box-shadow 0.2s;
+        }
+
+        .refresh-btn {
+            padding-right: 9.5px;
+            padding-left: 9.5px;
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.2s;
+            flex-basis: auto;
+        }
+
+        .refresh-btn:disabled {
+            background-color: #93c5fd;
+            cursor: not-allowed;
+        }
+
+        .refresh-icon {
+            width: 20px;
+            height: 20px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2px;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            transition: transform 0.2s;
+        }
+
+        .refresh-icon:hover {
+            transform: rotate(90deg);
+        }
+
+        .refresh-icon.refreshing {
+            animation: spin 1s linear infinite;
+        }
+
+        textarea,
+        input[type="text"] {
             box-sizing: border-box;
             width: 100%;
             padding: 10px;
@@ -65,7 +147,8 @@
             transition: border-color 0.2s, box-shadow 0.2s;
         }
 
-        textarea:focus, input[type="text"]:focus {
+        textarea:focus,
+        input[type="text"]:focus {
             outline: none;
             border-color: #3b82f6;
             box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
@@ -189,8 +272,13 @@
         }
 
         @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         .error-message {
@@ -227,19 +315,39 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="header">
             <h1>TTS.cpp Server API</h1>
         </div>
-        
+
         <div class="content">
             <form id="tts-form">
+                <!-- Model Selection -->
+                <div class="form-group">
+                    <label for="model-select">Model</label>
+                    <div class="model-selection-group">
+                        <select id="model-select">
+                            <option value="" disabled selected>Loading models...</option>
+                        </select>
+                        <button type="button" id="refresh-btn" class="refresh-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="refresh-icon"
+                                class="refresh-icon">
+                                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                                <path d="M21 3v5h-5" />
+                                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                                <path d="M8 16H3v5" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label for="text-input">Text to convert</label>
                     <textarea id="text-input" placeholder="Enter text to convert to speech..."></textarea>
                 </div>
-                
+
                 <div class="form-group">
                     <button type="button" id="advanced-toggle" class="toggle-button">
                         <span>Advanced Parameters</span>
@@ -247,7 +355,7 @@
                             <polyline points="6 9 12 15 18 9"></polyline>
                         </svg>
                     </button>
-                    
+
                     <div id="advanced-parameters" class="advanced-params">
                         <div class="form-group">
                             <label for="base-url">Base URL</label>
@@ -260,17 +368,18 @@
                             <input type="text" id="api-key" placeholder="MY_API_KEY">
                             <p class="hint">API key for authentication (does nothing for now)</p>
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="temperature">
                                 Temperature: <span id="temperature-value" class="slider-value">1</span>
                             </label>
                             <div class="slider-container">
-                                <input type="range" id="temperature" min="0" max="1" step="0.01" value="1.0" class="slider">
+                                <input type="range" id="temperature" min="0" max="1" step="0.01" value="1.0"
+                                    class="slider">
                             </div>
                             <p class="hint">Controls randomness (lower = more predictable)</p>
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="top_k">
                                 Top K: <span id="top_k-value" class="slider-value">50</span>
@@ -278,32 +387,37 @@
                             <div class="slider-container">
                                 <input type="range" id="top_k" min="1" max="100" step="1" value="50" class="slider">
                             </div>
-                            <p class="hint">By limiting the number of tokens to consider, tokens with very low probabilities are eliminated making the output more focused and coherent.</p>
+                            <p class="hint">By limiting the number of tokens to consider, tokens with very low
+                                probabilities are eliminated making the output more focused and coherent.</p>
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="repetition_penalty">
                                 Repetition Penalty: <span id="repetition_penalty-value" class="slider-value">1</span>
                             </label>
                             <div class="slider-container">
-                                <input type="range" id="repetition_penalty" min="1" max="2" step="0.01" value="1.0" class="slider">
+                                <input type="range" id="repetition_penalty" min="1" max="2" step="0.01" value="1.0"
+                                    class="slider">
                             </div>
                             <p class="hint">Penalty for repeated tokens (higher = less repetition)</p>
                         </div>
                     </div>
                 </div>
-                
+
                 <button type="submit" id="submit-btn" class="submit-btn">
-                    <svg id="loading-spinner" class="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+                    <svg id="loading-spinner" class="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" style="display: none;">
                         <circle cx="12" cy="12" r="10" stroke-opacity="0.25" stroke-width="4"></circle>
-                        <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" fill="currentColor"></path>
+                        <path
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            fill="currentColor"></path>
                     </svg>
                     <span id="btn-text">Convert to Speech</span>
                 </button>
-                
+
                 <div id="error-msg" class="error-message" role="alert" aria-live="assertive"></div>
             </form>
-            
+
             <div id="audio-container" class="audio-container">
                 <audio controls id="audio-player" autoplay></audio>
             </div>
@@ -312,7 +426,15 @@
 
     <script>
         const API_URL = '/v1/audio/speech';
+
+        // Refresh variables
+        const refreshBtn = document.getElementById('refresh-btn');
+        const refreshIcon = document.getElementById('refresh-icon');
+
+        // Form variables
         const form = document.getElementById('tts-form');
+        /** @type{HTMLSelectElement} */
+        const modelSelect = document.getElementById('model-select');
         const textInput = document.getElementById('text-input');
         const submitBtn = document.getElementById('submit-btn');
         const btnText = document.getElementById('btn-text');
@@ -323,7 +445,7 @@
         const advancedToggle = document.getElementById('advanced-toggle');
         const advancedIcon = document.getElementById('advanced-icon');
         const advancedParams = document.getElementById('advanced-parameters');
-        
+
         // Advanced parameters
         const baseUrl = document.getElementById('base-url');
         const apiKey = document.getElementById('api-key');
@@ -333,36 +455,85 @@
         const top_kValue = document.getElementById('top_k-value');
         const repetition_penalty = document.getElementById('repetition_penalty');
         const repetition_penaltyValue = document.getElementById('repetition_penalty-value');
-        
+
+        // Base URL
+        function getBaseURL() {
+            let base = baseUrl.value.trim();
+            if (base === "") {
+                base = document.location.href;
+            }
+            return base;
+        }
+
+        // Start: Refresh Logic
+        async function refreshModels() {
+            refreshBtn.disabled = true;
+            refreshIcon.classList.toggle('refreshing');
+            const getURL = new URL("/v1/models", getBaseURL())
+            const auth = apiKey.value ? `Bearer ${apiKey.value}` : undefined;
+
+            try {
+                const response = await fetch(getURL, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': auth,
+                    },
+                });
+
+                const models = (await response.json()).data;
+                for (let i = 0; i <= modelSelect.options.length; i++) {
+                    modelSelect.remove(0)
+                }
+
+                // There should be atleast one model
+                for (const model of models) {
+                    const option = document.createElement('option');
+                    option.textContent = model.id;
+                    option.value = model.id;
+                    modelSelect.add(option);
+                }
+            } catch (err) {
+                console.error('Error fetching models:', err);
+                showError(err.toString());
+            } finally {
+                refreshIcon.classList.toggle('refreshing');
+                refreshBtn.disabled = false;
+            }
+        }
+
+        refreshBtn.addEventListener('click', refreshModels);
+        refreshModels();
+        // End: Refresh Logic
+
         // Update slider values in real-time
         temperature.addEventListener('input', () => {
             temperatureValue.textContent = temperature.value;
         });
-        
+
         top_k.addEventListener('input', () => {
             top_kValue.textContent = top_k.value;
         });
-        
+
         repetition_penalty.addEventListener('input', () => {
             repetition_penaltyValue.textContent = repetition_penalty.value;
         });
-        
+
         // Toggle advanced parameters
         advancedToggle.addEventListener('click', () => {
             advancedParams.classList.toggle('visible');
             advancedIcon.classList.toggle('rotated');
         });
-        
+
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const text = textInput.value.trim();
-            
+
             if (!text) {
                 showError('Please enter some text to convert.');
                 audioContainer.style.display = 'none';
                 return;
             }
-            
+
             clearError();
             submitBtn.disabled = true;
             btnText.textContent = 'Generating...';
@@ -376,17 +547,14 @@
                     response_format: 'wav',
                     temperature: parseFloat(temperature.value),
                     top_k: parseInt(top_k.value),
-                    repetition_penalty: parseFloat(repetition_penalty.value)
+                    repetition_penalty: parseFloat(repetition_penalty.value),
+                    model: modelSelect.value
                 };
-                
-                let base = baseUrl.value.trim();
-                if (base === "") {
-                    base = document.location.href;
-                }
-                const postURL = new URL(API_URL, base)
 
-                const auth = apiKey.value ?  `Bearer ${apiKey.value}` : undefined;
-                
+                const postURL = new URL(API_URL, getBaseURL())
+
+                const auth = apiKey.value ? `Bearer ${apiKey.value}` : undefined;
+
                 const response = await fetch(postURL, {
                     method: 'POST',
                     headers: {
@@ -425,16 +593,17 @@
                 loadingSpinner.style.display = 'none';
             }
         });
-        
+
         function showError(message) {
             errorText.textContent = message;
             errorText.style.display = 'block';
         }
-        
+
         function clearError() {
             errorText.textContent = '';
             errorText.style.display = 'none';
         }
     </script>
 </body>
+
 </html>

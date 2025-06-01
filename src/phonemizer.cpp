@@ -1,6 +1,48 @@
 #include "phonemizer.h"
 
-/*
+#ifdef ESPEAK_INSTALL
+/**
+ * espeak_wrapper functions and assignments
+ * 
+ * The espeak_wrapper is a singleton which wraps threaded calls to espeak-ng with a shared mutex
+ */
+
+// non-const static members must be initialized out of line
+espeak_wrapper* espeak_wrapper::instance{nullptr};
+std::mutex espeak_wrapper::mutex;
+
+espeak_wrapper * espeak_wrapper::get_instance() {
+	if (!instance) {
+		instance = new espeak_wrapper;
+	}
+	return instance;
+}
+
+const espeak_VOICE ** espeak_wrapper::list_voices() {
+	std::lock_guard<std::mutex> lock(mutex);
+	return espeak_ListVoices(nullptr);
+}
+
+espeak_ERROR espeak_wrapper::set_voice(const char * voice_code) {
+	std::lock_guard<std::mutex> lock(mutex);
+	return espeak_SetVoiceByName(voice_code);
+}
+
+const char * espeak_wrapper::text_to_phonemes(const void ** textptr, int textmode, int phonememode) {
+	std::lock_guard<std::mutex> lock(mutex);
+	return espeak_TextToPhonemes(textptr, textmode, phonememode);
+}
+
+void espeak_wrapper::initialize(espeak_AUDIO_OUTPUT output, int buflength, const char * path, int options) {
+	std::lock_guard<std::mutex> lock(mutex);
+	if (!espeak_initialized) {
+		espeak_initialized = true;
+		espeak_Initialize(output, buflength, path, options);
+	}
+}
+#endif
+
+/**
  * Helper functions for string parsing
  */
 const std::unordered_set<std::string> inline_combine_sets(const std::vector<std::unordered_set<std::string>> sets) {
@@ -131,7 +173,7 @@ std::string parse_voice_code(std::string voice_code) {
 	if (search_by_id || search_by_lcc) {
 		voice_code = replace(voice_code, '_', '-');
 	}
-	const espeak_VOICE** espeak_voices = espeak_ListVoices(nullptr);
+	const espeak_VOICE** espeak_voices = espeak_wrapper::get_instance()->list_voices();
 	// ideally we'd use the espeak voice scores which order voices by preference, but they are only returned when a voice_spec is passed to the list api and
 	// the voice spec isn't compatible with partials (e.g. country codes, language family code, etc) 
 	int i = 0;
@@ -194,10 +236,10 @@ std::string parse_voice_code(std::string voice_code) {
 
 void update_voice(std::string voice_code) {
 #ifdef ESPEAK_INSTALL
-	espeak_ERROR e = espeak_SetVoiceByName(voice_code.c_str());
+	espeak_ERROR e = espeak_wrapper::get_instance()->set_voice(voice_code.c_str());
    	if (e != EE_OK) {
    		voice_code = parse_voice_code(voice_code);
-   		espeak_SetVoiceByName(voice_code.c_str());
+   		espeak_wrapper::get_instance()->set_voice(voice_code.c_str());
     }
 #else
     TTS_ABORT("Attempted to set voice without espeak-ng installed.");
@@ -951,7 +993,7 @@ bool phonemizer::route(corpus * text, std::string* output, conditions * flags) {
 std::string phonemizer::espeak_text_to_phonemes(const char * text) {
 	int mode = phoneme_mode == IPA ? (0 << 8 | 0x02) : (0 << 8 | 0x01);
 	const void ** txt_ptr = (const void**)&text;
-	const char * resp = espeak_TextToPhonemes(txt_ptr, espeakCHARS_UTF8, mode);
+	const char * resp = espeak_wrapper::get_instance()->text_to_phonemes(txt_ptr, espeakCHARS_UTF8, mode);
 	return strip(std::string(resp));
 }
 #endif
@@ -1083,7 +1125,7 @@ struct phonemizer * phonemizer_from_gguf(gguf_context * meta, const std::string 
 
     if ((phonemizer_type) ph_type == ESPEAK) {
 #ifdef ESPEAK_INSTALL
-    	espeak_Initialize(AUDIO_OUTPUT_SYNCHRONOUS, 0, ESPEAK_DATA_PATH, 0);
+    	espeak_wrapper::get_instance()->initialize(AUDIO_OUTPUT_SYNCHRONOUS, 0, ESPEAK_DATA_PATH, 0);
 
     	update_voice(espeak_voice_code);
 
@@ -1109,7 +1151,7 @@ struct phonemizer * phonemizer_from_gguf(gguf_context * meta, const std::string 
 
 struct phonemizer * espeak_phonemizer(bool use_espeak_phonemes, std::string espeak_voice_code) {
 #ifdef ESPEAK_INSTALL
-	espeak_Initialize(AUDIO_OUTPUT_SYNCHRONOUS, 0, ESPEAK_DATA_PATH, 0);
+	espeak_wrapper::get_instance()->initialize(AUDIO_OUTPUT_SYNCHRONOUS, 0, ESPEAK_DATA_PATH, 0);
 	
 	update_voice(espeak_voice_code);
 

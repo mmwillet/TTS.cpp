@@ -1,5 +1,9 @@
 #include "httplib.h"
 #include "ggml.h"
+#include "util.h"
+#include <cstdio>
+#include <format>
+#include <string>
 #define JSON_ASSERT GGML_ASSERT
 #include "json.hpp"
 // mime type for sending response
@@ -18,6 +22,7 @@
 #include <signal.h>
 #include <thread>
 #include <unordered_map>
+#include <filesystem>
 #include <unordered_set>
 #include <chrono>
 #include "tts.h"
@@ -106,6 +111,7 @@ struct simple_text_prompt_task {
     std::string message;
     std::chrono::time_point<std::chrono::steady_clock> time;
     float sample_rate = 44100.0f;
+    std::string model;
 
     bool timed_out(int t) {
         auto now = std::chrono::steady_clock::now();
@@ -216,12 +222,14 @@ void init_response_map(simple_response_map * rmap) {
 struct worker {
     worker(struct simple_task_queue * task_queue, struct simple_response_map * response_map, std::string text_encoder_path = "", int task_timeout = 300): task_queue(task_queue), response_map(response_map), text_encoder_path(text_encoder_path), task_timeout(task_timeout) {};
     ~worker() {
-        delete runner;
+        for (auto &[_, runner]: runners) {
+            delete runner;
+        }
     }
     struct simple_task_queue * task_queue;
     struct simple_response_map * response_map;
 
-    struct tts_runner * runner = nullptr;
+    std::unordered_map<std::string, struct tts_runner *> runners;
     std::string text_encoder_path;
     std::atomic<bool> running = true;
     std::thread * thread = nullptr;
@@ -247,6 +255,7 @@ struct worker {
         }
         int outcome;
         tts_response * data = nullptr;
+        tts_runner* runner = runners[task->model];
         switch(task->task) {
             case TTS:
                 data = new tts_response;
@@ -271,8 +280,10 @@ struct worker {
     }
 };
 
-void init_worker(std::string model_path, int n_threads, bool cpu_only, generation_configuration * config, worker * w) {
-    w->runner = runner_from_file(model_path, n_threads, config, cpu_only);
+void init_worker(std::unordered_map<std::string, std::string>* model_path, int n_threads, bool cpu_only, generation_configuration * config, worker * w) {
+    for (const auto &[id, path] : *model_path) {
+        w->runners[id] = runner_from_file(path, n_threads, config, cpu_only);
+    }
     w->loop();
 }
 
@@ -372,7 +383,7 @@ int main(int argc, const char ** argv) {
     args.add_argument(float_arg("--temperature", "(OPTIONAL) The temperature to use when generating outputs. Defaults to 1.0.", "-t", false, &default_temperature));
     args.add_argument(int_arg("--topk", "(OPTIONAL) when set to an integer value greater than 0 generation uses nucleus sampling over topk nucleaus size. Defaults to 50.", "-tk", false, &default_top_k));
     args.add_argument(float_arg("--repetition-penalty", "The by channel repetition penalty to be applied the sampled output of the model. defaults to 1.0.", "-r", false, &default_repetition_penalty));
-    args.add_argument(string_arg("--model-path", "(REQUIRED) The local path of the gguf model file for Parler TTS mini or large v1, Dia, or Kokoro.", "-mp", true));
+    args.add_argument(string_arg("--model-path", "(REQUIRED) The local path of the gguf model file or a directory containing only gguf model files for Parler TTS mini or large v1, Dia, or Kokoro.", "-mp", true));
     args.add_argument(int_arg("--n-threads", "The number of cpu threads to run generation with. Defaults to hardware concurrency.", "-nt", false, &default_n_threads));
     args.add_argument(bool_arg("--use-metal", "(OPTIONAL) Whether to use metal acceleration", "-m"));
     args.add_argument(bool_arg("--no-cross-attn", "(OPTIONAL) Whether to not include cross attention", "-ca"));
@@ -432,6 +443,39 @@ int main(int argc, const char ** argv) {
     }
     svr.reset(new httplib::Server());
 #endif
+
+    std::unordered_map<std::string, std::string> model_map = {};
+    const std::string model_path = args.get_string_param("--model-path");
+    if (std::filesystem::is_directory(model_path)) {
+        for (auto const &entry : std::filesystem::directory_iterator(model_path)) {
+            if (!entry.is_directory() && entry.path().extension() == ".gguf") {
+                const std::string id = entry.path().stem();
+                model_map[id] = entry.path().string();
+            }
+        }
+        if (model_map.size() == 0) {
+            fprintf(stderr, "No model found in directory %s", model_path.c_str());
+            return 1;
+        }
+    } else {
+        const std::filesystem::path path = model_path;
+        model_map[path.stem()] = path;
+    }
+    auto model_creation = std::chrono::duration_cast<std::chrono::seconds>(
+                              std::chrono::system_clock::now().time_since_epoch())
+                              .count();
+    const std::string default_model = model_map.begin()->first;
+    std::vector<json> models = {};
+    for (const auto &[id, _] : model_map) {
+      json model = {{"id", ""},
+                    {"object", "model"},
+                    {"created", 0},
+                    {"owned_by", "tts.cpp"}};
+      model["id"] = id;
+      model["created"] = model_creation;
+      models.push_back(model);
+    }
+    const json models_json = {{"object", "list"}, {"data", models}};
 
     std::atomic<server_state> state{LOADING};
 
@@ -518,7 +562,15 @@ int main(int argc, const char ** argv) {
         res_ok_json(res, health);
     };
 
-    const auto handle_tts = [&tqueue, &rmap, &res_error, &res_ok_audio, &default_generation_config](const httplib::Request &req, httplib::Response & res) {
+    const auto handle_tts = [
+        &tqueue,
+        &rmap,
+        &res_error,
+        &res_ok_audio,
+        &default_generation_config,
+        &model_map,
+        &default_model
+    ](const httplib::Request &req, httplib::Response & res) {
         json data = json::parse(req.body);
         if (!data.contains("input") || !data.at("input").is_string()) {
             json formatted_error = format_error_response("the 'input' field is required for tts generation and must be passed as a string.", ERROR_TYPE_INVALID_REQUEST);
@@ -578,6 +630,19 @@ int main(int argc, const char ** argv) {
             conf->voice = data.at("voice").get<std::string>();
         }
 
+        if (data.contains("model") && data.at("model").is_string()) {
+            const std::string model = data.at("model");
+            if (!model_map.contains(model)) {
+                const std::string message = std::format("Invalid Model: {0}", model);
+                json formatted_error = format_error_response(message, ERROR_TYPE_INVALID_REQUEST);
+                res_error(res, formatted_error);
+                return;
+            }
+            task->model = data.at("model").get<std::string>();
+        } else {
+            task->model = default_model;
+        }
+
         task->gen_config = conf;
         tqueue->push(task);
         struct simple_text_prompt_task * rtask = rmap->get(id);
@@ -604,7 +669,15 @@ int main(int argc, const char ** argv) {
         res_ok_audio(res, audio, mime_type);
     };
 
-    const auto handle_conditional = [&args, &tqueue, &rmap, &res_error, &res_ok_json](const httplib::Request & req, httplib::Response & res) {
+    const auto handle_conditional = [
+        &args,
+        &tqueue,
+        &rmap,
+        &res_error,
+        &res_ok_json,
+        &model_map,
+        &default_model
+    ](const httplib::Request & req, httplib::Response & res) {
         if (args.get_string_param("--text-encoder-path").size() == 0) {
             json formatted_error = format_error_response("A '--text-encoder-path' must be specified for conditional generation.", ERROR_TYPE_NOT_SUPPORTED);
             res_error(res, formatted_error);
@@ -623,6 +696,20 @@ int main(int argc, const char ** argv) {
         }
         std::string prompt = data.at("input").get<std::string>();
         struct simple_text_prompt_task * task = new simple_text_prompt_task(CONDITIONAL_PROMPT, prompt);
+
+        if (data.contains("model") && data.at("model").is_string()) {
+            const std::string model = data.at("model");
+            if (!model_map.contains(model)) {
+                const std::string message = std::format("Invalid Model: {0}", model);
+                json formatted_error = format_error_response(message, ERROR_TYPE_INVALID_REQUEST);
+                res_error(res, formatted_error);
+                return;
+            }
+            task->model = data.at("model").get<std::string>();
+        } else {
+            task->model = default_model;
+        }
+
         int id = task->id;
         tqueue->push(task);
         struct simple_text_prompt_task * rtask = rmap->get(id);
@@ -635,11 +722,21 @@ int main(int argc, const char ** argv) {
         res_ok_json(res, health);
     };
 
+    const auto handle_models = [
+        &args,
+        &res_error,
+        &res_ok_json,
+        &models_json
+    ](const httplib::Request & _, httplib::Response & res) {
+        res_ok_json(res, models_json);
+    };
+
     // register API routes
     svr->Get("/", handle_index);
     svr->Get("/health", handle_health);
     svr->Post("/v1/audio/speech", handle_tts);
     svr->Post("/v1/audio/conditional-prompt", handle_conditional);
+    svr->Get("/v1/models", handle_models);
 
     // Start the server
     svr->new_task_queue = [&args] { 
@@ -694,14 +791,14 @@ int main(int argc, const char ** argv) {
     // It might make sense in the long run to have the primary thread run clean up on the response map and keep the model workers parallel.    
     for (int i = *args.get_int_param("--n-parallelism"); i > 0; i--) {
         if (i == 1) {
-            fprintf(stdout, "%s: HTTP server is listening on http://%s:%d\n", __func__, args.get_string_param("--host").c_str(), *args.get_int_param("--port"));
+            fprintf(stdout, "%s: server is listening on http://%s:%d\n", __func__, args.get_string_param("--host").c_str(), *args.get_int_param("--port"));
             worker * w = new worker(tqueue, rmap, args.get_string_param("--text-encoder-path"), *args.get_int_param("--timeout"));
             state.store(READY);
             pool->push_back(w);
-            init_worker(args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), !args.get_bool_param("--use-metal"), default_generation_config, w);
+            init_worker(&model_map, *args.get_int_param("--n-threads"), !args.get_bool_param("--use-metal"), default_generation_config, w);
         } else {
             worker * w = new worker(tqueue, rmap, args.get_string_param("--text-encoder-path"), *args.get_int_param("--timeout"));
-            w->thread = new std::thread(init_worker, args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), !args.get_bool_param("--use-metal"), default_generation_config, w);
+            w->thread = new std::thread(init_worker, &model_map, *args.get_int_param("--n-threads"), !args.get_bool_param("--use-metal"), default_generation_config, w);
             pool->push_back(w);
         }
     }
@@ -710,7 +807,6 @@ int main(int argc, const char ** argv) {
     t.join();
     complete(pool);
     rmap->cleanup_thread->join();
-
 
     return 0;
 }
