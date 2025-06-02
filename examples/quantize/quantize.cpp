@@ -24,6 +24,7 @@ int main(int argc, const char ** argv) {
     args.add_argument(bool_arg("--quantize-output-heads", "(OPTIONAL) Whether to quantize the output heads. Defaults to false and is true when passed (does not accept a parameter).", "-qh"));
     args.add_argument(bool_arg("--quantize-text-embedding", "(OPTIONAL) Whether to quantize the input text embededings (only applicable for Parler TTS). Defaults to false and is true when passed (does not accept a parameter).", "-qe"));
     args.add_argument(bool_arg("--quantize-cross-attn-kv", "(OPTIONAL) Whether to quantize the cross attention keys and values (only applicable for Parler TTS). Defaults to false and is true when passed (does not accept a parameter).", "-qkv"));
+    args.add_argument(bool_arg("--convert-non-quantized-to-f16", "(OPTIONAL) Whether or not to convert quantization incompatible tensors to 16 bit precision. Only currently applicable to Kokoro. defaults to false.", "-nqf"));
     args.parse(argc, argv);
     if (args.for_help) {
         args.help();
@@ -40,6 +41,7 @@ int main(int argc, const char ** argv) {
     qp->quantize_text_embeddings = args.get_bool_param("--quantize-text-embedding");
     qp->quantize_cross_attn_kv = args.get_bool_param("--quantize-cross-attn-kv");
     qp->convert_dac_to_f16 = args.get_bool_param("--convert-dac-to-f16");
+    qp->convert_non_quantizable_to_f16 = args.get_bool_param("--convert-non-quantized-to-f16");
   	quantize_gguf(args.get_string_param("--model-path"), args.get_string_param("--quantized-model-path"), qp);
     return 0;
 }
