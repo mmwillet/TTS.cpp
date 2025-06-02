@@ -356,7 +356,7 @@ void quantize_gguf(const std::string & ifile, const std::string & ofile, struct 
 
         if (is_quantizable(arch_type, name, params)) {
             if ((cur->type) != GGML_TYPE_F32) {
-                TTS_ABORT("ERROR: All quantized tensors must be transformed from 32bit floats. Tensor, '%s', has impropert type, '%d'\n", cur->name, cur->type);
+                TTS_ABORT("ERROR: All quantized tensors must be transformed from 32bit floats. Tensor, '%s', has improper type, '%d'\n", cur->name, cur->type);
             }
             new_type = params->quantize_type;
             if ((new_type >= GGML_TYPE_IQ2_XXS && new_type <= GGML_TYPE_IQ4_XS)) {
