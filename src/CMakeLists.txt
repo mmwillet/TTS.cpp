@@ -23,6 +23,7 @@ add_library(tts
             tts_model.cpp
             kokoro_model.cpp
             dia_model.cpp
+            snake1d.cpp
             )
 
 target_include_directories(tts PUBLIC . ../include ../ggml/src/)
@@ -33,6 +34,9 @@ if (ESPEAK_INCLUDE_DIRS)
     set_source_files_properties(phonemizer.cpp PROPERTIES COMPILE_FLAGS "${ESPEAK_CFLAGS_OTHER}")
     set_source_files_properties(phonemizer.cpp PROPERTIES INCLUDE_DIRECTORIES "${ESPEAK_INCLUDE_DIRS}")
     target_link_libraries(tts PUBLIC ${ESPEAK_LIBRARIES})
+endif()
+if (NOT MSVC)
+    set_source_files_properties(snake1d.cpp PROPERTIES COMPILE_FLAGS "-ffast-math")
 endif()
 target_link_libraries(tts PUBLIC ggml)
 
