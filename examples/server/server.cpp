@@ -384,6 +384,7 @@ int main(int argc, const char ** argv) {
     args.add_argument(int_arg("--topk", "(OPTIONAL) when set to an integer value greater than 0 generation uses nucleus sampling over topk nucleaus size. Defaults to 50.", "-tk", false, &default_top_k));
     args.add_argument(float_arg("--repetition-penalty", "The by channel repetition penalty to be applied the sampled output of the model. defaults to 1.0.", "-r", false, &default_repetition_penalty));
     args.add_argument(string_arg("--model-path", "(REQUIRED) The local path of the gguf model file or a directory containing only gguf model files for Parler TTS mini or large v1, Dia, or Kokoro.", "-mp", true));
+    args.add_argument(string_arg("--default-model", "(OPTIONAL) The default model to use when multiple models (a directory with multiple GGUF files) are provided. This can be set by giving the path to the model (./models/Kokoro_no_espeak.gguf), the filename (Kokoro_no_espeak.gguf), or the model ID itself (Kokoro_no_espeak).", "-dm", false));
     args.add_argument(int_arg("--n-threads", "The number of cpu threads to run generation with. Defaults to hardware concurrency.", "-nt", false, &default_n_threads));
     args.add_argument(bool_arg("--use-metal", "(OPTIONAL) Whether to use metal acceleration", "-m"));
     args.add_argument(bool_arg("--no-cross-attn", "(OPTIONAL) Whether to not include cross attention", "-ca"));
@@ -461,10 +462,24 @@ int main(int argc, const char ** argv) {
         const std::filesystem::path path = model_path;
         model_map[path.stem()] = path;
     }
+
     auto model_creation = std::chrono::duration_cast<std::chrono::seconds>(
                               std::chrono::system_clock::now().time_since_epoch())
                               .count();
-    const std::string default_model = model_map.begin()->first;
+
+    std::string default_model = "";
+    if (args.get_string_param("--default-model") != "") {
+        const std::string model = std::filesystem::path { args.get_string_param("--default-model") }.stem();
+        if (model_map.contains(model)) {
+            default_model = model;
+        } else {
+            fprintf(stderr, "Invalid Default Model Provided: %s", model.c_str());
+            return 1;
+        }
+    } else {
+        default_model = model_map.begin()->first;
+    }
+
     std::vector<json> models = {};
     for (const auto &[id, _] : model_map) {
       json model = {{"id", ""},
