@@ -24,7 +24,7 @@ int main(int argc, const char ** argv) {
     args.add_argument(bool_arg("--quantize-output-heads", "(OPTIONAL) Whether to quantize the output heads. Defaults to false and is true when passed (does not accept a parameter).", "-qh"));
     args.add_argument(bool_arg("--quantize-text-embedding", "(OPTIONAL) Whether to quantize the input text embededings (only applicable for Parler TTS). Defaults to false and is true when passed (does not accept a parameter).", "-qe"));
     args.add_argument(bool_arg("--quantize-cross-attn-kv", "(OPTIONAL) Whether to quantize the cross attention keys and values (only applicable for Parler TTS). Defaults to false and is true when passed (does not accept a parameter).", "-qkv"));
-    args.add_argument(bool_arg("--convert-non-quantized-to-f16", "(OPTIONAL) Whether or not to convert quantization incompatible tensors to 16 bit precision. Only currently applicable to Kokoror. defaults to false.", "-nqf"));
+    args.add_argument(bool_arg("--convert-non-quantized-to-f16", "(OPTIONAL) Whether or not to convert quantization incompatible tensors to 16 bit precision. Only currently applicable to Kokoro. defaults to false.", "-nqf"));
     args.parse(argc, argv);
     if (args.for_help) {
         args.help();
