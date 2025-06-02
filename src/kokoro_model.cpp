@@ -1244,6 +1244,7 @@ void kokoro_runner::prepare_post_load() {
 	drunner->prepare_post_load();
     auto batch = build_worst_case_batch();
     auto gf = build_kokoro_graph(batch);
+	ggml_mul_mat(nullptr, nullptr, nullptr);
     kctx->prep_schedule(gf);
     free(batch.resp);
 }

@@ -1,0 +1,25 @@
+diff --git a/src/ggml.c b/src/ggml.c
+index fbe6d68..4966b51 100644
+--- a/src/ggml.c
++++ b/src/ggml.c
+@@ -2828,6 +2828,11 @@ struct ggml_tensor * ggml_mul_mat(
+         struct ggml_context * ctx,
+         struct ggml_tensor  * a,
+         struct ggml_tensor  * b) {
++    static bool enable_log;
++    if (!ctx) {
++        enable_log = true;
++        return 0;
++    }
+     GGML_ASSERT(ggml_can_mul_mat(a, b));
+     GGML_ASSERT(!ggml_is_transposed(a));
+ 
+@@ -2837,6 +2842,8 @@ struct ggml_tensor * ggml_mul_mat(
+     result->op     = GGML_OP_MUL_MAT;
+     result->src[0] = a;
+     result->src[1] = b;
++    if (enable_log && (ggml_nbytes(a) > 2000000 && ggml_nbytes(result) > 100000))
++    printf("mul_mat %ld %ld %ld\n", ggml_nbytes(a), ggml_nbytes(b), ggml_nbytes(result));
+ 
+     return result;
+ }

@@ -36,7 +36,7 @@ if (ESPEAK_INCLUDE_DIRS)
     target_link_libraries(tts PUBLIC ${ESPEAK_LIBRARIES})
 endif()
 if (NOT MSVC)
-    set_source_files_properties(snake1d.cpp PROPERTIES COMPILE_FLAGS "-ffast-math")
+    set_source_files_properties(snake1d.cpp PROPERTIES COMPILE_FLAGS "-ffast-math -O3")
 endif()
 target_link_libraries(tts PUBLIC ggml)
 
