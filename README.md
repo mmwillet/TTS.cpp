@@ -21,7 +21,7 @@ In this endeavor, MacOS and metal support will be treated as the primary platfor
 | [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M)                      |&check;|&cross;|&check;|[here](https://huggingface.co/mmwillet2/Kokoro_GGUF)    |
 | [Dia](https://github.com/nari-labs/dia)                                  |&check;|&check;|&check;|[here](https://huggingface.co/mmwillet2/Dia_GGUF)       |
 
-Additional Model support will initially be added based on open source model performance in the [TTS model arena](https://huggingface.co/spaces/TTS-AGI/TTS-Arena) and the availability of said models' architectures and checkpoints.
+Additional Model support will initially be added based on open source model performance in both the [old TTS model arena](https://huggingface.co/spaces/TTS-AGI/TTS-Arena) and [new TTS model arena](https://huggingface.co/spaces/TTS-AGI/TTS-Arena-V2) as well as the availability of said models' architectures and checkpoints.
 
 #### Functionality
 
