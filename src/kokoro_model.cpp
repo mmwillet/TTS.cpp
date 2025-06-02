@@ -1388,7 +1388,7 @@ int kokoro_runner::generate(std::string prompt, struct tts_response * response, 
     	// if the language changed then we should change the phonemization voice
     	if (phmzr->mode == ESPEAK && kctx->voice[0] != voice[0]) {
     		if (voice_code.empty()) {
-    			voice_code = get_espeak_id_from_kokoro_voice(voice);
+    			voice_code = get_espeak_id_from_kokoro_voice(voice.c_str());
     		}
     		update_voice(voice_code);
     	}
@@ -1435,9 +1435,6 @@ int kokoro_runner::generate(std::string prompt, struct tts_response * response, 
 }
 
 
-std::string get_espeak_id_from_kokoro_voice(std::string voice) {
-	return !voice.empty() && KOKORO_LANG_TO_ESPEAK_ID.find(voice[0]) != KOKORO_LANG_TO_ESPEAK_ID.end() ? KOKORO_LANG_TO_ESPEAK_ID[voice[0]] : "gmw/en-US";
-}
 
 struct kokoro_duration_context * build_new_duration_kokoro_context(struct kokoro_model * model, int n_threads, bool use_cpu) {
     kokoro_duration_context * kctx = new kokoro_duration_context(model, n_threads);

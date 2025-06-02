@@ -17,14 +17,25 @@ enum tts_arch {
 	DIA_ARCH = 2,
 };
 
-const std::map<std::string, tts_arch> SUPPORTED_ARCHITECTURES = {
-	{ "parler-tts", PARLER_TTS_ARCH },
-	{ "kokoro", KOKORO_ARCH },
-	{ "dia", DIA_ARCH },
+constexpr auto SUPPORTED_ARCHITECTURES{[] {
+	std::array<str, 3> result{};
+	result[PARLER_TTS_ARCH] = "parler-tts";
+	result[KOKORO_ARCH] = "kokoro";
+	result[DIA_ARCH] = "dia";
+	return result;
+}()};
+
+
+constexpr tts_arch parse_arch_type(str fname, str arch) {
+	const auto result = ranges::find(SUPPORTED_ARCHITECTURES, sv{arch});
+	if (result == SUPPORTED_ARCHITECTURES.end()) {
+		TTS_ABORT("%s failed for file %s. The architecture '%s' is not supported.", __func__, fname, arch);
+	}
+	return static_cast<tts_arch>(distance(SUPPORTED_ARCHITECTURES.cbegin(), result));
 };
 
 struct generation_configuration {
-    generation_configuration(
+    explicit generation_configuration(
     	std::string voice = "",
     	int top_k = 50, 
     	float temperature = 1.0, 

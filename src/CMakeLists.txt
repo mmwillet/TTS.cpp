@@ -9,7 +9,6 @@ endif()
 
 add_library(tts
             ../include/tts.h
-            ../include/args.h
             ../include/phonemizer.h
             tts.cpp
             tokenizer.cpp
@@ -17,7 +16,6 @@ add_library(tts
             parler_model.cpp
             dac_model.cpp
             util.cpp
-            args.cpp
             t5_encoder_model.cpp
             phonemizer.cpp
             tts_model.cpp
@@ -26,8 +24,6 @@ add_library(tts
             )
 
 target_include_directories(tts PUBLIC . ../include ../ggml/src/)
-
-target_compile_features   (tts PUBLIC cxx_std_11) # don't bump
 
 if (ESPEAK_INCLUDE_DIRS)
     set_source_files_properties(phonemizer.cpp PROPERTIES COMPILE_FLAGS "${ESPEAK_CFLAGS_OTHER}")

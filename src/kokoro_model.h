@@ -9,17 +9,23 @@
 // Rather than using ISO 639-2 language codes, Kokoro voice pack specify their corresponding language via their first letter.
 // Below is a map that describes the relationship between those designations and espeak-ng's voice identifiers so that the 
 // appropriate phonemization protocol can inferred from the Kokoro voice.
-static std::map<char, std::string> KOKORO_LANG_TO_ESPEAK_ID = {
-	{'a', "gmw/en-US"},
-	{'b', "gmw/en"},
-	{'e', "roa/es"},
-	{'f', "roa/fr"},
-	{'h', "inc/hi"},
-	{'i', "roa/it"},
-	{'j', "jpx/ja"},
-	{'p', "roa/pt-BR"},
-	{'z', "sit/cmn"}
-};
+constexpr auto KOKORO_LANG_TO_ESPEAK_ID{[] {
+	std::array<str, 256> result{};
+	result['a'] = "gmw/en-US";
+	result['b'] = "gmw/en";
+	result['e'] = "roa/es";
+	result['f'] = "roa/fr";
+	result['h'] = "inc/hi";
+	result['i'] = "roa/it";
+	result['j'] = "jpx/ja";
+	result['p'] = "roa/pt-BR";
+	result['z'] = "sit/cmn";
+	return result;
+}()};
+
+constexpr str get_espeak_id_from_kokoro_voice(str voice) {
+	return KOKORO_LANG_TO_ESPEAK_ID[voice[0]] ? KOKORO_LANG_TO_ESPEAK_ID[voice[0]] : "gmw/en-US";
+}
 
 struct lstm_cell {
 	std::vector<ggml_tensor*> weights; 
@@ -349,7 +355,6 @@ static kokoro_generator_residual_block * build_res_block_from_file(gguf_context 
 static kokoro_noise_residual_block * build_noise_block_from_file(gguf_context * meta, int index);
 static kokoro_generator_upsample_block* kokoro_generator_upsample_block(gguf_context * meta, int index);
 
-std::string get_espeak_id_from_kokoro_voice(std::string voice);
 struct kokoro_duration_context * build_new_duration_kokoro_context(struct kokoro_model * model, int n_threads, bool use_cpu = true);
 
 struct kokoro_duration_response {

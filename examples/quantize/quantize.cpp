@@ -1,9 +1,11 @@
-#include "tts.h"
-#include "args.h"
-#include <stdio.h>
-#include <thread>
-#include "ggml.h"
+#include <cstdio>
 #include <vector>
+#include <thread>
+
+#include "args.h"
+#include "ggml.h"
+#include "tts.h"
+#include "quantize_impl.h"
 
 std::vector<ggml_type> valid_quantization_types = {
     GGML_TYPE_F16,
