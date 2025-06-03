@@ -1,22 +1,13 @@
-#include "tts.h"
-#include "args.h"
-#include "common.h"
-#include <stdio.h>
 #include <chrono>
-#include <functional>
-#include <thread>
+#include <iostream>
 
+#include "args_common.h"
+#include "tts.h"
 
-std::vector<std::string> ARCH_LOOKUP = {
-	"parler-tts",
-	"kokoro",
-};
-
-using perf_cb = std::function<void()>;
-
-double benchmark_ms(perf_cb func) {
+namespace {
+double benchmark_ms(auto lambda) {
 	auto start = std::chrono::steady_clock::now();
-	func();
+	lambda();
 	auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double, std::milli> duration = end - start;
     return duration.count();
@@ -26,7 +17,7 @@ double benchmark_ms(perf_cb func) {
  * These are the 'Harvard Sentences' (https://en.wikipedia.org/wiki/Harvard_sentences). They are phonetically
  * balanced sentences typically used for standardized testing of voice over cellular and telephone systems.
  */
-std::vector<std::string> TEST_SENTENCES = {
+constexpr array TEST_SENTENCES = {
 	"The birch canoe slid on the smooth planks.",
 	"Glue the sheet to the dark blue background.",
 	"It's easy to tell the depth of a well.",
@@ -67,57 +58,40 @@ double mean(std::vector<double> series) {
 	return (double) sum / series.size();
 }
 
-std::string benchmark_printout(tts_arch arch, std::vector<double> generation_samples, std::vector<double> output_times) {
-	std::string arch_name = ARCH_LOOKUP[(int)arch];
-	double gen_mean = mean(generation_samples);
+void benchmark_printout(tts_arch arch, const vector<double> & generation_samples, const vector<double> & output_times) {
+	const str arch_name = SUPPORTED_ARCHITECTURES[arch];
+	const double gen_mean = mean(generation_samples);
 	std::vector<double> gen_output;
-	for (int i = 0; i < (int) output_times.size(); i++) {
+	for (size_t i = 0; i < output_times.size(); i++) {
 		gen_output.push_back(generation_samples[i]/output_times[i]);
 	}
 	double gen_out_mean = mean(gen_output);
-	std::string printout = (std::string) "Mean Stats for arch " + arch_name + ":\n\n" + (std::string) "  Generation Time (ms):             " +  std::to_string(gen_mean) + (std::string) "\n";
-	printout += (std::string) "  Generation Real Time Factor (ms): " + std::to_string(gen_out_mean) + (std::string) "\n";
-	return printout;
+	cout << "Mean Stats for arch " << arch_name << ":\n\n  Generation Time (ms):             ";
+    cout << gen_mean << endl;
+	cout << "  Generation Real Time Factor (ms): " << gen_out_mean << endl;
+}
 }
 
-
 int main(int argc, const char ** argv) {
-    float default_temperature = 1.0f;
-    int default_n_threads = std::max((int)std::thread::hardware_concurrency(), 1);
-    int default_top_k = 50;
-    float default_repetition_penalty = 1.0f;
-	arg_list args;
-    args.add_argument(string_arg("--model-path", "(REQUIRED) The local path of the gguf model file for Parler TTS mini v1.", "-mp", true));
-    args.add_argument(int_arg("--n-threads", "The number of cpu threads to run generation with. Defaults to hardware concurrency. If hardware concurrency cannot be determined it defaults to 1.", "-nt", false, &default_n_threads));
-    args.add_argument(float_arg("--temperature", "The temperature to use when generating outputs. Defaults to 1.0.", "-t", false, &default_temperature));
-    args.add_argument(int_arg("--topk", "(OPTIONAL) When set to an integer value greater than 0 generation uses nucleus sampling over topk nucleaus size. Defaults to 50.", "-tk", false, &default_top_k));
-    args.add_argument(string_arg("--voice", "(OPTIONAL) The voice to use to generate the audio. This is only used for models with voice packs.", "-v", false, "af_alloy"));
-    args.add_argument(float_arg("--repetition-penalty", "The by channel repetition penalty to be applied the sampled output of the model. defaults to 1.0.", "-r", false, &default_repetition_penalty));
-    args.add_argument(bool_arg("--use-metal", "(OPTIONAL) whether or not to use metal acceleration.", "-m"));
-    args.add_argument(bool_arg("--no-cross-attn", "(OPTIONAL) Whether to not include cross attention", "-ca"));
+    arg_list args{};
+    add_common_args(args);
     args.parse(argc, argv);
-    if (args.for_help) {
-        args.help();
-        return 0;
-    }
-    args.validate();
 
-    generation_configuration * config = new generation_configuration(args.get_string_param("--voice"), *args.get_int_param("--topk"), *args.get_float_param("--temperature"), *args.get_float_param("--repetition-penalty"), !args.get_bool_param("--no-cross-attn"));
-
-    struct tts_runner * runner = runner_from_file(args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), config, !args.get_bool_param("--use-metal"));
+    const generation_configuration config{parse_generation_config(args)};
+    tts_runner * const runner{runner_from_args(args, config)};
     std::vector<double> generation_samples;
     std::vector<double> output_times;
     
-    for (std::string sentence : TEST_SENTENCES) {
+    for (const str sentence : TEST_SENTENCES) {
     	tts_response response;
-    	perf_cb cb = [&]{
-    		generate(runner, sentence, &response, config);
+    	const auto cb = [&]{
+    		generate(runner, sentence, response, config);
     	};
     	double generation_ms = benchmark_ms(cb);
-    	output_times.push_back((double)(response.n_outputs / 44.1));
+    	output_times.push_back(response.n_outputs / 44.1);
     	generation_samples.push_back(generation_ms);
     }
 
-    fprintf(stdout, "%s", benchmark_printout(runner->arch, generation_samples, output_times).c_str());
+    benchmark_printout(runner->arch, generation_samples, output_times);
 	return 0;
 }

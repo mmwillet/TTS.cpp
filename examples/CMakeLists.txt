@@ -3,6 +3,8 @@
 add_library(examples_common
         args.cpp
         args.h
+        args_common.cpp
+        args_common.h
         audio_file.h
 )
 target_include_directories(examples_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

@@ -11,30 +11,27 @@ This script converts a 32bit floating point TTS.cpp GGUF model file to a quantiz
 
 ### Usage
 
-**Please note** Quantization and lower precision conversion is currently only supported for Parler TTS models. 
-
 In order to get a detailed breakdown of the functionality currently available you can call the cli with the `--help` parameter. This will return a breakdown of all parameters:
-```bash
-./quantize --help
-
---quantized-type (-qt):
-    (OPTIONAL) The ggml enum of the quantized type to convert compatible model tensors to. For more information see readme. Defaults to Q4_0 quantization (2).
---n-threads (-nt):
-    (OPTIONAL) The number of cpu threads to run the quantization process with. Defaults to known hardware concurrency.
+```console
+$ ./quantize --help
 --convert-dac-to-f16 (-df):
     (OPTIONAL) Whether to convert the DAC audio decoder model to a 16 bit float.
---quantize-output-heads (-qh):
-    (OPTIONAL) Whether to quantize the output heads. Defaults to false and is true when passed (does not accept a parameter).
---quantize-text-embedding (-qe):
-    (OPTIONAL) Whether to quantize the input text embededings (only applicable for Parler TTS). Defaults to false and is true when passed (does not accept a parameter).
---quantize-cross-attn-kv (-qkv):
-    (OPTIONAL) Whether to quantize the cross attention keys and values (only applicable for Parler TTS). Defaults to false and is true when passed (does not accept a parameter).
 --convert-non-quantized-to-f16 (-nqf):
-    (OPTIONAL) Whether or not to convert quantization incompatible tensors to 16 bit precision. Only currently applicable to Kokoror. defaults to false.
+    (OPTIONAL) Whether or not to convert quantization incompatible tensors to 16 bit precision. Only currently applicable to Kokoro.
 --model-path (-mp):
-    (REQUIRED) The local path of the gguf model file for Parler TTS mini v1 to quantize.
+    (REQUIRED) The local path of the gguf model(s) to load.
+--n-threads (-nt):
+    (OPTIONAL) The number of CPU threads to run calculations with. Defaults to known hardware concurrency. If hardware concurrency cannot be determined then it defaults to 1.
+--quantize-cross-attn-kv (-qkv):
+    (OPTIONAL) Whether to quantize the cross attention keys and values (only applicable for Parler TTS).
+--quantize-output-heads (-qh):
+    (OPTIONAL) Whether to quantize the output heads.
+--quantize-text-embedding (-qe):
+    (OPTIONAL) Whether to quantize the input text embededings.
 --quantized-model-path (-qp):
     (REQUIRED) The path to save the model in a quantized format.
+--quantized-type (-qt):
+    (OPTIONAL) The ggml enum of the quantized type to convert compatible model tensors to. For more information see readme. Defaults to Q4_0 quantization (2).
 ```
 
 General usage should follow from these possible parameters. E.G. The following command will save a quantized version of the model using Q4_0 quantization to `/model/path/to/new/gguf_file_q.gguf`:
@@ -98,7 +95,7 @@ The following approaches were experimented with:
 
 A clear improvement in tokens per second via the generative model is observed with quantization. Seen below Parler TTS mini with Q5_0 quantization, the model is capable of completing its generation in real time (it generates tokens faster than it takes to listen to them), and the model's TPS has improved from ~693 to ~986.
 
-```
+```text
 Mean Stats:
 
   Generation Time (ms):      1945.434146

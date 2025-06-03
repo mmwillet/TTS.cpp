@@ -60,7 +60,7 @@ We are currently [working on upstreaming some of these operations inorder to dep
 #### Build:
 
 Assuming that the above requirements are met the library and basic CLI example can be built by running the following command in the repository's base directory:
-```commandline
+```bash
 cmake -B build                                           
 cmake --build build --config Release
 ```

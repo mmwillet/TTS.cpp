@@ -17,7 +17,7 @@ bool kokoro_is_f16_compatible(std::string name) {
            !has_suffix(name, "norm");
 }
 
-bool kokoro_is_quantizable(std::string name, struct quantization_params * params) {
+bool kokoro_is_quantizable(str name) {
     // A list of all of the top level GGUF names under kokoro.duration_predictor that have quantization compatible tensors.
     constexpr std::array<const char *, 5> DURATION_PREDICTOR_QUANTIZATION_COMPATIBLE_PARTS = {
         "duration_proj",
@@ -41,38 +41,38 @@ bool kokoro_is_quantizable(std::string name, struct quantization_params * params
     return false;
 }
 
-bool dia_is_quantizable(std::string name, struct quantization_params * params) {
+bool dia_is_quantizable(str name, const quantization_params & params) {
     // The DAC audio encoder / decoder is not compatible with quantization and normalization tensors should not be quantized.
     bool quantizable = !has_prefix(name, "audio_encoder") && !has_suffix(name, "norm");
-    if (!params->quantize_output_heads) {
+    if (!params.quantize_output_heads) {
         quantizable = quantizable && !has_prefix(name, "dia.decoder.heads");
     }
     return quantizable;
 }
 
-bool parler_is_quanitizable(std::string name, struct quantization_params * params) {
+bool parler_is_quanitizable(str name, const quantization_params & params) {
     // the DAC audio encoder / decoder is not compatible with quantization, normalization weight shouldn't be quantized, and the text encoding shouldn't be normalized.
     bool quantizable = !has_prefix(name, "audio_encoder") && !has_suffix(name, "norm.weight") && !has_suffix(name, "text_encoding") && !has_suffix(name, "positional_embed") && !has_suffix(name, "norm.bias");
-    if (!params->quantize_output_heads) {
+    if (!params.quantize_output_heads) {
         quantizable = quantizable && !has_suffix(name, "weight.head");
     }
-    if (!params->quantize_text_embeddings) {
+    if (!params.quantize_text_embeddings) {
         quantizable = quantizable && !has_suffix(name, "embed_prompts");
     }
-    if (!params->quantize_cross_attn_kv) {
+    if (!params.quantize_cross_attn_kv) {
         quantizable = quantizable && !has_suffix(name, "encoder_attn.k_proj.weight") && !has_suffix(name, "encoder_attn.v_proj.weight");
     }
     return quantizable;
 }
 
-bool is_quantizable(tts_arch arch, std::string name, struct quantization_params * params) {
+bool is_quantizable(tts_arch arch, str name, const quantization_params & params) {
     switch(arch) {
         case PARLER_TTS_ARCH:
             return parler_is_quanitizable(name, params);
         case DIA_ARCH:
             return dia_is_quantizable(name, params);
         case KOKORO_ARCH:
-            return kokoro_is_quantizable(name, params);
+            return kokoro_is_quantizable(name);
         default:
             TTS_ABORT("%s failed. The architecture '%d' is not supported.", __func__, arch);
     }
@@ -164,34 +164,38 @@ struct no_init {
 };
 }
 
-void quantize_gguf(const std::string & ifile, const std::string & ofile, struct quantization_params * params) {
+void quantize_gguf(str ifile, str ofile, const quantization_params & params) {
     ggml_context * weight_ctx = NULL;
     struct gguf_init_params gguf_params = {
         /*.no_alloc   =*/ false,
         /*.ctx        =*/ &weight_ctx,
     };
-    gguf_context * meta_ctx = gguf_init_from_file(ifile.c_str(), gguf_params);
+    gguf_context * meta_ctx = gguf_init_from_file(ifile, gguf_params);
     str arch = "parler-tts"; // only parler-tts gguf files should lack an explicit architecture.
 
     if (int arch_key = gguf_find_key(meta_ctx, "general.architecture"); arch_key != -1) {
         arch = gguf_get_val_str(meta_ctx, arch_key);
     }
-    const tts_arch arch_type{parse_arch_type(ifile.c_str(), arch)};
+    const tts_arch arch_type{parse_arch_type(ifile, arch)};
 
-    if (params->quantize_type != GGML_TYPE_Q5_0 && params->quantize_type != GGML_TYPE_Q8_0 && params->quantize_type != GGML_TYPE_F16 && params->quantize_type != GGML_TYPE_Q4_0) {
-        fprintf(stdout, "Warning, %s is untested for quantization type '%d'. Use at your own risk.\n", arch, params->quantize_type);
+    switch (params.quantize_type) {
+        case GGML_TYPE_Q5_0:
+        case GGML_TYPE_Q8_0:
+        case GGML_TYPE_F16:
+        case GGML_TYPE_Q4_0:
+            break;
+        default:
+            fprintf(stdout, "Warning, %s is untested for quantization type '%d'. Use at your own risk.\n", arch, params.quantize_type);
     }
 
-    const size_t align = GGUF_DEFAULT_ALIGNMENT;
     gguf_context_ptr ctx_out { gguf_init_empty() };
 
     // copy the KV pairs from the input file
     gguf_set_kv(ctx_out.get(), meta_ctx);
     gguf_set_val_u32(ctx_out.get(), "general.quantization_version", GGML_QNT_VERSION);
-    gguf_set_val_u32(ctx_out.get(), "general.quantization_type", params->quantize_type);
+    gguf_set_val_u32(ctx_out.get(), "general.quantization_type", params.quantize_type);
     for (ggml_tensor * tensor = ggml_get_first_tensor(weight_ctx); tensor; tensor = ggml_get_next_tensor(weight_ctx, tensor)) {
-        std::string name = ggml_get_name(tensor);
-        if (name.size() != 0) {
+        if (*ggml_get_name(tensor)) {
             gguf_add_tensor(ctx_out.get(), tensor);
         }
     }
@@ -219,12 +223,13 @@ void quantize_gguf(const std::string & ifile, const std::string & ofile, struct 
     };
     new_ofstream();
     for (ggml_tensor * cur = ggml_get_first_tensor(weight_ctx); cur; cur = ggml_get_next_tensor(weight_ctx, cur)) {
-        enum ggml_type new_type;
+        const size_t align = GGUF_DEFAULT_ALIGNMENT;
+        ggml_type new_type;
         void * new_data;
         size_t new_size;
-        std::string name = ggml_get_name(cur);
+        str name = ggml_get_name(cur);
 
-        if (name.size() == 0) {
+        if (!*name) {
             continue;
         }
 
@@ -232,7 +237,7 @@ void quantize_gguf(const std::string & ifile, const std::string & ofile, struct 
             if ((cur->type) != GGML_TYPE_F32) {
                 TTS_ABORT("ERROR: All quantized tensors must be transformed from 32bit floats. Tensor, '%s', has improper type, '%d'\n", cur->name, cur->type);
             }
-            new_type = params->quantize_type;
+            new_type = params.quantize_type;
             if ((new_type >= GGML_TYPE_IQ2_XXS && new_type <= GGML_TYPE_IQ4_XS)) {
                 TTS_ABORT("ERROR: Quantization type '%d' requires an importance matrix.\n", new_type);
             }
@@ -241,8 +246,8 @@ void quantize_gguf(const std::string & ifile, const std::string & ofile, struct 
                 work.resize(nelement_size); // upper bound on size
             }
             new_data = work.data();
-            new_size = quantize_tensor(new_data, cur, nullptr, new_type, params->n_threads);
-        } else if ((params->convert_non_quantizable_to_f16 && kokoro_is_f16_compatible(name)) || (params->convert_dac_to_f16 && has_prefix(name, "audio_encoder") && !has_suffix(name, "alpha"))) {
+            new_size = quantize_tensor(new_data, cur, nullptr, new_type, params.n_threads);
+        } else if ((params.convert_non_quantizable_to_f16 && kokoro_is_f16_compatible(name)) || (params.convert_dac_to_f16 && has_prefix(name, "audio_encoder") && !has_suffix(name, "alpha"))) {
             if ((cur->type) != GGML_TYPE_F32) {
                 TTS_ABORT("ERROR: All converted tensors must be transformed from 32bit floats. Tensor, '%s', has improper type, '%d'\n", cur->name, cur->type);
             }
@@ -252,16 +257,16 @@ void quantize_gguf(const std::string & ifile, const std::string & ofile, struct 
                 work.resize(nelement_size); // upper bound on size
             }
             new_data = work.data();
-            new_size = quantize_tensor(new_data, cur, nullptr, new_type, params->n_threads);
+            new_size = quantize_tensor(new_data, cur, nullptr, new_type, params.n_threads);
         } else {
             new_type = cur->type;
             new_data = cur->data;
             new_size = ggml_nbytes(cur);
         }
 
-        gguf_set_tensor_type(ctx_out.get(), name.c_str(), new_type);
-        gguf_set_tensor_data(ctx_out.get(), name.c_str(), new_data, new_size);
-        fprintf(stdout, "At tensor: '%s' with new size: %zu bytes\n", name.c_str(), new_size);
+        gguf_set_tensor_type(ctx_out.get(), name, new_type);
+        gguf_set_tensor_data(ctx_out.get(), name, new_data, new_size);
+        fprintf(stdout, "At tensor: '%s' with new size: %zu bytes\n", name, new_size);
         // write tensor data + padding
         fout.write((const char *) new_data, new_size);
         zeros(fout, GGML_PAD(new_size, align) - new_size);

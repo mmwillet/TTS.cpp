@@ -35,26 +35,15 @@ constexpr tts_arch parse_arch_type(str fname, str arch) {
 };
 
 struct generation_configuration {
-    explicit generation_configuration(
-    	std::string voice = "",
-    	int top_k = 50, 
-    	float temperature = 1.0, 
-    	float repetition_penalty = 1.0, 
-    	bool use_cross_attn = true, 
-    	std::string espeak_voice_id = "",
-    	int max_tokens = 0,
-    	float top_p = 1.0,
-    	bool sample = true): top_k(top_k), temperature(temperature), repetition_penalty(repetition_penalty), use_cross_attn(use_cross_attn), sample(sample), voice(voice), espeak_voice_id(espeak_voice_id), max_tokens(max_tokens), top_p(top_p) {};
-
-    bool use_cross_attn;
-    float temperature;
-    float repetition_penalty;
-    float top_p;
-    int top_k;
-    int max_tokens;
-    std::string voice = "";
-    bool sample = true;
-    std::string espeak_voice_id = "";
+    bool use_cross_attn{true}; // TODO split out this load-time option from the rest of the generate-time configuration
+    float temperature{1.0f};
+    float repetition_penalty{1.0f};
+    float top_p{1.0f};
+    int top_k{50};
+    int max_tokens{0};
+    str voice{"af_alloy"};
+    static constexpr bool sample{true};
+    str espeak_voice_id{"gmw/en-US"};
 };
 
 struct tts_runner {

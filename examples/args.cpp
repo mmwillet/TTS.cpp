@@ -1,164 +1,76 @@
 #include "args.h"
 
-std::string arg::help_text() {
-    std::string htxt = full_name;
-    if (abbreviation != "") {
-        htxt += " (" + abbreviation + ")";
+#include <iostream>
+#include <sstream>
+
+void arg::print_help() const {
+    cout << "--" << full_name;
+    if (*abbreviation) {
+        cout << " (-" << abbreviation << ")";
     }
-    htxt += ":\n    ";
-    if (description != "") {
-        htxt += description + "\n";
+    if (*description) {
+        cout << (required ? ":\n    (REQUIRED) " : ":\n    (OPTIONAL) ") << description << ".\n";
     } else {
-        htxt += "is a " + (std::string)(required ? "required " : "optional ") + "parameter.\n";
+        cout << (required ? " is a required parameter.\n" : " is an optional parameter.\n");
     }
-    return htxt;
 }
 
-int string_arg::parse(int argc, const char ** argv) {
+void arg::parse(span<str> & argv) {
     required = false;
-    value.assign(argv[0]);
-    return 1;
+    if (const auto bool_param{get_if<bool>(&value)}) {
+        *bool_param = true;
+        return;
+    }
+    if (argv.empty()) {
+        fprintf(stderr, "The option '--%s' requires an argument\n", full_name);
+        exit(1);
+    }
+    const str a = argv[0];
+    argv = argv.subspan(1);
+    if (const auto string_param{get_if<str>(&value)}) {
+        *string_param = a;
+    } else if (const auto int_param{get_if<int>(&value)}) {
+        istringstream{a} >> *int_param;
+    } else if (const auto float_param{get_if<float>(&value)}) {
+        istringstream{a} >> *float_param;
+    }
 }
 
-int int_arg::parse(int argc, const char ** argv) {
-    if (required) {
-        required = false;
-    }
-    int val = atoi(argv[0]);
-    *value = val;
-    return 1;
-}
-
-int float_arg::parse(int argc, const char ** argv) {
-    if (required) {
-        required = false;
-    }
-    float val = strtof(argv[0], nullptr);
-    *value = val;
-    return 1;
-}
-
-void arg_list::help() {
-    std::string help_text = "";
-    for (auto arg : fargs) {
-        help_text += arg.help_text();
-    }
-    for (auto arg : iargs) {
-        help_text += arg.help_text();
-
-    }
-    for (auto arg : bargs) {
-        help_text += arg.help_text();
-
-    }
-    for (auto arg : sargs) {
-        help_text += arg.help_text();
-
-    }
-    fprintf(stdout, "%s", help_text.c_str());
-}
-
-void arg_list::validate() {
-    for (auto arg : fargs) {
-        if (arg.required) {
-            fprintf(stderr, "argument '%s' is required.\n", arg.full_name.c_str());
+void arg_list::parse(int argc, str argv_[]) {
+    TTS_ASSERT(argc);
+    span<str> argv{argv_, static_cast<size_t>(argc)};
+    argv = argv.subspan(1);
+    while (!argv.empty()) {
+        str name{argv[0]};
+        if (*name != '-') {
+            fprintf(stderr, "Only named arguments are supported\n");
             exit(1);
         }
-    }
-    for (auto arg : iargs) {
-        if (arg.required) {
-            fprintf(stderr, "argument '%s' is required.\n", arg.full_name.c_str());
+        ++name;
+        const map<sv, size_t> * lookup = &abbreviations;
+        if (*name == '-') {
+            ++name;
+            lookup = &full_names;
+            if (name == "help"sv) {
+                for (const size_t i : full_names | views::values) {
+                    args[i].print_help();
+                }
+                exit(0);
+            }
+        }
+        const auto found = lookup->find(sv{name});
+        if (found == lookup->end()) {
+            fprintf(stderr, "argument '%s' is not a valid argument. "
+                    "Call '--help' for information on all valid arguments.\n", argv[0]);
             exit(1);
         }
+        argv = argv.subspan(1);
+        args[found->second].parse(argv);
     }
-    for (auto arg : bargs) {
-        if (arg.required) {
-            fprintf(stderr, "argument '%s' is required.\n", arg.full_name.c_str());
-            exit(1);
-        }
-    }
-    for (auto arg : sargs) {
-        if (arg.required) {
-            fprintf(stderr, "argument '%s' is required.\n", arg.full_name.c_str());
+    for (const arg & x : args) {
+        if (x.required) {
+            fprintf(stderr, "argument '--%s' is required.\n", x.full_name);
             exit(1);
         }
     }
 }
-
-void arg_list::parse(int argc, const char ** argv) {
-    int current_arg = 1;
-    while (current_arg < argc) {
-        std::string name(argv[current_arg]);
-        if (name == "--help") {
-            for_help = true;
-            return;
-        }
-        current_arg += 1;
-        current_arg += find_and_parse(name, argc - current_arg, argv + current_arg);
-    }
-}
-
-int arg_list::find_and_parse(std::string name, int argc, const char ** argv) {
-    for (int i = 0; i < fargs.size(); i++) {
-        if (fargs[i].full_name == name || fargs[i].abbreviation == name) {
-            return fargs[i].parse(argc, argv);
-        }
-    }
-    for (int i = 0; i < iargs.size(); i++) {
-        if (iargs[i].full_name == name || iargs[i].abbreviation == name) {
-            return iargs[i].parse(argc, argv);
-        }
-    }
-    for (int i = 0; i < bargs.size(); i++) {
-        if (bargs[i].full_name == name || bargs[i].abbreviation == name) {
-            bargs[i].value = !bargs[i].value;
-            bargs[i].required = false;
-            return 0;
-        }
-
-    }
-    for (int i = 0; i < sargs.size(); i++) {
-        if (sargs[i].full_name == name || sargs[i].abbreviation == name) {
-            return sargs[i].parse(argc, argv);
-        }
-    }
-    fprintf(stderr, "argument '%s' is not a valid argument. Call '--help' for information on all valid arguments.\n", name.c_str());
-    exit(1);
-}
-
-std::string arg_list::get_string_param(std::string full_name) {
-    for (auto arg : sargs) {
-        if (arg.full_name == full_name) {
-            return arg.value;
-        }
-    }
-    return "";
-}
-
-int * arg_list::get_int_param(std::string full_name) {
-    for (auto arg : iargs) {
-        if (arg.full_name == full_name) {
-            return arg.value;
-        }
-    }
-    return nullptr;
-}
-
-float * arg_list::get_float_param(std::string full_name) {
-    for (auto arg : fargs) {
-        if (arg.full_name == full_name) {
-            return arg.value;
-        }
-    }
-    return nullptr;
-}
-
-bool arg_list::get_bool_param(std::string full_name) {
-    for (auto arg : bargs) {
-        if (arg.full_name == full_name) {
-            return arg.value;
-        }
-    }
-    return false;
-}
-
