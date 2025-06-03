@@ -958,7 +958,7 @@ struct ggml_cgraph * kokoro_duration_runner::build_kokoro_duration_graph(kokoro_
     kctx->positions = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, batch.n_tokens);
     ggml_set_input(kctx->positions);
 
-    inpL = build_albert_inputs(ctx, model, kctx->inp_tokens, kctx->positions, kctx->token_types);
+    inpL = build_albert_inputs(ctx, &*model, kctx->inp_tokens, kctx->positions, kctx->token_types);
     ggml_set_name(inpL, "albert_embeddings");
     cur = inpL;
 
@@ -1233,7 +1233,7 @@ struct ggml_cgraph * kokoro_runner::build_kokoro_graph(kokoro_ubatch & batch) {
 	ggml_set_input(kctx->window_sq_sum);
 
 	// run generation
-	cur = build_generator(ctx, model, kctx, cur, style_half2, f0_curve, model->decoder->generator, (int)kctx->sequence_length, kctx->window_sq_sum, gf);
+	cur = build_generator(ctx, &*model, kctx, cur, style_half2, f0_curve, model->decoder->generator, (int)kctx->sequence_length, kctx->window_sq_sum, gf);
     ggml_build_forward_expand(gf, cur);
     free_build();
     return gf;
@@ -1245,7 +1245,7 @@ void kokoro_runner::prepare_post_load() {
     auto batch = build_worst_case_batch();
     auto gf = build_kokoro_graph(batch);
     kctx->prep_schedule(gf);
-    free(batch.resp);
+    delete batch.resp;
 }
 
 void kokoro_runner::set_inputs(kokoro_ubatch & batch, uint32_t total_size) {

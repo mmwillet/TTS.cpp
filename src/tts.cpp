@@ -40,23 +40,23 @@ struct tts_runner * parler_tts_from_file(gguf_context * meta_ctx, ggml_context *
     ggml_free(weight_ctx);
     runner->arch = arch;
 
-    return (tts_runner*)runner;
+    return runner;
 }
 
 struct tts_runner * kokoro_from_file(gguf_context * meta_ctx, ggml_context * weight_ctx, int n_threads, generation_configuration * config, tts_arch arch, bool cpu_only) {
-    kokoro_model * model = new kokoro_model;
+    unique_ptr<kokoro_model> model = make_unique<kokoro_model>();
     single_pass_tokenizer * spt = single_pass_tokenizer_from_gguf(meta_ctx, "tokenizer.ggml.tokens");
     model->setup_from_file(meta_ctx, weight_ctx, cpu_only);
-    struct kokoro_duration_context * kdctx = build_new_duration_kokoro_context(model, n_threads, cpu_only);
-    struct kokoro_duration_runner * duration_runner = new kokoro_duration_runner(model, kdctx, spt);
-    struct kokoro_context * kctx = build_new_kokoro_context(model, n_threads, cpu_only);
+    kokoro_duration_context * kdctx = build_new_duration_kokoro_context(&*model, n_threads, cpu_only);
+    kokoro_duration_runner * duration_runner = new kokoro_duration_runner(&*model, kdctx, spt);
+    kokoro_context * kctx = build_new_kokoro_context(&*model, n_threads, cpu_only);
     // if an espeak voice id wasn't specifically set infer it from the kokoro voice, if it was override it, otherwise fallback to American English.
     std::string espeak_voice_id = config->espeak_voice_id;
     if (espeak_voice_id.empty()) {
         espeak_voice_id = !config->voice.empty() && KOKORO_LANG_TO_ESPEAK_ID.find(config->voice.at(0)) != KOKORO_LANG_TO_ESPEAK_ID.end() ? KOKORO_LANG_TO_ESPEAK_ID[config->voice.at(0)] : "gmw/en-US";
     }
-    struct phonemizer * phmzr = phonemizer_from_gguf(meta_ctx, espeak_voice_id);
-    struct kokoro_runner * runner = new kokoro_runner(model, kctx, spt, duration_runner, phmzr);
+    phonemizer * phmzr = phonemizer_from_gguf(meta_ctx, espeak_voice_id);
+    kokoro_runner * runner = new kokoro_runner(move(model), kctx, spt, duration_runner, phmzr);
 
     // TODO: change this weight assignment pattern to mirror llama.cpp
     for (ggml_tensor * cur = ggml_get_first_tensor(weight_ctx); cur; cur = ggml_get_next_tensor(weight_ctx, cur)) {
@@ -69,7 +69,7 @@ struct tts_runner * kokoro_from_file(gguf_context * meta_ctx, ggml_context * wei
     ggml_free(weight_ctx);
     runner->arch = arch;
 
-    return (tts_runner*)runner;
+    return runner;
 }
 
 struct tts_runner * dia_from_file(gguf_context * meta_ctx, ggml_context * weight_ctx, int n_threads, generation_configuration * config, tts_arch arch, bool cpu_only) {
@@ -94,7 +94,7 @@ struct tts_runner * dia_from_file(gguf_context * meta_ctx, ggml_context * weight
     ggml_free(weight_ctx);
     runner->arch = arch;
 
-    return (tts_runner*)runner;
+    return runner;
 }
 
 // currently only metal and cpu devices are supported, so cpu_only only describes whether or not to try to load and run on metal.
@@ -146,8 +146,14 @@ int generate(tts_runner * runner, std::string sentence, struct tts_response * re
 }
 
 void update_conditional_prompt(tts_runner * runner, const std::string file_path, const std::string prompt, bool cpu_only) {
-    int n_threads = ((parler_tts_runner*)runner)->pctx->n_threads;
-    ((parler_tts_runner*)runner)->update_conditional_prompt(file_path, prompt, n_threads, cpu_only);
+    const auto parler{dynamic_cast<parler_tts_runner *>(runner)};
+    if (!parler) {
+        fprintf(stderr, "Wrong model for conditional prompt\n");
+        return;
+    }
+
+    const int n_threads = parler->pctx->n_threads;
+    parler->update_conditional_prompt(file_path, prompt, n_threads, cpu_only);
 }
 
 bool kokoro_is_f16_compatible(std::string name) {
