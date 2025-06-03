@@ -21,15 +21,6 @@ static std::map<char, std::string> KOKORO_LANG_TO_ESPEAK_ID = {
 	{'z', "sit/cmn"}
 };
 
-// A list of all of the top level GGUF names under kokoro.duration_predictor that have quantization compatible tensors. 
-const std::vector<std::string> DURATION_PREDICTOR_QUANTIZATION_COMPATIBLE_PARTS = {
-	"duration_proj",
-	"encode",
-	"shared_lstm",
-	"duration_lstm",
-	"layers"
-};
-
 struct lstm_cell {
 	std::vector<ggml_tensor*> weights; 
 	std::vector<ggml_tensor*> biases;
