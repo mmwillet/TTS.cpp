@@ -1,10 +1,7 @@
-#ifndef common_h
-#define common_h
+#pragma once
 
-#include <cstdint>
-#include <string>
 #include <map>
-#include <vector>
+#include "imports.h"
 
 // Using this simple struct as opposed to a common std::vector allows us to return the cpu buffer
 // pointer directly rather than copying the contents of the buffer to a predefined std::vector.
@@ -57,5 +54,3 @@ struct tts_runner {
 	void init_build(std::vector<uint8_t>* buf_compute_meta);
 	void free_build();
 };
-
-#endif
