@@ -1,6 +1,6 @@
 #pragma once
 
-// On OSX threads other than the main thread are created with a reduced stack size of 512KB by default, this is too low 
+// OSX threads other than the main thread are created with a reduced stack size of 512KB by default, this is too low 
 // for large GGML graphs in which graph nodes are traversed recursively. To address this we instead use pthreads so that stack
 // size can be increased in order to be in parity with linux.
 
