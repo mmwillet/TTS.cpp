@@ -48,7 +48,7 @@ namespace tts_server_threading {
 #else
 
 namespace tts_server_threading {
-	using native_thread = thread;
+	using native_thread = std::thread;
 }
 
 #endif
