@@ -24,10 +24,12 @@
 #include "tts.h"
 #include "audio_file.h"
 #include "args_common.h"
+#include "tts_server_thread_osx.h"
 
 #include "index.html.hpp"
 
 namespace {
+
 using json = nlohmann::ordered_json;
 
 void res_ok_json_str(httplib::Response & res, str output) {
@@ -150,7 +152,7 @@ struct worker {
     reference_wrapper<const unordered_map<string, string>> model_map;
 
     unordered_map<string, unique_ptr<tts_runner>> runners{};
-    thread worker_thread{};
+    tts_server_threading::native_thread worker_thread{};
 
     void loop() {
         const arg_list & args_ = args.get();
@@ -492,7 +494,7 @@ int main(int argc, const char ** argv) {
     fprintf(stdout, "%s: loading model and initializing main loop\n", __func__);
     for (int i{q.startup_fence.load(memory_order_relaxed)}; i > 0; i--) {
         auto & w = q.workers.emplace_back(make_unique<worker>(q, args, model_map));
-        w->worker_thread = thread(&worker::loop, w.get());
+        w->worker_thread = tts_server_threading::native_thread(&worker::loop, w.get());//thread(&worker::loop, w.get());
     }
     fprintf(stdout, "%s: HTTP server is listening with %d threads on http://%s:%d/\n",
         __func__, n_http_threads, host, port);

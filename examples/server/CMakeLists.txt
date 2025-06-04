@@ -12,6 +12,7 @@ set(TARGET_SRCS
     server.cpp
     httplib.h
     json.hpp
+    tts_server_thread_osx.h
 )
 set(PUBLIC_ASSETS
     index.html
