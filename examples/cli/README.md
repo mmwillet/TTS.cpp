@@ -10,57 +10,56 @@ This simple example cli tool can be used to generate speach from a text prompt a
 ### Usage
 
 In order to get a detailed breakdown the functionality currently available you can call the cli with the `--help` parameter. This will return a breakdown of all parameters:
-```bash
-./cli --help
-
---temperature (-t):
-    The temperature to use when generating outputs. Defaults to 1.0.
---repetition-penalty (-r):
-    The by channel repetition penalty to be applied the sampled output of the model. defaults to 1.0.
---top-p (tp):
-    (OPTIONAL) the sum of probabilities to sample over. Must be a value between 0.0 and 1.0. Defaults to 1.0.
---n-threads (-nt):
-    The number of cpu threads to run generation with. Defaults to hardware concurrency. If hardware concurrency cannot be determined then it defaults to 1.
---topk (-tk):
-    (OPTIONAL) When set to an integer value greater than 0 generation uses nucleus sampling over topk nucleaus size. Defaults to 50.
---max-tokens (-mt):
-    (OPTIONAL) The max audio tokens or token batches to generate where each represents approximates 11 ms of audio. Only applied to Dia generation. If set to zero as is its default then the default max generation size. Warning values under 15 are not supported.
---use-metal (-m):
-    (OPTIONAL) Whether to use metal acceleration
---no-cross-attn (-ca):
-    (OPTIONAL) Whether to not include cross attention
---vad (-va):
-    (OPTIONAL) whether to apply voice inactivity detection (VAD) and strip silence form the end of the output (particularly useful for Parler TSS). By default, no VAD is applied.
---play:
-    (OPTIONAL) Whether to play back the audio immediately instead of saving it to file.
---model-path (-mp):
-    (REQUIRED) The local path of the gguf model file for Parler TTS mini or large v1, Dia, or Kokoro.
---prompt (-p):
-    (REQUIRED) The text prompt for which to generate audio in quotation markers.
---save-path (-sp):
-    (OPTIONAL) The path to save the audio output to in a .wav format. Defaults to TTS.cpp.wav
+```console
+$ ./tts-cli --help
 --conditional-prompt (-cp):
     (OPTIONAL) A distinct conditional prompt to use for generating. If none is provided the preencoded prompt is used. '--text-encoder-path' must be set to use conditional generation.
+--espeak-voice-id (-eid):
+    (OPTIONAL) The eSpeak voice id to use for phonemization. This should only be specified when the correct eSpeak voice cannot be inferred from the Kokoro voice. See MultiLanguage Configuration in the README for more info.
+--max-tokens (-mt):
+    (OPTIONAL) The max audio tokens or token batches to generate where each represents approximates 11 ms of audio. Only applied to Dia generation. If set to zero as is its default then the default max generation size. Warning values under 15 are not supported.
+--model-path (-mp):
+    (REQUIRED) The local path of the gguf model(s) to load.
+--n-threads (-nt):
+    (OPTIONAL) The number of CPU threads to run calculations with. Defaults to known hardware concurrency. If hardware concurrency cannot be determined then it defaults to 1.
+--no-cross-attn (-ca):
+    (OPTIONAL) Whether to not include cross attention.
+--play:
+    (OPTIONAL) Whether to play back the audio immediately instead of saving it to file..
+--prompt (-p):
+    (REQUIRED) The text prompt for which to generate audio.
+--repetition-penalty (-r):
+    (OPTIONAL) The per-channel repetition penalty to be applied the sampled output of the model.
+--save-path (-sp):
+    (OPTIONAL) The path to save the audio output to in a .wav format.
+--temperature (-t):
+    (OPTIONAL) The temperature to use when generating outputs.
 --text-encoder-path (-tep):
-    (OPTIONAL) The local path of the text encoder gguf model for conditional generaiton.
+    (OPTIONAL) The local path of the text encoder gguf model for conditional generation.
+--top-p (-mt):
+    (OPTIONAL) The sum of probabilities to sample over. Must be a value between 0.0 and 1.0. Defaults to 1.0.
+--topk (-tk):
+    (OPTIONAL) When set to an integer value greater than 0 generation uses nucleus sampling over topk nucleus size. Defaults to 50.
+--use-metal (-m):
+    (OPTIONAL) Whether to use metal acceleration.
+--vad (-va):
+    (OPTIONAL) Whether to apply voice inactivity detection (VAD) and strip silence form the end of the output. This is particularly useful for Parler TTS. By default, no VAD is applied.
 --voice (-v):
     (OPTIONAL) The voice to use to generate the audio. This is only used for models with voice packs.
---espeak-voice-id (-eid):
-    (OPTIONAL) The espeak voice id to use for phonemization. This should only be specified when the correct espeak voice cannot be inferred from the kokoro voice ( see MultiLanguage Configuration in the README for more info).
 ```
 
 General usage should follow from these possible parameters. E.G. The following command will save generated speech to the `/tmp/test.wav` file.
 
 ```bash
-./cli --model-path /model/path/to/gguf_file.gguf --prompt "I am saying some words" --save-path /tmp/test.wav
+./tts-cli --model-path /model/path/to/gguf_file.gguf --prompt "I am saying some words" --save-path /tmp/test.wav
 ```
 
 #### Dia Generation Arguments
 
 Currently the default cli arguments are not aligned with Dia's default sampling settings. Specifically the temperature and topk settings should be changed to  `1.3` and `35` respectively when generating with Dia like so:
 
-```base
-./cli --model-path /model/path/to/Dia.gguf --prompt "[S1] Hi, I am Dia, this is how I talk." --save-path /tmp/test.wav --topk 35 --temperature 1.3
+```bash
+./tts-cli --model-path /model/path/to/Dia.gguf --prompt "[S1] Hi, I am Dia, this is how I talk." --save-path /tmp/test.wav --topk 35 --temperature 1.3
 ```
 
 #### Conditional Generation
@@ -87,7 +86,7 @@ Kokoro supports multiple langauges with distinct voices, and, by default, the st
 
 Each voice has a language assigned and gender assigned to it where the first letter of the pack represents the language and the second the gender (e.g. `af_alloy` is an American English Female voice; `a` corresponds to American Enlgish and `f` to Female). Below is a list of all currently supported langauges mapped to their respective codes:
 
-```
+```text
 # 🇺🇸 'a' => American English, 🇬🇧 'b' => British English
 # 🇪🇸 'e' => Spanish es
 # 🇫🇷 'f' => French fr-fr
@@ -103,4 +102,3 @@ By default when a voice of a specific language is used, phonemization for that l
 ```bash
 espeak-ng --voices
 ```
-

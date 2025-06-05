@@ -34,9 +34,7 @@ endforeach()
 add_executable(${TARGET} ${TARGET_SRCS})
 install(TARGETS ${TARGET} RUNTIME)
 
-target_include_directories(${TARGET} PRIVATE ${CMAKE_SOURCE_DIR})
-target_link_libraries(${TARGET} PRIVATE ggml tts)
-
+target_link_libraries(${TARGET} PRIVATE examples_common)
 
 if (LLAMA_SERVER_SSL)
     find_package(OpenSSL REQUIRED)
@@ -47,5 +45,3 @@ endif()
 if (WIN32)
     TARGET_LINK_LIBRARIES(${TARGET} PRIVATE ws2_32)
 endif()
-
-target_compile_features(${TARGET} PRIVATE cxx_std_17)

@@ -208,7 +208,7 @@ struct parler_tts_runner : tts_runner {
     }
 
 
-    void configure_generation(generation_configuration * config);
+    void configure_generation(const generation_configuration & config);
     void assign_weight(std::string name, ggml_tensor * tensor);
     parler_ubatch build_worst_case_batch();
     struct ggml_cgraph * build_parler_graph(parler_ubatch & batch);
@@ -223,7 +223,7 @@ struct parler_tts_runner : tts_runner {
     void parler_graph_compute(ggml_cgraph * gf);
     void just_audio_token_decode(uint32_t * tokens, int32_t sq_len, struct tts_response * output);
     int generate_audio_tokens(std::string sentence);
-    void update_conditional_prompt(const std::string file_path, const std::string prompt, int n_threads, bool cpu_only = true);
+    void update_conditional_prompt(str file_path, const str prompt, int n_threads, bool cpu_only = true);
 };
 
 #endif

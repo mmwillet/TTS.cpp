@@ -526,8 +526,8 @@ struct phonemizer {
 	bool handle_unknown(corpus* text);
 };
 
-struct phonemizer * phonemizer_from_gguf(gguf_context * meta, const std::string espeak_voice_code = "gmw/en-US");
-struct phonemizer * phonemizer_from_file(const std::string fname, const std::string espeak_voice_code = "gmw/en-US");
-struct phonemizer * espeak_phonemizer(bool use_espeak_phonemes = false, std::string espeak_voice_code = "gmw/en-US");
+phonemizer * phonemizer_from_gguf(gguf_context * meta, str espeak_voice_code = "gmw/en-US");
+phonemizer * phonemizer_from_file(str fname, str espeak_voice_code = "gmw/en-US");
+phonemizer * espeak_phonemizer(bool use_espeak_phonemes = false, str espeak_voice_code = "gmw/en-US");
 
 #endif

@@ -2,7 +2,6 @@
 #include "ggml.h"
 #include "util.h"
 #include <cstdio>
-#include <format>
 #include <string>
 #define JSON_ASSERT GGML_ASSERT
 #include "json.hpp"
@@ -11,452 +10,274 @@
 #define MIMETYPE_AIFF "audio/aiff"
 #define MIMETYPE_JSON "application/json; charset=utf-8"
 #define MIMETYPE_HTML "text/html; charset=utf-8"
+#define MIMETYPE_TXT "text/plain"
 
 #include <atomic>
 #include <condition_variable>
-#include <cstddef>
-#include <cinttypes>
 #include <deque>
-#include <memory>
 #include <mutex>
-#include <signal.h>
+#include <csignal>
 #include <thread>
 #include <unordered_map>
 #include <filesystem>
-#include <unordered_set>
 #include <chrono>
 #include "tts.h"
 #include "audio_file.h"
-#include "args.h"
-#include "common.h"
+#include "args_common.h"
 #include "tts_server_threading_osx.h"
 
 #include "index.html.hpp"
 
-enum server_state {
-    LOADING,  // Server is starting up / model loading
-    READY,    // Server is ready
-};
-
-// These are form copied from llama.cpp which copied them from openAI chat:
-// https://community.openai.com/t/openai-chat-list-of-error-codes-and-types/357791/11
-// In testing, openAI TTS endpoints make use of the same behavior.
-enum error_type {
-    ERROR_TYPE_INVALID_REQUEST,
-    ERROR_TYPE_AUTHENTICATION, // not currently supported as auth keys are not built in yet
-    ERROR_TYPE_SERVER,
-    ERROR_TYPE_NOT_FOUND,
-    ERROR_TYPE_PERMISSION, // not currently supported as auth keys are not built in yet
-    ERROR_TYPE_UNAVAILABLE, // custom error
-    ERROR_TYPE_NOT_SUPPORTED, // custom error
-};
-
-enum task_type {
-    TTS,
-    CONDITIONAL_PROMPT,
-};
-
+namespace {
 using json = nlohmann::ordered_json;
 
-template <typename T>
-static T json_value(const json & body, const std::string & key, const T & default_value) {
-    // Fallback null to default value
-    if (body.contains(key) && !body.at(key).is_null()) {
-        try {
-            return body.at(key);
-        } catch (NLOHMANN_JSON_NAMESPACE::detail::type_error const &) {
-            fprintf(stderr, "Wrong type supplied for parameter '%s'. Expected '%s', using default value\n", key.c_str(), json(default_value).type_name());
-            return default_value;
-        }
-    } else {
-        return default_value;
-    }
+void res_ok_json_str(httplib::Response & res, str output) {
+    res.set_content(output, MIMETYPE_JSON);
+    res.status = 200;
 }
 
-bool write_audio_data(float * data, size_t length, std::vector<uint8_t> & output, AudioFileFormat format = AudioFileFormat::Wave, float sample_rate = 44100.f, float frequency = 440.f, int channels = 1) {
-    AudioFile<float> file;
-    file.setBitDepth(16);
-    file.setSampleRate(sample_rate);
-    file.setNumChannels(channels);
-    int samples = (int) (length / channels);
-    file.setNumSamplesPerChannel(samples);
-    for (int channel = 0; channel < channels; channel++) {
-        for (int i = 0; i < samples; i++) {
-            file.samples[channel][i] = data[i];
-        }
-    }
-    return file.writeData(output, format);
+string safe_json_to_str(const json & data) {
+    return data.dump(-1, ' ', false, json::error_handler_t::replace);
 }
 
-static void log_server_request(const httplib::Request & req, const httplib::Response & res) {
-    if (req.path == "/v1/health") {
-        return;
-    }
-
-    fprintf(stdout, "request: %s %s %s %d\n", req.method.c_str(), req.path.c_str(), req.remote_addr.c_str(), res.status);
+void res_ok_audio(httplib::Response & res, const vector<uint8_t> & audio, str mime_type) {
+    res.set_content(reinterpret_cast<const char *>(audio.data()), audio.size(), mime_type);
+    res.status = 200;
 }
 
-struct simple_text_prompt_task {
-    simple_text_prompt_task(task_type task, std::string prompt): task(task), prompt(prompt) {
-        id = rand();
-        time = std::chrono::steady_clock::now();
+void res_error(httplib::Response & res, str err) {
+    res.set_content(err, MIMETYPE_TXT);
+    res.status = 500;
+}
+
+class simple_task_queue;
+
+class simple_text_prompt_task {
+    mutex condition_mutex{};
+    condition_variable condition{};
+    friend simple_task_queue;
+public:
+    str prompt{""};
+    str conditional_prompt{""};
+    str model{""};
+    AudioFileFormat format{};
+    generation_configuration gen_config{};
+    atomic<chrono::time_point<chrono::steady_clock>> time{};
+
+    vector<uint8_t> response;
+    bool success{};
+    atomic<bool> locked_by_worker{};
+
+    bool timed_out(int cleanup_timeout) const {
+        const auto start{time.load(memory_order_relaxed)};
+        return chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - start).count() > cleanup_timeout;
     }
 
-    task_type task;
-    int id;
-    std::string prompt;
-    generation_configuration * gen_config;
-    void * response;
-    size_t length;
-    bool success = false;
-    std::string message;
-    std::chrono::time_point<std::chrono::steady_clock> time;
-    float sample_rate = 44100.0f;
-    std::string model;
-
-    bool timed_out(int t) {
-        auto now = std::chrono::steady_clock::now();
-        std::chrono::duration<double, std::ratio<1>> duration = now - time;
-        return (int) duration.count() > t;
-    }
-};
-
-struct simple_task_queue {
-    std::mutex rw_mutex;
-    std::condition_variable condition;
-    std::deque<simple_text_prompt_task*> queue;
-    bool running = true;
-
-    struct simple_text_prompt_task * get_next() {
-        struct simple_text_prompt_task * resp;
-        std::unique_lock<std::mutex> lock(rw_mutex);
-        condition.wait(lock, [&]{ 
-            return !queue.empty() || !running; 
-        });
-        if (!running) {
-            return nullptr;
-        }
-        resp = queue.front();
-        queue.pop_front();
-        lock.unlock();
-        return resp;
-    }
-
-    void terminate() {
-        std::lock_guard<std::mutex> lock(rw_mutex);
-        running = false; 
-        condition.notify_all();
-    }
-
-    void push(struct simple_text_prompt_task * task) {
-        std::lock_guard<std::mutex> lock(rw_mutex);
-        queue.push_back(task);
+    void respond() {
+        lock_guard lock{condition_mutex};
+        locked_by_worker.store(false);
         condition.notify_one();
     }
 };
 
-struct simple_response_map {
-    std::mutex rw_mutex;
-    std::condition_variable updated;
-    int cleanup_timeout = 300;
-    std::atomic<bool> running = true;
-    std::thread * cleanup_thread;
+struct worker;
 
-    std::map<int, simple_text_prompt_task*> completed;
+class simple_task_queue {
+    mutex rw_mutex{};
+    condition_variable condition{};
+    deque<weak_ptr<simple_text_prompt_task>> queue{};
+public:
+    vector<unique_ptr<worker>> workers{};
+    atomic<bool> running{true};
+    atomic<int> startup_fence{};
+    int cleanup_timeout{300};
+    str text_encoder_path{""};
 
-    void cleanup_routine() {
-        std::unique_lock<std::mutex> lock(rw_mutex);
-        while(true) {
-            updated.wait(lock, [&]{
-                return completed.size() > 100 || !running;
-            });
-            if (!running) {
+    shared_ptr<simple_text_prompt_task> get_next() {
+        unique_lock lock(rw_mutex);
+        condition.wait(lock, [&] {
+            return !queue.empty() || !running.load();
+        });
+        if (!running.load()) {
+            return {};
+        }
+        do {
+            shared_ptr result = queue.front().lock();
+            queue.pop_front();
+            if (!result) {
+                continue;
+            }
+            if (result->timed_out(cleanup_timeout)) {
+                result->respond();
+                continue;
+            }
+            return result;
+        } while (!queue.empty());
+        return {};
+    }
+
+    void terminate();
+
+    void request(shared_ptr<simple_text_prompt_task> & task) {
+        unique_lock lock{task->condition_mutex};
+        task->time.store(chrono::steady_clock::now(), memory_order_relaxed);
+        {
+            unique_lock lock2{rw_mutex};
+            task->response.clear();
+            task->success = false;
+        }
+        task->locked_by_worker.store(true, memory_order_relaxed);
+        {
+            lock_guard lock2(rw_mutex);
+            queue.emplace_back(task);
+            condition.notify_one();
+        }
+        do {
+            if (condition.wait_for(lock, chrono::seconds(1), [&] {
+                return !task->locked_by_worker.load() || !running.load();
+            })) {
                 return;
             }
-            auto now = std::chrono::steady_clock::now();
-            std::vector<int> deletable;
-            for (auto const& [key, task] : completed) {
-                if (task->timed_out(cleanup_timeout)) {
-                    deletable.push_back(key);
-                }
-            }
-            for (auto const id : deletable) {
-                completed.erase(id);
-            }
-        }
-    }
-
-    void terminate() {
-        std::lock_guard<std::mutex> lock(rw_mutex);
-        running = false; 
-        updated.notify_all();
-    }
-
-    void push(struct simple_text_prompt_task * task) {
-        std::unique_lock<std::mutex> lock(rw_mutex);
-        completed[task->id] = task;
-        lock.unlock();
-        updated.notify_all();
-    }
-
-    struct simple_text_prompt_task * get(int id) {
-        std::unique_lock<std::mutex> lock(rw_mutex);
-        struct simple_text_prompt_task * resp = nullptr;
-        try {
-            return completed.at(id);
-        } catch (const std::out_of_range& e) {
-            updated.wait(lock, [&]{
-                return completed.find(id) != completed.end() || !running;
-            });
-            if (!running) {
-                return nullptr;
-            }
-            return completed.at(id);
-        }
+        } while (!task->timed_out(cleanup_timeout));
     }
 };
-
-void init_response_map(simple_response_map * rmap) {
-    rmap->cleanup_routine();
-}
 
 struct worker {
-    worker(struct simple_task_queue * task_queue, struct simple_response_map * response_map, std::string text_encoder_path = "", int task_timeout = 300): task_queue(task_queue), response_map(response_map), text_encoder_path(text_encoder_path), task_timeout(task_timeout) {};
-    ~worker() {
-        for (auto &[_, runner]: runners) {
-            delete runner;
-        }
+    worker(simple_task_queue & q, const arg_list & args, const unordered_map<string, string> & model_map)
+        : q{q}, args{args}, model_map{model_map} {
     }
-    struct simple_task_queue * task_queue;
-    struct simple_response_map * response_map;
+    reference_wrapper<simple_task_queue> q;
+    reference_wrapper<const arg_list> args;
+    reference_wrapper<const unordered_map<string, string>> model_map;
 
-    std::unordered_map<std::string, struct tts_runner *> runners;
-    std::string text_encoder_path;
-    std::atomic<bool> running = true;
-    tts_server_threading::native_thread * thread = nullptr;
-
-    int task_timeout;
-
-    void terminate() {
-        running = false;
-    }
+    unordered_map<string, unique_ptr<tts_runner>> runners{};
+    tts_server_threading::native_thread worker_thread{};
 
     void loop() {
-        while (running) {
-            struct simple_text_prompt_task * task = task_queue->get_next();
-            if (task) {
-                process_task(task);
+        const arg_list & args_ = args.get();
+        const int n_threads{args_["n-threads"]};
+        const generation_configuration startup_config{parse_generation_config(args_)};
+        const bool cpu_only{!args_["use-metal"]};
+
+        for (const auto & [id, path]: model_map.get()) {
+            runners[id].reset(runner_from_file(path.c_str(), n_threads, startup_config, cpu_only));
+        }
+        q.get().startup_fence.fetch_sub(1, memory_order_acq_rel);
+
+        while (q.get().running.load()) {
+            if (shared_ptr const task{q.get().get_next()}) {
+                process_task(*task);
+                task->respond();
             }
         }
     }
 
-    void process_task(struct simple_text_prompt_task * task) {
-        if (task->timed_out(task_timeout)) {
+    void process_task(simple_text_prompt_task & task) {
+        tts_runner * runner = &*runners[task.model];
+        if (*task.conditional_prompt) {
+            TTS_ASSERT(*q.get().text_encoder_path);
+            update_conditional_prompt(runner, q.get().text_encoder_path, task.conditional_prompt);
+        }
+        tts_response data;
+        task.success = !generate(runner, task.prompt, data, task.gen_config);
+        if (!task.success) {
             return;
         }
-        int outcome;
-        tts_response * data = nullptr;
-        tts_runner* runner = runners[task->model];
-        switch(task->task) {
-            case TTS:
-                data = new tts_response;
-                outcome = generate(runner, task->prompt, data, task->gen_config);
-                task->response = (void*) data->data;
-                task->length = data->n_outputs;
-                task->sample_rate = runner->sampling_rate;
-                task->success = outcome == 0;
-                response_map->push(task);
-                break;
-            case CONDITIONAL_PROMPT:
-                if (text_encoder_path.size() == 0) {
-                    task->message = "A text encoder path must be specified on server initialization in order to support conditional prompting.";
-                    response_map->push(task);
-                    break;
-                }
-                update_conditional_prompt(runner, text_encoder_path, task->prompt);
-                task->success = true;
-                response_map->push(task);
-                break;
-        }
+
+        AudioFile<float> file{};
+        file.setSampleRate(runner->sampling_rate);
+        file.samples[0] = vector(data.data, data.data + data.n_outputs);
+        const bool write_audio_data_result{file.writeData(task.response, task.format)};
+        TTS_ASSERT(write_audio_data_result);
     }
 };
 
-void init_worker(std::unordered_map<std::string, std::string>* model_path, int n_threads, bool cpu_only, generation_configuration * config, worker * w) {
-    for (const auto &[id, path] : *model_path) {
-        w->runners[id] = runner_from_file(path, n_threads, config, cpu_only);
+void simple_task_queue::terminate() {
+    if (workers.empty()) {
+        return;
     }
-    w->loop();
+    {
+        lock_guard lock{rw_mutex};
+        running.store(false);
+        condition.notify_all();
+    }
+    for (const auto & w : workers) {
+        w->worker_thread.join();
+    }
+    workers.clear();
 }
 
-typedef std::vector<worker*> worker_pool;
+std::function<void()> shutdown_handler;
 
-void terminate(worker_pool * pool) {
-    for (auto w : *pool) {
-        w->terminate();
-    }
-    if (pool->size() > 0) {
-        (*pool)[0]->task_queue->terminate();
-        (*pool)[0]->response_map->terminate();
-    }
-}
-
-void complete(worker_pool * pool) {
-    for (auto w : *pool) {
-        if (w->thread) {
-            w->thread->join();
-        }
-        delete w;
-    }
-}
-
-static std::string safe_json_to_str(json data) {
-    return data.dump(-1, ' ', false, json::error_handler_t::replace);
-}
-
-// this function maybe used outside of server_task_result_error
-static json format_error_response(const std::string & message, const enum error_type type) {
-    std::string type_str;
-    int code = 500;
-    switch (type) {
-        case ERROR_TYPE_INVALID_REQUEST:
-            type_str = "invalid_request_error";
-            code = 400;
-            break;
-        case ERROR_TYPE_AUTHENTICATION:
-            type_str = "authentication_error";
-            code = 401;
-            break;
-        case ERROR_TYPE_NOT_FOUND:
-            type_str = "not_found_error";
-            code = 404;
-            break;
-        case ERROR_TYPE_SERVER:
-            type_str = "server_error";
-            code = 500;
-            break;
-        case ERROR_TYPE_PERMISSION:
-            type_str = "permission_error";
-            code = 403;
-            break;
-        case ERROR_TYPE_NOT_SUPPORTED:
-            type_str = "not_supported_error";
-            code = 501;
-            break;
-        case ERROR_TYPE_UNAVAILABLE:
-            type_str = "unavailable_error";
-            code = 503;
-            break;
-    }
-    return json {
-        {"code", code},
-        {"message", message},
-        {"type", type_str},
-    };
-}
-
-std::function<void(int)> shutdown_handler;
-std::atomic_flag is_terminating = ATOMIC_FLAG_INIT;
-
-inline void signal_handler(int signal) {
+void signal_handler(int /*signal*/) {
+    static atomic_flag is_terminating{};
     if (is_terminating.test_and_set()) {
         // in case it hangs, we can force terminate the server by hitting Ctrl+C twice
         // this is for better developer experience, we can remove when the server is stable enough
         fprintf(stderr, "Received second interrupt, terminating immediately.\n");
         exit(1);
     }
-
-    shutdown_handler(signal);
+    shutdown_handler();
+}
 }
 
 int main(int argc, const char ** argv) {
-    int default_n_threads = std::max((int)std::thread::hardware_concurrency(), 1);
-    int default_http_threads = std::max((int)std::thread::hardware_concurrency() - 1, 3);
-    int default_n_parallel = 1;
-    int default_port = 8080;
-    int default_timeout = 300;
-    std::string default_host = "127.0.0.1";
-    float default_temperature = 1.0f;
-    int default_top_k = 50;
-    float default_repetition_penalty = 1.0f;
-    float default_top_p = 1.0f;
-
-    arg_list args;
-    args.add_argument(float_arg("--temperature", "(OPTIONAL) The temperature to use when generating outputs. Defaults to 1.0.", "-t", false, &default_temperature));
-    args.add_argument(int_arg("--topk", "(OPTIONAL) when set to an integer value greater than 0 generation uses nucleus sampling over topk nucleaus size. Defaults to 50.", "-tk", false, &default_top_k));
-    args.add_argument(float_arg("--repetition-penalty", "The by channel repetition penalty to be applied the sampled output of the model. defaults to 1.0.", "-r", false, &default_repetition_penalty));
-    args.add_argument(string_arg("--model-path", "(REQUIRED) The local path of the gguf model file or a directory containing only gguf model files for Parler TTS mini or large v1, Dia, or Kokoro.", "-mp", true));
-    args.add_argument(string_arg("--default-model", "(OPTIONAL) The default model to use when multiple models (a directory with multiple GGUF files) are provided. This can be set by giving the path to the model (./models/Kokoro_no_espeak.gguf), the filename (Kokoro_no_espeak.gguf), or the model ID itself (Kokoro_no_espeak).", "-dm", false));
-    args.add_argument(int_arg("--n-threads", "The number of cpu threads to run generation with. Defaults to hardware concurrency.", "-nt", false, &default_n_threads));
-    args.add_argument(bool_arg("--use-metal", "(OPTIONAL) Whether to use metal acceleration", "-m"));
-    args.add_argument(bool_arg("--no-cross-attn", "(OPTIONAL) Whether to not include cross attention", "-ca"));
-    args.add_argument(string_arg("--text-encoder-path", "(OPTIONAL) The local path of the text encoder gguf model for conditional generaiton.", "-tep", false));
-    args.add_argument(string_arg("--ssl-file-cert", "(OPTIONAL) The local path to the PEM encoded ssl cert.", "-sfc", false));
-    args.add_argument(string_arg("--ssl-file-key", "(OPTIONAL) The local path to the PEM encoded ssl private key.", "-sfk", false));
-    args.add_argument(int_arg("--port", "(OPTIONAL) The port to use. Defaults to 8080.", "-p", false, &default_port));
-    args.add_argument(string_arg("--host", "(OPTIONAL) the hostname of the server. Defaults to '127.0.0.1'.", "-h", false, default_host));
-    args.add_argument(int_arg("--n-http-threads", "(OPTIONAL) The number of http threads to use. Defaults to hardware concurrency minus 1.", "-ht", false, &default_http_threads));
-    args.add_argument(int_arg("--timeout", "(OPTIONAL) The server side timeout on http calls in seconds. Defaults to 300 seconds.", "-t", false, &default_timeout));
-    args.add_argument(int_arg("--n-parallelism", "(OPTIONAL) the number of parallel models to run asynchronously. Deafults to 1.", "-np", false, &default_n_parallel));
-    args.add_argument(string_arg("--voice", "(OPTIONAL) the default voice to use when generating audio. Only used with applicable models.", "-v", false, "af_alloy"));
-    args.add_argument(string_arg("--espeak-voice-id", "(OPTIONAL) The espeak voice id to use for phonemization. This should only be specified when the correct espeak voice cannot be inferred from the kokoro voice (see #MultiLanguage Configuration in the cli README for more info).", "-eid", false));
-    args.add_argument(float_arg("--top-p", "(OPTIONAL) the default sum of probabilities to sample over. Must be a value between 0.0 and 1.0. Defaults to 1.0.", "-tp", false, &default_top_p));
-
-    args.parse(argc, argv);
-    if (args.for_help) {
-        args.help();
-        return 0;
-    }
-    args.validate();
-
-    if (*args.get_float_param("--top-p") > 1.0f || *args.get_float_param("--top-p") <= 0.0f) {
-        fprintf(stderr, "The '--top-p' value must be between 0.0 and 1.0. It was set to '%.6f'.\n", *args.get_float_param("--top-p"));
-        exit(1);
-    }
-
-    generation_configuration * default_generation_config = new generation_configuration(
-        args.get_string_param("--voice"),
-        *args.get_int_param("--topk"),
-        *args.get_float_param("--temperature"),
-        *args.get_float_param("--repetition-penalty"),
-        !args.get_bool_param("--no-cross-attn"),
-        args.get_string_param("--espeak-voice-id"),
-        0,
-        *args.get_float_param("--top-p"));
-
-    worker_pool * pool = nullptr;
-    struct simple_task_queue * tqueue = new simple_task_queue;
-    struct simple_response_map * rmap  = new simple_response_map;
-
-    bool conditional_prompt_viable = args.get_string_param("--text-encoder-path").size() > 0 && *args.get_int_param("--n-parallelism") <= 1;
-
-    std::unique_ptr<httplib::Server> svr;
+    simple_task_queue q{};
+    arg_list args{};
+    add_common_args(args);
+    args.add({
+        "", "default-model", "dm",
+        "The default model to use when multiple models (a directory with multiple GGUF files) are provided. "
+        "This can be set by giving the path to the model (./models/Kokoro_no_espeak.gguf), "
+        "the filename (Kokoro_no_espeak.gguf), or the model ID itself (Kokoro_no_espeak)"
+    });
+    add_text_encoder_arg(args);
+    args.add({8080, "port", "p", "The port to use. Defaults to 8080"});
+    args.add({"127.0.0.1", "host", "h", "The hostname of the server. Defaults to 127.0.0.1"});
+    args.add({
+        max(static_cast<int>(thread::hardware_concurrency()) - 1, 3), "n-http-threads", "ht",
+        "The number of http threads to use. Defaults to hardware concurrency minus 1"
+    });
+    args.add({300, "timeout", "t", "The server side timeout on http calls in seconds. Defaults to 300 seconds"});
+    args.add({1, "n-parallelism", "np", "The number of parallel models to run asynchronously. Defaults to 1"});
 #ifdef CPPHTTPLIB_OPENSSL_SUPPORT
-    if (args.get_string_param("--ssl-file-cert") != "" && args.get_string_param("--ssl-file-key") != "") {
-        fprintf(stdout, "Running with SSL: key = %s, cert = %s\n", args.get_string_param("--ssl-file-key").c_str(), args.get_string_param("--ssl-file-cert").c_str());
-        svr.reset(new httplib::SSLServer(args.get_string_param("--ssl-file-key").c_str(), args.get_string_param("--ssl-file-cert").c_str()));
-    } else {
-        fprintf(stdout, "Running without SSL\n");
-        svr.reset(new httplib::Server());
+    args.add({"", "ssl-file-cert", "sfc", "The local path to the PEM encoded SSL certificate"});
+    args.add({"", "ssl-file-key", "sfk", "The local path to the PEM encoded SSL private key"});
+#endif
+    args.parse(argc, argv);
+    q.startup_fence.store(args["n-parallelism"], memory_order_relaxed);
+    q.cleanup_timeout = args["timeout"];
+    q.text_encoder_path = args["text-encoder-path"];
+
+    unique_ptr<httplib::Server> svr;
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+    {
+        const str cert{args["ssl-file-cert"]};
+        const str key{args["ssl-file-key"]};
+        if (*cert) {
+            TTS_ASSERT(*key);
+            fprintf(stdout, "Running with SSL: key = %s, cert = %s\n", key, cert);
+            svr = make_unique<httplib::SSLServer>(key, cert);
+        } else {
+            TTS_ASSERT(!*key);
+            fprintf(stdout, "Running without SSL\n");
+            svr = make_unique<httplib::Server>();
+        }
     }
 #else
-    if (args.get_string_param("--ssl-file-cert") != "" && args.get_string_param("--ssl-file-key") != "") {
-        fprintf(stderr, "Server is built without SSL support\n");
-        return 1;
-    }
-    svr.reset(new httplib::Server());
+    svr = make_unique<httplib::Server>();
 #endif
 
     std::unordered_map<std::string, std::string> model_map = {};
-    const std::string model_path = args.get_string_param("--model-path");
-    if (std::filesystem::is_directory(model_path)) {
+    if (const str model_path{args["model-path"]}; filesystem::is_directory(model_path)) {
         for (auto const &entry : std::filesystem::directory_iterator(model_path)) {
             if (!entry.is_directory() && entry.path().extension() == ".gguf") {
                 const std::string id = entry.path().stem();
                 model_map[id] = entry.path().string();
             }
         }
-        if (model_map.size() == 0) {
-            fprintf(stderr, "No model found in directory %s", model_path.c_str());
+        if (model_map.empty()) {
+            fprintf(stderr, "No model found in directory %s", model_path);
             return 1;
         }
     } else {
@@ -464,96 +285,49 @@ int main(int argc, const char ** argv) {
         model_map[path.stem()] = path;
     }
 
-    auto model_creation = std::chrono::duration_cast<std::chrono::seconds>(
-                              std::chrono::system_clock::now().time_since_epoch())
-                              .count();
-
-    std::string default_model = "";
-    if (args.get_string_param("--default-model") != "") {
-        const std::string model = std::filesystem::path { args.get_string_param("--default-model") }.stem();
-        if (model_map.contains(model)) {
-            default_model = model;
+    str default_model{args["default-model"]};
+    if (*default_model) {
+        const string model{filesystem::path{default_model}.stem()};
+        if (auto found = model_map.find(model); found != model_map.end()) {
+            default_model = found->first.c_str();
         } else {
             fprintf(stderr, "Invalid Default Model Provided: %s", model.c_str());
             return 1;
         }
     } else {
-        default_model = model_map.begin()->first;
+        default_model = model_map.begin()->first.c_str();
     }
 
-    std::vector<json> models = {};
-    for (const auto &[id, _] : model_map) {
-      json model = {{"id", ""},
-                    {"object", "model"},
-                    {"created", 0},
-                    {"owned_by", "tts.cpp"}};
-      model["id"] = id;
-      model["created"] = model_creation;
-      models.push_back(model);
-    }
-    const json models_json = {{"object", "list"}, {"data", models}};
+    const string models_json_output{[&model_map] {
+        vector<json> models = {};
+        const auto model_creation{chrono::system_clock::now().time_since_epoch().count()};
+        for (const auto & id: model_map | views::keys) {
+            json model{
+                {"id", id},
+                {"object", "model"},
+                {"created", model_creation},
+                {"owned_by", "tts.cpp"}
+            };
+            models.push_back(model);
+        }
+        return safe_json_to_str({{"object", "list"}, {"data", models}});
+    }()};
 
-    std::atomic<server_state> state{LOADING};
-
-    svr->set_logger(log_server_request);
-
-    auto res_error = [](httplib::Response & res, const json & error_data) {
-        json final_response {{"error", error_data}};
-        res.set_content(safe_json_to_str(final_response), MIMETYPE_JSON);
-        res.status = json_value(error_data, "code", 500);
-    };
-
-    auto res_ok_html = [](httplib::Response & res, const char * const & data) {
-        res.set_content(data, MIMETYPE_HTML);
-        res.status = 200;
-    };
-
-    auto res_ok_json = [](httplib::Response & res, const json & data) {
-        res.set_content(safe_json_to_str(data), MIMETYPE_JSON);
-        res.status = 200;
-    };
-
-    auto res_ok_audio = [](httplib::Response & res, const std::vector<uint8_t> & audio, std::string mime_type) {
-        res.set_content((char*)audio.data(), audio.size(), mime_type);
-        res.status = 200;
-    };
-
-    svr->set_exception_handler([&res_error](const httplib::Request &, httplib::Response & res, const std::exception_ptr & ep) {
-        std::string message;
-        try {
-            std::rethrow_exception(ep);
-        } catch (const std::exception & e) {
-            message = e.what();
-        } catch (...) {
-            message = "Unknown Exception";
+    svr->set_logger([](const httplib::Request & req, const httplib::Response & res) {
+        if (req.path == "/v1/health") {
+            return;
         }
 
-        json formatted_error = format_error_response(message, ERROR_TYPE_SERVER);
-        fprintf(stderr, "got exception: %s\n", formatted_error.dump().c_str());
-        res_error(res, formatted_error);
-    });
-
-    svr->set_error_handler([&res_error](const httplib::Request &, httplib::Response & res) {
-        if (res.status == 404) {
-            res_error(res, format_error_response("File Not Found", ERROR_TYPE_NOT_FOUND));
-        }
+        fprintf(stdout, "request: %s %s %s %d\n", req.method.c_str(), req.path.c_str(), req.remote_addr.c_str(), res.status);
     });
 
     // set timeouts and change hostname and port
-    svr->set_read_timeout(*args.get_int_param("--timeout"));
-    svr->set_write_timeout(*args.get_int_param("--timeout"));
-
-    auto middleware_server_state = [&res_error, &state](const httplib::Request & req, httplib::Response & res) {
-        server_state current_state = state.load();
-        if (current_state == LOADING) {
-            res_error(res, format_error_response("Loading model", ERROR_TYPE_UNAVAILABLE));
-            return false;
-        }
-        return true;
-    };
+    const int timeout{args["timeout"]};
+    svr->set_read_timeout(timeout);
+    svr->set_write_timeout(timeout);
 
     // register server middlewares
-    svr->set_pre_routing_handler([&middleware_server_state](const httplib::Request & req, httplib::Response & res) {
+    svr->set_pre_routing_handler([&q](const httplib::Request & req, httplib::Response & res) {
         res.set_header("Access-Control-Allow-Origin", req.get_header_value("Origin"));
         // If this is OPTIONS request, skip validation because browsers don't include Authorization header
         if (req.method == "OPTIONS") {
@@ -563,239 +337,152 @@ int main(int argc, const char ** argv) {
             res.set_content("", "text/html"); // blank response, no data
             return httplib::Server::HandlerResponse::Handled; // skip further processing
         }
-        if (!middleware_server_state(req, res)) {
+        if (q.startup_fence.load(memory_order_relaxed)) {
+            res_error(res, "Loading model");
             return httplib::Server::HandlerResponse::Handled;
         }
         return httplib::Server::HandlerResponse::Unhandled;
     });
 
-    const auto handle_index = [&](const httplib::Request &, httplib::Response & res) {
-        res_ok_html(res, reinterpret_cast<const char*>(index_html));
-    };
-
-    const auto handle_health = [&](const httplib::Request &, httplib::Response & res) {
-        json health = {{"status", "ok"}};
-        res_ok_json(res, health);
-    };
-
+    const generation_configuration startup_config{parse_generation_config(args)};
     const auto handle_tts = [
-        &tqueue,
-        &rmap,
-        &res_error,
-        &res_ok_audio,
-        &default_generation_config,
+        &q,
         &model_map,
-        &default_model
+        default_model,
+        &startup_config
     ](const httplib::Request &req, httplib::Response & res) {
-        json data = json::parse(req.body);
-        if (!data.contains("input") || !data.at("input").is_string()) {
-            json formatted_error = format_error_response("the 'input' field is required for tts generation and must be passed as a string.", ERROR_TYPE_INVALID_REQUEST);
-            res_error(res, formatted_error);
+        thread_local auto task{make_shared<simple_text_prompt_task>()};
+        if (task->locked_by_worker.load()) {
+            res_error(res, "Service unavailable");
             return;
         }
 
-        std::string mime_type = MIMETYPE_WAV;
-        AudioFileFormat audio_type = AudioFileFormat::Wave;
-        if (data.contains("response_format") && data.at("response_format").is_string()) {
-            std::string format = data.at("response_format").get<std::string>();
-            if (format != "wav" && format != "wave" && format != "aiff") {
-                json formatted_error = format_error_response("Currently 'wav' and 'aiff' are the only supported formats for the 'response_format' field.", ERROR_TYPE_NOT_SUPPORTED);
-                res_error(res, formatted_error);
-                return;
-            } else if (format == "aiff") {
-                mime_type = MIMETYPE_AIFF;
-                audio_type = AudioFileFormat::Aiff;
-            }
-        }
+        const json data(json::parse(req.body));
 
-        std::string prompt = data.at("input").get<std::string>();
+        if (!data.contains("input") || !data.at("input").is_string()) {
+            res_error(res, "the 'input' field is required for tts generation and must be passed as a string");
+            return;
+        }
+        const string & prompt = data.at("input").get<string>();
         if (prompt.empty()) {
-            json formatted_error = format_error_response("the 'input' field must be a non empty string", ERROR_TYPE_INVALID_REQUEST);
-            res_error(res, formatted_error);
+            res_error(res, "the 'input' field must be a non-empty string");
             return;
         }
-        struct simple_text_prompt_task * task = new simple_text_prompt_task(TTS, prompt);
-        int id = task->id;
-        generation_configuration * conf = new generation_configuration();
-        std::memcpy((void*)conf, default_generation_config, sizeof(generation_configuration));
-        float temp;
-        float rep_pen;
-        float top_p;
-        int top_k;
+        task->prompt = prompt.c_str();
+
+        string conditional_prompt;
+        if (data.contains("conditional_prompt") && data.at("conditional_prompt").is_string()) {
+            if (!*q.text_encoder_path) {
+                res_error(res, "A text encoder path must be specified on server initialization "
+                "in order to support conditional prompting.");
+                return;
+            }
+            conditional_prompt = data.at("conditional_prompt").get<string>();
+        }
+        task->conditional_prompt = conditional_prompt.c_str();
+
+        string model;
+        if (data.contains("model") && data.at("model").is_string()) {
+            model = data.at("model").get<string>();
+            if (!model_map.contains(model)) {
+                res_error(res, "Invalid Model");
+                return;
+            }
+            task->model = model.c_str();
+        } else {
+            task->model = default_model;
+        }
+
+        str mime_type = MIMETYPE_WAV;
+        AudioFileFormat format = AudioFileFormat::Wave;
+        if (data.contains("response_format") && data.at("response_format").is_string()) {
+            if (const string & requested = data.at("response_format").get<string>(); requested == "aiff") {
+                mime_type = MIMETYPE_AIFF;
+                format = AudioFileFormat::Aiff;
+            } else if (requested != "wav" && requested != "wave") {
+                res_error(res,
+                    "Currently 'wav' and 'aiff' are the only supported formats for the 'response_format' field");
+                return;
+            }
+        }
+        task->format = format;
+
+        task->gen_config = startup_config;
         if (data.contains("temperature") && data.at("temperature").is_number()) {
-            temp = data.at("temperature").get<float>();
-            conf->temperature = temp;
+            task->gen_config.temperature = data.at("temperature").get<float>();
         }
-
         if (data.contains("top_k") && data.at("top_k").is_number()) {
-            top_k = data.at("top_k").get<int>();
-            conf->top_k = top_k;
+            task->gen_config.top_k = data.at("top_k").get<int>();
         }
-
         if (data.contains("top_p") && data.at("top_p").is_number()) {
-            top_p = data.at("top_p").get<float>();
-            conf->top_p = top_p;
+            task->gen_config.top_p = data.at("top_p").get<float>();
         }
-
         if (data.contains("repetition_penalty") && data.at("repetition_penalty").is_number()) {
-            rep_pen = data.at("repetition_penalty").get<float>();
-            conf->repetition_penalty = rep_pen;
+            task->gen_config.repetition_penalty = data.at("repetition_penalty").get<float>();
         }
-
+        string voice;
         if (data.contains("voice") && data.at("voice").is_string()) {
-            conf->voice = data.at("voice").get<std::string>();
+            voice = data.at("voice").get<string>();
+            task->gen_config.voice = voice.c_str();
         }
 
-        if (data.contains("model") && data.at("model").is_string()) {
-            const std::string model = data.at("model");
-            if (!model_map.contains(model)) {
-                const std::string message = std::format("Invalid Model: {0}", model);
-                json formatted_error = format_error_response(message, ERROR_TYPE_INVALID_REQUEST);
-                res_error(res, formatted_error);
-                return;
-            }
-            task->model = data.at("model").get<std::string>();
-        } else {
-            task->model = default_model;
-        }
+        q.request(task);
 
-        task->gen_config = conf;
-        tqueue->push(task);
-        struct simple_text_prompt_task * rtask = rmap->get(id);
-        if (!rtask->success) {
-            json formatted_error = format_error_response(rtask->message, ERROR_TYPE_SERVER);
-            res_error(res, formatted_error);
+        if (task->locked_by_worker.load()) {
+            res_error(res, "Timed out");
+            return;
+        }
+        if (!task->success) {
+            res_error(res, "Generation failed");
+            return;
+        }
+        if (task->response.empty()) {
+            res_error(res, "Model returned an empty response");
             return;
         }
 
-        if (rtask->length == 0) {
-            json formatted_error = format_error_response("Model returned an empty response.", ERROR_TYPE_SERVER);
-            res_error(res, formatted_error);
-            return;
-        }
-
-        std::vector<uint8_t> audio;
-        bool success = write_audio_data((float *)rtask->response, rtask->length, audio, audio_type, rtask->sample_rate);
-        if (!success) {
-            json formatted_error = format_error_response("failed to write audio data", ERROR_TYPE_SERVER);
-            res_error(res, formatted_error);
-            return;
-        }
-
-        res_ok_audio(res, audio, mime_type);
-    };
-
-    const auto handle_conditional = [
-        &args,
-        &tqueue,
-        &rmap,
-        &res_error,
-        &res_ok_json,
-        &model_map,
-        &default_model
-    ](const httplib::Request & req, httplib::Response & res) {
-        if (args.get_string_param("--text-encoder-path").size() == 0) {
-            json formatted_error = format_error_response("A '--text-encoder-path' must be specified for conditional generation.", ERROR_TYPE_NOT_SUPPORTED);
-            res_error(res, formatted_error);
-            return;
-        }
-        if (*args.get_int_param("--n-parallelism") > 1) {
-            json formatted_error = format_error_response("Conditional prompting is not supported for parallelism greater than 1.", ERROR_TYPE_NOT_SUPPORTED);
-            res_error(res, formatted_error);
-            return;
-        }
-        json data = json::parse(req.body);
-        if (!data.contains("input") || !data.at("input").is_string()) {
-            json formatted_error = format_error_response("the 'input' field is required for conditional prompting.", ERROR_TYPE_INVALID_REQUEST);
-            res_error(res, formatted_error);
-            return;
-        }
-        std::string prompt = data.at("input").get<std::string>();
-        struct simple_text_prompt_task * task = new simple_text_prompt_task(CONDITIONAL_PROMPT, prompt);
-
-        if (data.contains("model") && data.at("model").is_string()) {
-            const std::string model = data.at("model");
-            if (!model_map.contains(model)) {
-                const std::string message = std::format("Invalid Model: {0}", model);
-                json formatted_error = format_error_response(message, ERROR_TYPE_INVALID_REQUEST);
-                res_error(res, formatted_error);
-                return;
-            }
-            task->model = data.at("model").get<std::string>();
-        } else {
-            task->model = default_model;
-        }
-
-        int id = task->id;
-        tqueue->push(task);
-        struct simple_text_prompt_task * rtask = rmap->get(id);
-        if (!rtask->success) {
-            json formatted_error = format_error_response(rtask->message, ERROR_TYPE_SERVER);
-            res_error(res, formatted_error);
-            return;
-        }
-        json health = {{"status", "ok"}};
-        res_ok_json(res, health);
-    };
-
-    const auto handle_models = [
-        &args,
-        &res_error,
-        &res_ok_json,
-        &models_json
-    ](const httplib::Request & _, httplib::Response & res) {
-        res_ok_json(res, models_json);
+        res_ok_audio(res, task->response, mime_type);
     };
 
     // register API routes
-    svr->Get("/", handle_index);
-    svr->Get("/health", handle_health);
+    svr->Get("/", [](const httplib::Request &, httplib::Response & res) {
+        res.set_content(reinterpret_cast<const char*>(index_html), MIMETYPE_HTML);
+        res.status = 200;
+    });
+    svr->Get("/health", [](const httplib::Request &, httplib::Response & res) {
+        res_ok_json_str(res, R"({"status":"ok")");
+    });
     svr->Post("/v1/audio/speech", handle_tts);
-    svr->Post("/v1/audio/conditional-prompt", handle_conditional);
-    svr->Get("/v1/models", handle_models);
+    svr->Get("/v1/models", [output = models_json_output.c_str()](const httplib::Request & _, httplib::Response & res) {
+        res_ok_json_str(res, output);
+    });
 
     // Start the server
-    svr->new_task_queue = [&args] { 
-        return new httplib::ThreadPool(*args.get_int_param("--n-http-threads")); 
+    const int n_http_threads{args["n-http-threads"]};
+    svr->new_task_queue = [n_http_threads] {
+        return new httplib::ThreadPool(n_http_threads);
     };
 
-    // clean up function, to be called before exit
-    auto clean_up = [&svr]() {
+    shutdown_handler = [&svr] {
         svr->stop();
     };
 
+    const str host{args["host"]};
+    const int port{args["port"]};
     // bind HTTP listen port
-    bool bound = svr->bind_to_port(args.get_string_param("--host"), *args.get_int_param("--port"));
-
-    if (!bound) {
-        fprintf(stderr, "%s: couldn't bind HTTP server socket, hostname: %s, port: %d\n", __func__, args.get_string_param("--host").c_str(), *args.get_int_param("--port"));
-        clean_up();
+    if (!svr->bind_to_port(host, port)) {
+        fprintf(stderr, "%s: couldn't bind HTTP server socket, hostname: %s, port: %d\n", __func__, host, port);
+        shutdown_handler();
         return 1;
     }
 
-    rmap->cleanup_timeout = *args.get_int_param("--timeout");
-    rmap->cleanup_thread = new std::thread(init_response_map, rmap);
-
-    // run the HTTP server in a thread
-    std::thread t([&]() { svr->listen_after_bind(); });
-    svr->wait_until_ready();
-    fprintf(stdout, "%s: HTTP server is listening, hostname: %s, port: %d, http threads: %d\n", __func__, args.get_string_param("--host").c_str(), *args.get_int_param("--port"), *args.get_int_param("--n-http-threads"));
-
-
-    pool = new worker_pool;
-    shutdown_handler = [&](int) {
-        // this should unblock the primary thread;
-        terminate(pool);
-        return;
-    };
-
 #if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
-    struct sigaction sigint_action;
+    struct sigaction sigint_action{};
     sigint_action.sa_handler = signal_handler;
     sigemptyset(&sigint_action.sa_mask);
     sigint_action.sa_flags = 0;
-    sigaction(SIGINT, &sigint_action, NULL);
-    sigaction(SIGTERM, &sigint_action, NULL);
+    sigaction(SIGINT, &sigint_action, nullptr);
+    sigaction(SIGTERM, &sigint_action, nullptr);
 #elif defined (_WIN32)
     auto console_ctrl_handler = +[](DWORD ctrl_type) -> BOOL {
         return (ctrl_type == CTRL_C_EVENT) ? (signal_handler(SIGINT), true) : false;
@@ -804,25 +491,16 @@ int main(int argc, const char ** argv) {
 #endif
 
     fprintf(stdout, "%s: loading model and initializing main loop\n", __func__);
-    // It might make sense in the long run to have the primary thread run clean up on the response map and keep the model workers parallel.    
-    for (int i = *args.get_int_param("--n-parallelism"); i > 0; i--) {
-        if (i == 1) {
-            fprintf(stdout, "%s: server is listening on http://%s:%d\n", __func__, args.get_string_param("--host").c_str(), *args.get_int_param("--port"));
-            worker * w = new worker(tqueue, rmap, args.get_string_param("--text-encoder-path"), *args.get_int_param("--timeout"));
-            state.store(READY);
-            pool->push_back(w);
-            init_worker(&model_map, *args.get_int_param("--n-threads"), !args.get_bool_param("--use-metal"), default_generation_config, w);
-        } else {
-            worker * w = new worker(tqueue, rmap, args.get_string_param("--text-encoder-path"), *args.get_int_param("--timeout"));
-            w->thread = new tts_server_threading::native_thread(init_worker, &model_map, *args.get_int_param("--n-threads"), !args.get_bool_param("--use-metal"), default_generation_config, w);
-            pool->push_back(w);
-        }
+    for (int i{q.startup_fence.load(memory_order_relaxed)}; i > 0; i--) {
+        auto & w = q.workers.emplace_back(make_unique<worker>(q, args, model_map));
+        w->worker_thread = tts_server_threading::native_thread(&worker::loop, w.get());
     }
-    fprintf(stdout, "%s: HTTP server listening on hostname: %s and port: %d, is shutting down.\n", __func__, args.get_string_param("--host").c_str(), *args.get_int_param("--port"));
-    svr->stop();
-    t.join();
-    complete(pool);
-    rmap->cleanup_thread->join();
+    fprintf(stdout, "%s: HTTP server is listening with %d threads on http://%s:%d/\n",
+        __func__, n_http_threads, host, port);
+    svr->listen_after_bind();
+    fprintf(stdout, "%s: HTTP server listening on hostname: %s and port: %d, is shutting down.\n",
+        __func__, host, port);
+    q.terminate();
 
     return 0;
 }

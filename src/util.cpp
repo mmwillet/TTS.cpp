@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <stdarg.h>
 #ifdef __APPLE__
 #include <sys/sysctl.h>

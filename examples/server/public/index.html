@@ -567,14 +567,9 @@
                 if (!response.ok) {
                     let errorMessage = `API error: ${response.status} ${response.statusText}`;
                     try {
-                        const errorData = await response.json();
-                        if (errorData?.error?.message) {
-                            errorMessage = `API error: ${errorData.error.message}`;
-                        } else if (typeof errorData === 'string') {
-                            errorMessage = `API error: ${errorData}`;
-                        }
+                        const errorData = await response.text();
+                        errorMessage = `API error: ${errorData}`;
                     } catch (jsonError) {
-                        console.error('Failed to parse error response:', jsonError);
                     }
                     throw new Error(errorMessage);
                 }

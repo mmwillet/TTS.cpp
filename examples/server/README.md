@@ -6,45 +6,44 @@ This script runs a simple restful HTTP server which supports an OpenAI like `/v1
 
 In order to get a detailed breakdown of the functionality currently available you can call the tts-server with the `--help` parameter. This will return a breakdown of all parameters:
 
-```bash
-./build/bin/tts-server --help
-
---temperature (-t):
-    (OPTIONAL) The temperature to use when generating outputs. Defaults to 1.0.
---repetition-penalty (-r):
-    The by channel repetition penalty to be applied the sampled output of the model. defaults to 1.0.
---top-p (tp):
-    (OPTIONAL) the default sum of probabilities to sample over. Must be a value between 0.0 and 1.0. Defaults to 1.0.
---topk (-tk):
-    (OPTIONAL) when set to an integer value greater than 0 generation uses nucleus sampling over topk nucleaus size. Defaults to 50.
---n-threads (-nt):
-    The number of cpu threads to run generation with. Defaults to hardware concurrency.
---port (-p):
-    (OPTIONAL) The port to use. Defaults to 8080.
+```console
+$ ./tts-server --help
+--default-model (-dm):
+    (OPTIONAL) The default model to use when multiple models (a directory with multiple GGUF files) are provided. This can be set by giving the path to the model (./models/Kokoro_no_espeak.gguf), the filename (Kokoro_no_espeak.gguf), or the model ID itself (Kokoro_no_espeak).
+--espeak-voice-id (-eid):
+    (OPTIONAL) The eSpeak voice id to use for phonemization. This should only be specified when the correct eSpeak voice cannot be inferred from the Kokoro voice. See MultiLanguage Configuration in the README for more info.
+--host (-h):
+    (OPTIONAL) The hostname of the server. Defaults to 127.0.0.1.
+--max-tokens (-mt):
+    (OPTIONAL) The max audio tokens or token batches to generate where each represents approximates 11 ms of audio. Only applied to Dia generation. If set to zero as is its default then the default max generation size. Warning values under 15 are not supported.
+--model-path (-mp):
+    (REQUIRED) The local path of the gguf model(s) to load.
 --n-http-threads (-ht):
     (OPTIONAL) The number of http threads to use. Defaults to hardware concurrency minus 1.
+--n-parallelism (-np):
+    (OPTIONAL) The number of parallel models to run asynchronously. Defaults to 1.
+--n-threads (-nt):
+    (OPTIONAL) The number of CPU threads to run calculations with. Defaults to known hardware concurrency. If hardware concurrency cannot be determined then it defaults to 1.
+--no-cross-attn (-ca):
+    (OPTIONAL) Whether to not include cross attention.
+--port (-p):
+    (OPTIONAL) The port to use. Defaults to 8080.
+--repetition-penalty (-r):
+    (OPTIONAL) The per-channel repetition penalty to be applied the sampled output of the model.
+--temperature (-t):
+    (OPTIONAL) The temperature to use when generating outputs.
+--text-encoder-path (-tep):
+    (OPTIONAL) The local path of the text encoder gguf model for conditional generation.
 --timeout (-t):
     (OPTIONAL) The server side timeout on http calls in seconds. Defaults to 300 seconds.
---n-parallelism (-np):
-    (OPTIONAL) the number of parallel models to run asynchronously. Deafults to 1.
+--top-p (-mt):
+    (OPTIONAL) The sum of probabilities to sample over. Must be a value between 0.0 and 1.0. Defaults to 1.0.
+--topk (-tk):
+    (OPTIONAL) When set to an integer value greater than 0 generation uses nucleus sampling over topk nucleus size. Defaults to 50.
 --use-metal (-m):
-    (OPTIONAL) Whether to use metal acceleration
---no-cross-attn (-ca):
-    (OPTIONAL) Whether to not include cross attention
---model-path (-mp):
-    (REQUIRED) The local path of the gguf model file for Parler TTS mini or large v1, Dia, or Kokoro.
---text-encoder-path (-tep):
-    (OPTIONAL) The local path of the text encoder gguf model for conditional generaiton.
---ssl-file-cert (-sfc):
-    (OPTIONAL) The local path to the PEM encoded ssl cert.
---ssl-file-key (-sfk):
-    (OPTIONAL) The local path to the PEM encoded ssl private key.
---host (-h):
-    (OPTIONAL) the hostname of the server. Defaults to '127.0.0.1'.
+    (OPTIONAL) Whether to use metal acceleration.
 --voice (-v):
-    (OPTIONAL) the default voice to use when generating audio. Only used with applicable models.
---espeak-voice-id (-eid):
-    (OPTIONAL) The espeak voice id to use for phonemization. This should only be specified when the correct espeak voice cannot be inferred from the kokoro voice (see #MultiLanguage Configuration in the cli README for more info).
+    (OPTIONAL) The voice to use to generate the audio. This is only used for models with voice packs.
 ```
 
 Important configuration here includes `--n-parallelism` which describes how may models for asynchronous processing and `--model-path` which describes from where to load the model locally.

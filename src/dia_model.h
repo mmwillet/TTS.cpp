@@ -193,7 +193,7 @@ struct dia_runner : tts_runner {
 
     void tokenize_sentence(std::string sentence, dia_ubatch & tokens);
     dia_ubatch batch_from_sentence(std::string sentence);
-    void configure_generation(generation_configuration * config);
+    void configure_generation(const generation_configuration & config);
     void assign_weight(std::string name, ggml_tensor * tensor);
     dia_ubatch build_worst_case_batch();
     struct ggml_cgraph * build_dia_graph(dia_ubatch & batch);

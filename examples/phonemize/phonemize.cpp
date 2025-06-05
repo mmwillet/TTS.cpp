@@ -1,31 +1,27 @@
+#include <cstdio>
+
+#include "args_common.h"
 #include "phonemizer.h"
-#include "args.h"
-#include <stdio.h>
 
 int main(int argc, const char ** argv) {
-    arg_list args;
-    args.add_argument(string_arg("--phonemizer-path", "(OPTIONAL) The local path of the gguf phonemiser file for TTS.cpp phonemizer. This is required if not using espeak.", "-mp"));
-    args.add_argument(string_arg("--prompt", "(REQUIRED) The text prompt to phonemize.", "-p", true));
-    args.add_argument(bool_arg("--use-espeak", "(OPTIONAL) Whether to use espeak to generate phonems.", "-ue"));
-    args.add_argument(string_arg("--espeak-voice-id", "(OPTIONAL) The voice id to use for espeak phonemization. Defaults to 'gmw/en-US'.", "-eid", false, "gmw/en-US"));
+    arg_list args{};
+    args.add({"", "prompt", "p", "The text prompt to phonemize", true});
+    args.add({
+        "", "phonemizer-path", "mp",
+        "The local path of the gguf phonemiser file for TTS.cpp phonemizer. "
+        "Omit this to use eSpeak to generate phonemes"
+    });
+    add_espeak_voice_arg(args);
     args.parse(argc, argv);
-    if (args.for_help) {
-        args.help();
-        return 0;
-    }
-    args.validate();
-    if (!args.get_bool_param("--use-espeak") && args.get_string_param("--phonemizer-path") == "") {
-        fprintf(stderr, "The '--phonemizer-path' must be specified when '--use-espeak' is not true.\n");
-        exit(1);
-    }
+    const str phonemizer_path{args["phonemizer-path"]};
 
     phonemizer * ph;
-    if (args.get_bool_param("--use-espeak")) {
-        ph = espeak_phonemizer(false, args.get_string_param("--espeak-voice-id"));
+    if (*phonemizer_path) {
+        ph = phonemizer_from_file(phonemizer_path);
     } else {
-        ph = phonemizer_from_file(args.get_string_param("--phonemizer-path"));
+        ph = espeak_phonemizer(false, args["espeak-voice-id"]);
     }
-    std::string response = ph->text_to_phonemes(args.get_string_param("--prompt"));
+    const string response{ph->text_to_phonemes(string{args["prompt"]})};
     fprintf(stdout, "%s\n", response.c_str());
     return 0;
 }

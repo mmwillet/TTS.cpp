@@ -2,12 +2,9 @@
 #define util_h
 
 #include <functional>
-#include <math.h>
+#include <cmath>
 #include <random>
-#include <stdio.h>
-#include <string>
-#include <cstring>
-#include <vector>
+#include <cstdio>
 #include <stdint.h>
 #include <sys/types.h>
 #include "ggml-metal.h"
@@ -17,9 +14,7 @@
 #include "ggml.h"
 #include "ggml-impl.h"
 #include "ggml-cpp.h"
-
-#define TTS_ABORT(...) tts_abort(__FILE__, __LINE__, __VA_ARGS__)
-#define TTS_ASSERT(x) if (!(x)) TTS_ABORT("TTS_ASSERT(%s) failed", #x)
+#include "imports.h"
 
 struct model_tensor_meta {
 	uint32_t n_tensors = 0;
@@ -59,7 +54,5 @@ std::vector<std::string> split(std::string target, std::string split_on, bool in
 std::vector<std::string> split(std::string target, const char split_on, bool include_split_characters = false);
 std::string strip(std::string target, std::string vals = " ");
 std::string replace_any(std::string target, std::string to_replace, std::string replacement);
-
-[[noreturn]] void tts_abort(const char * file, int line, const char * fmt, ...);
 
 #endif

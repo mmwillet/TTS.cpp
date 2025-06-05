@@ -1,4 +1,7 @@
 #include <cstdint>
+#ifdef SDL2_INSTALL
+#include "SDL.h"
+#endif
 #include "playback.h"
 
 #ifndef SDL2_INSTALL
@@ -10,13 +13,12 @@ bool play_tts_response(arg_list & args, const tts_response & data, float sample_
     return false;
 }
 #else
-#include "SDL.h"
 void register_play_tts_response_args(arg_list & args) {
-    args.add_argument(bool_arg("--play", "(OPTIONAL) Whether to play back the audio immediately instead of saving it to file."));
+    args.add({false, "play", "", "Whether to play back the audio immediately instead of saving it to file."});
 }
 
 bool play_tts_response(arg_list & args, const tts_response & data, float sample_rate) {
-    if (!args.get_bool_param("--play")) {
+    if (!args["play"]) {
         return false;
     }
 
