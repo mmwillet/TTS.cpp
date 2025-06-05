@@ -23,6 +23,7 @@
 #include <chrono>
 #include "tts.h"
 #include "audio_file.h"
+#include "args_common.h"
 #include "tts_server_threading_osx.h"
 
 #include "index.html.hpp"
