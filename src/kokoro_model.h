@@ -362,13 +362,15 @@ struct kokoro_duration_response {
 // Duration computation and speech generation are separated into distinct graphs because the precomputed graph structure of ggml doesn't 
 // support the tensor dependent views that would otherwise be necessary.
 struct kokoro_duration_runner : tts_runner {
-    kokoro_duration_runner(kokoro_model * model, kokoro_duration_context * context, single_pass_tokenizer * tokenizer): model(model), kctx(context), tokenizer(tokenizer) {};
+    explicit kokoro_duration_runner(/* shared */ kokoro_model * model, kokoro_duration_context * context,
+                                    single_pass_tokenizer * tokenizer)
+        :  tokenizer{tokenizer}, model{model}, kctx{context} {
+    };
+
     ~kokoro_duration_runner() {
         if (ctx) {
             ggml_free(ctx);
         }
-        model->free();
-        delete model;
         delete kctx;
     }
     struct single_pass_tokenizer * tokenizer;
@@ -387,17 +389,7 @@ struct kokoro_duration_runner : tts_runner {
 };
 
 struct kokoro_context : runner_context {
-    kokoro_context(kokoro_model * model, int n_threads): runner_context(n_threads), model(model) {};
-    ~kokoro_context() {
-        ggml_backend_sched_free(sched);
-        ggml_backend_free(backend_cpu);
-        if (backend) {
-            ggml_backend_free(backend);
-        }
-        if (buf_output) {
-            ggml_backend_buffer_free(buf_output);
-        }
-    }
+    explicit kokoro_context(kokoro_model * model, int n_threads) : runner_context{n_threads}, model{model} {}
 
     std::string voice = "af_alloy";
     
@@ -428,21 +420,21 @@ struct kokoro_context * build_new_kokoro_context(struct kokoro_model * model, in
 
 // This manages the graph compilation of computation for the Kokoro model.
 struct kokoro_runner : tts_runner {
-    kokoro_runner(kokoro_model * model, kokoro_context * context, single_pass_tokenizer * tokenizer, kokoro_duration_runner * drunner, phonemizer * phmzr): model(model), kctx(context), tokenizer(tokenizer), drunner(drunner), phmzr(phmzr) {
-    	tts_runner::sampling_rate = 24000.0f;
+    explicit kokoro_runner(unique_ptr<kokoro_model> && model, kokoro_context * context,
+                           single_pass_tokenizer * tokenizer, kokoro_duration_runner * drunner, phonemizer * phmzr)
+        : tokenizer{tokenizer}, model{move(model)}, kctx{context}, drunner{drunner}, phmzr{phmzr} {
+        sampling_rate = 24000.0f;
     };
     ~kokoro_runner() {
         if (ctx) {
             ggml_free(ctx);
         }
         delete drunner;
-        model->free();
-        delete model;
         delete kctx;
         delete phmzr;
     }
     struct single_pass_tokenizer * tokenizer;
-    kokoro_model * model;
+    unique_ptr<kokoro_model> model;
     kokoro_context * kctx;
     kokoro_duration_runner * drunner;
     phonemizer * phmzr;
