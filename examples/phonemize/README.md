@@ -10,22 +10,19 @@ This is a simple cli for running TTS.cpp phonemization on a pass text string. Fo
 ### Usage
 
 In order to get a detailed breakdown the functionality currently available you can call the cli with the `--help` parameter. This will return a breakdown of all parameters:
-```commandline
-./build/bin/phonemize --help
-
---use-espeak (-ue):
-    (OPTIONAL) Whether to use espeak to generate phonems.
+```console
+$ ./phonemize --help
+--espeak-voice-id (-eid):
+    (OPTIONAL) The eSpeak voice id to use for phonemization. This should only be specified when the correct eSpeak voice cannot be inferred from the Kokoro voice. See MultiLanguage Configuration in the README for more info.
 --phonemizer-path (-mp):
-    (OPTIONAL) The local path of the gguf phonemiser file for TTS.cpp phonemizer. This is required if not using espeak.
+    (OPTIONAL) The local path of the gguf phonemiser file for TTS.cpp phonemizer. Omit this to use eSpeak to generate phonemes.
 --prompt (-p):
     (REQUIRED) The text prompt to phonemize.
---espeak-voice-id (-eid):
-    (OPTIONAL) The voice id to use for espeak phonemization. Defaults to 'gmw/en-US'.
 ```
 
 General usage should follow from these possible parameters. E.G. The following command will return the phonemized IPA text for the prompt via the TTS.cpp phonemizer.
 
-```commandline
+```bash
 ./build/bin/phonemize --phonemizer-path "/path/to/tts_phonemizer.gguf" --prompt "this is a test."
 ```
 
@@ -33,6 +30,6 @@ General usage should follow from these possible parameters. E.G. The following c
 
 To use espeak phonemization you must first install the TTS with espeak linked. Phonemization can then be accomplished via the following:
 
-```commandlinecommandline
+```bash
 ./build/bin/phonemize --prompt "this is a test." --use-espeak
 ```

@@ -1115,41 +1115,30 @@ struct phoneme_dictionary * phoneme_dictionary_from_gguf(gguf_context * meta) {
     return dict;
 }
 
-struct phonemizer * phonemizer_from_gguf(gguf_context * meta, const std::string espeak_voice_code) {
+phonemizer * phonemizer_from_gguf(gguf_context * meta, str espeak_voice_code) {
 	int mode_key = gguf_find_key(meta, "phonemizer.type");
-	phonemizer * ph;
     if (mode_key == -1) {
         TTS_ABORT("Key 'phonemizer.type' must be specified in gguf file for all models using a phonemizer.");
     }
     uint32_t ph_type = gguf_get_val_u32(meta, mode_key);
 
     if ((phonemizer_type) ph_type == ESPEAK) {
-#ifdef ESPEAK_INSTALL
-    	espeak_wrapper::get_instance()->initialize(AUDIO_OUTPUT_SYNCHRONOUS, 0, ESPEAK_DATA_PATH, 0);
-
-    	update_voice(espeak_voice_code);
-
-		ph = new phonemizer(nullptr, nullptr);
-		ph->mode = ESPEAK;
-#else
-		TTS_ABORT("%s attempted to load an espeak phonemizer without espeak installed. \n", __func__);
-#endif
-		int phoneme_type_key = gguf_find_key(meta, "phonemizer.phoneme_type");
-		if (phoneme_type_key != -1) {
-			uint32_t phoneme_typing = gguf_get_val_u32(meta, mode_key);
-			if ((phoneme_type)phoneme_typing == ESPEAK_PHONEMES) {
-				ph->phoneme_mode = ESPEAK_PHONEMES;
-			}
-		}
-		return ph;
+        bool use_espeak_phonemes{};
+        int phoneme_type_key = gguf_find_key(meta, "phonemizer.phoneme_type");
+        if (phoneme_type_key != -1) {
+            uint32_t phoneme_typing = gguf_get_val_u32(meta, mode_key);
+            if ((phoneme_type)phoneme_typing == ESPEAK_PHONEMES) {
+                use_espeak_phonemes = true;
+            }
+        }
+        return espeak_phonemizer(use_espeak_phonemes, espeak_voice_code);
     }
     struct word_phonemizer * phonetic_ph = word_phonemizer_from_gguf(meta);
     struct phoneme_dictionary * dict =  phoneme_dictionary_from_gguf(meta);
-    ph = new phonemizer(dict, phonetic_ph);
-    return ph;
+    return new phonemizer(dict, phonetic_ph);
 }
 
-struct phonemizer * espeak_phonemizer(bool use_espeak_phonemes, std::string espeak_voice_code) {
+phonemizer * espeak_phonemizer(bool use_espeak_phonemes, str espeak_voice_code) {
 #ifdef ESPEAK_INSTALL
 	espeak_wrapper::get_instance()->initialize(AUDIO_OUTPUT_SYNCHRONOUS, 0, ESPEAK_DATA_PATH, 0);
 	
@@ -1166,16 +1155,15 @@ struct phonemizer * espeak_phonemizer(bool use_espeak_phonemes, std::string espe
 #endif
 }
 
-struct phonemizer * phonemizer_from_file(const std::string fname, const std::string espeak_voice_code) {
+phonemizer * phonemizer_from_file(str fname, str espeak_voice_code) {
 	ggml_context * weight_ctx = NULL;
     struct gguf_init_params params = {
         /*.no_alloc   =*/ false,
         /*.ctx        =*/ &weight_ctx,
     };
-    gguf_context * meta_ctx = gguf_init_from_file(fname.c_str(), params);
+    gguf_context * meta_ctx = gguf_init_from_file(fname, params);
     if (!meta_ctx) {
-        TTS_ABORT("%s failed for file %s\n", __func__, fname.c_str());
+        TTS_ABORT("%s failed for file %s\n", __func__, fname);
     }
     return phonemizer_from_gguf(meta_ctx, espeak_voice_code);
 }
-

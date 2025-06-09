@@ -16,4 +16,4 @@ if (SDL2_FOUND)
     set_source_files_properties(playback.cpp PROPERTIES COMPILE_FLAGS -DSDL2_INSTALL=1)
 endif()
 
-target_link_libraries(${TARGET} PRIVATE ggml tts)
+target_link_libraries(${TARGET} PRIVATE examples_common)

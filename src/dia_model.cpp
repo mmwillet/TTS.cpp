@@ -720,14 +720,14 @@ struct ggml_cgraph * dia_runner::build_dia_graph(dia_ubatch & batch) {
     return gf;
 }
 
-void dia_runner::configure_generation(generation_configuration * config) {
-    GGML_ASSERT(config->max_tokens == 0 || config->max_tokens > model->max_delay);
-    decode_sampler->temperature = config->temperature;
-    decode_sampler->repetition_penalty = config->repetition_penalty;
-    decode_sampler->do_sample = config->sample;
-    decode_sampler->top_k = config->top_k;
-    decode_sampler->top_p = config->top_p;
-    dctx->max_generation_size = config->max_tokens > model->max_delay ? config->max_tokens : model->max_generation_size;
+void dia_runner::configure_generation(const generation_configuration & config) {
+    GGML_ASSERT(config.max_tokens == 0 || config.max_tokens > model->max_delay);
+    decode_sampler->temperature = config.temperature;
+    decode_sampler->repetition_penalty = config.repetition_penalty;
+    decode_sampler->do_sample = config.sample;
+    decode_sampler->top_k = config.top_k;
+    decode_sampler->top_p = config.top_p;
+    dctx->max_generation_size = config.max_tokens > model->max_delay ? config.max_tokens : model->max_generation_size;
 }
 
 void dia_runner::set_inputs(dia_ubatch & batch) {
