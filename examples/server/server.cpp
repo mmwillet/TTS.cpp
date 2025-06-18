@@ -29,6 +29,7 @@
 #include "audio_file.h"
 #include "args.h"
 #include "common.h"
+#include "tts_server_threading_osx.h"
 
 #include "index.html.hpp"
 
@@ -232,7 +233,7 @@ struct worker {
     std::unordered_map<std::string, struct tts_runner *> runners;
     std::string text_encoder_path;
     std::atomic<bool> running = true;
-    std::thread * thread = nullptr;
+    tts_server_threading::native_thread * thread = nullptr;
 
     int task_timeout;
 
@@ -813,7 +814,7 @@ int main(int argc, const char ** argv) {
             init_worker(&model_map, *args.get_int_param("--n-threads"), !args.get_bool_param("--use-metal"), default_generation_config, w);
         } else {
             worker * w = new worker(tqueue, rmap, args.get_string_param("--text-encoder-path"), *args.get_int_param("--timeout"));
-            w->thread = new std::thread(init_worker, &model_map, *args.get_int_param("--n-threads"), !args.get_bool_param("--use-metal"), default_generation_config, w);
+            w->thread = new tts_server_threading::native_thread(init_worker, &model_map, *args.get_int_param("--n-threads"), !args.get_bool_param("--use-metal"), default_generation_config, w);
             pool->push_back(w);
         }
     }

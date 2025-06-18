@@ -1,6 +1,15 @@
 #include "tts.h"
 #include <mutex>
 
+// A list of all of the top level GGUF names under kokoro.duration_predictor that have quantization compatible tensors.
+static constexpr std::array<const char *, 5> DURATION_PREDICTOR_QUANTIZATION_COMPATIBLE_PARTS = {
+    "duration_proj",
+    "encode",
+    "shared_lstm",
+    "duration_lstm",
+    "layers"
+};
+
 struct tts_runner * orpheus_from_file(gguf_context * meta_ctx, ggml_context * weight_ctx, int n_threads, generation_configuration * config, tts_arch arch, bool cpu_only) {
     orpheus_model * model = new orpheus_model;
     snac_model * audio_model = new snac_model;
@@ -402,7 +411,7 @@ void quantize_gguf(const std::string & ifile, const std::string & ofile, struct 
             new_size = quantize_tensor(new_data, cur, nullptr, new_type, params->n_threads);
         } else if ((params->convert_non_quantizable_to_f16 && kokoro_is_f16_compatible(name)) || (params->convert_dac_to_f16 && has_prefix(name, "audio_encoder") && !has_suffix(name, "alpha"))) {
             if ((cur->type) != GGML_TYPE_F32) {
-                TTS_ABORT("ERROR: All converted tensors must be transformed from 32bit floats. Tensor, '%s', has impropert type, '%d'\n", cur->name, cur->type);
+                TTS_ABORT("ERROR: All converted tensors must be transformed from 32bit floats. Tensor, '%s', has improper type, '%d'\n", cur->name, cur->type);
             }
             new_type = GGML_TYPE_F16;
             const int64_t nelement_size = ggml_nelements(cur) * 4;
