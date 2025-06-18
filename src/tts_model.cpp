@@ -67,6 +67,19 @@ bool runner_context::prep_schedule(struct ggml_cgraph * gf) {
     return ggml_backend_sched_reserve(sched, gf);
 }
 
+void runner_context::prep_output_buffer(size_t new_size) {
+    const size_t prev_size = buf_output ? ggml_backend_buffer_get_size(buf_output) : 0;
+    if (!buf_output || prev_size < new_size) {
+        if (buf_output) {
+            ggml_backend_buffer_free(buf_output);
+            buf_output = nullptr;
+            logits = nullptr;
+        }
+        buf_output = ggml_backend_buft_alloc_buffer(backend_cpu_buffer, new_size);
+    }
+    logits = (float *) ggml_backend_buffer_get_base(buf_output);
+}
+
 void tts_runner::init_build(std::vector<uint8_t>* buf_compute_meta) {
     struct ggml_init_params params = {
         /*.mem_size   =*/ buf_compute_meta->size(),

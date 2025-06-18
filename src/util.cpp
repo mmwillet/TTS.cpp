@@ -63,9 +63,17 @@ int search_for_gguf_keys(gguf_context * meta, std::vector<std::string> possible_
     return gguf_key;
 }
 
-void random_gen(int count, float * tgt, float min, float max) {
+void random_uniform_gen(int count, float * tgt, float min, float max) {
     static std::default_random_engine e;
     static std::uniform_real_distribution<float> dis(min, max);
+    for (int i = 0; i < count; i++) {
+        tgt[i] = dis(e);
+    }
+}
+
+void random_normal_gen(int count, float * tgt, float mean, float std) {
+    static std::default_random_engine e;
+    static std::normal_distribution<float> dis(mean, std);
     for (int i = 0; i < count; i++) {
         tgt[i] = dis(e);
     }
@@ -220,6 +228,11 @@ std::vector<std::string> split(std::string target, std::string split_on, bool in
                 output.push_back(target.substr(i, 1));
             }
             last = i+1;
+        } else if (i == last && split_on.find(target[i]) != std::string::npos) {
+            if (include_split_characters) {
+                output.push_back(target.substr(i, 1));
+            }
+            last = i+1;
         }
     }
     if (last < target.size()) {
@@ -238,6 +251,11 @@ std::vector<std::string> split(std::string target, const char split_on, bool inc
         if (i > last && split_on == target[i]) {
             std::string part(target.substr(last, i - last));
             output.push_back(part);
+            if (include_split_characters) {
+                output.push_back(target.substr(i, 1));
+            }
+            last = i+1;
+        } else if (i == last && split_on == target[i]) {
             if (include_split_characters) {
                 output.push_back(target.substr(i, 1));
             }

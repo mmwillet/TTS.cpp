@@ -6,6 +6,7 @@
 #include <map>
 #include <unordered_set>
 #include <regex>
+#include <queue>
 #include "util.h"
 
 struct token_trie {
@@ -73,5 +74,84 @@ struct single_pass_tokenizer {
 };
 
 single_pass_tokenizer * single_pass_tokenizer_from_gguf(gguf_context * meta, std::string key_name = "phonemizer.graphemes");
+
+struct bpe_symbol;
+
+struct bpe_merge {
+    bpe_symbol * a;
+    bpe_symbol * b;
+    int rank;
+    int new_size;
+
+    bpe_symbol * merge();   
+};
+
+struct bpe_merge_comp{
+    bool operator() (const bpe_merge & a, const bpe_merge & b);
+};
+
+struct pair_hash {
+    size_t operator()(const std::pair<std::string, std::string> & p) const {
+        //std::string hashable = p.first + " " + p.second;
+        return std::hash<std::string>{}(p.first) ^  //create some hash for pair
+               (std::hash<std::string>{}(p.second) << 1);
+    }
+};
+
+struct bpe_symbol {
+    bpe_symbol(const char * token): token(token) {};
+    const char* token;
+    int size = 1;
+    int pos;
+    bpe_symbol * next = nullptr;
+    bpe_symbol * last = nullptr;
+
+    void add_merges(std::priority_queue<bpe_merge, std::vector<bpe_merge>, bpe_merge_comp> & merges, std::unordered_map<std::pair<std::string, std::string>, int, pair_hash> & rank_map, bool only_forward = false);
+    std::string as_str();
+};
+
+struct pair_builder {
+    pair_builder(std::string word) {
+        bpe_symbol * last = nullptr;
+        for (int i = 0; i < word.size(); i++) {
+            int increment = 0;
+            while(i + increment + 1 < word.size() && (word[i+increment+1] & 0b11000000) == 0b10000000) {
+                ++increment;
+            }
+            bpe_symbol * part = new bpe_symbol(word.data()+i);
+            part->pos = i;
+            part->size += increment;
+            i += increment;
+            if (last) {
+                last->next = part;
+                part->last = last;
+            }
+            last = part;
+            parts.push_back(part);
+        }
+    }
+
+    ~pair_builder() {
+        for (auto p : parts) {
+            delete p;
+        }
+    }
+
+    void join_pairs(std::unordered_map<std::pair<std::string, std::string>, int, pair_hash> & rank_map);
+    std::vector<bpe_symbol*> parts;
+};
+
+struct bpe_tokenizer {
+    bpe_tokenizer(std::unordered_map<std::string, uint32_t> & tokens_to_ids, std::unordered_map<std::pair<std::string, std::string>, int, pair_hash> & ranks, uint32_t bos, uint32_t eos): tokens_to_ids(tokens_to_ids), ranks(ranks), eos_token_id(eos), bos_token_id(bos) {};
+    std::unordered_map<std::string, uint32_t> tokens_to_ids;
+    std::unordered_map<std::pair<std::string, std::string>, int, pair_hash> ranks;
+    uint32_t eos_token_id;
+    uint32_t bos_token_id;
+
+    void tokenize(const std::string & text, std::vector<uint32_t> & token_ids);
+    void bpe_tokenize(std::string chunk, std::vector<uint32_t> & token_ids);
+};
+
+bpe_tokenizer * bpe_tokenizer_from_gguf(gguf_context * meta, std::string base_name = "tokenizer.ggml");
 
 #endif

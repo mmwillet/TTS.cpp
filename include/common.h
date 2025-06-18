@@ -18,12 +18,14 @@ enum tts_arch {
 	PARLER_TTS_ARCH = 0,
 	KOKORO_ARCH = 1,
 	DIA_ARCH = 2,
+	ORPHEUS_ARCH = 3,
 };
 
 const std::map<std::string, tts_arch> SUPPORTED_ARCHITECTURES = {
 	{ "parler-tts", PARLER_TTS_ARCH },
 	{ "kokoro", KOKORO_ARCH },
 	{ "dia", DIA_ARCH },
+	{ "orpheus", ORPHEUS_ARCH }
 };
 
 struct generation_configuration {

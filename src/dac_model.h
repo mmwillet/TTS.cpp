@@ -1,7 +1,7 @@
 #ifndef dac_model_h
 #define dac_model_h
 
-#include "tts_model.h"
+#include "general_neural_audio_codec.h"
 #include <map>
 
 enum dac_tensor {
@@ -10,40 +10,6 @@ enum dac_tensor {
     DAC_ENCODER_OUT_KERNEL,
     DAC_ENCODER_OUT_BIAS,
     DAC_ENCODER_SNAKE_ALPHA,
-    DAC_ENCODER_LAYER_SNAKE_ALPHA,
-    DAC_ENCODER_LAYER_OUT_KERNEL,
-    DAC_ENCODER_LAYER_OUT_BIAS,
-    DAC_ENCODER_LAYER_RES_BLK_IN_SNAKE,
-    DAC_ENCODER_LAYER_RES_BLK_OUT_SNAKE,
-    DAC_ENCODER_LAYER_RES_BLK_IN_KERNEL,
-    DAC_ENCODER_LAYER_RES_BLK_OUT_KERNEL,
-    DAC_ENCODER_LAYER_RES_BLK_IN_BIAS,
-    DAC_ENCODER_LAYER_RES_BLK_OUT_BIAS,
-    DAC_QUANTIZER_LAYER_IN_KERNEL,
-    DAC_QUANTIZER_LAYER_IN_BIAS,
-    DAC_QUANTIZER_LAYER_OUT_KERNEL,
-    DAC_QUANTIZER_LAYER_OUT_BIAS,
-    DAC_QUANTIZER_LAYER_CODEBOOK
-};
-
-struct dac_residual_unit {
-    struct ggml_tensor * in_snake_alpha;
-    struct ggml_tensor * in_conv_kernel;
-    struct ggml_tensor * in_conv_bias;
-    struct ggml_tensor * out_snake_alpha;
-    struct ggml_tensor * out_conv_kernel;
-    struct ggml_tensor * out_conv_bias;
-};
-
-struct dac_layer {
-    struct ggml_tensor * snake_alpha_in;
-    struct ggml_tensor * out_conv_kernel;
-    struct ggml_tensor * out_conv_bias;
-
-    uint32_t padding;
-    uint32_t stride;
-    
-    std::vector<dac_residual_unit> residual_blocks;
 };
 
 struct dac_quantize_layer {
@@ -52,6 +18,7 @@ struct dac_quantize_layer {
     struct ggml_tensor * codebook;
 };
 
+// DAC, Descript Audio Codec, is a channel token to audio autoencoder model (though we only use its decoder functionality).
 // this struct maintains the static tensors for the dac audio decoder graph.
 // As such, this is designed to contain basic configuration and ggml tensor support for DAC.
 // The dac_runner describes how the graph is built and run.
@@ -67,8 +34,8 @@ struct dac_model : tts_model {
     struct ggml_tensor * out_conv_kernel;
     struct ggml_tensor * out_conv_bias;
     struct ggml_tensor * snake_alpha;
-    std::vector<dac_layer> layers;
-    std::vector<dac_quantize_layer> quantizer_layers;
+    std::vector<general_neural_audio_codec::layer> layers;
+    std::vector<general_neural_audio_codec::residual_vector_quantize_layer> quantizer_layers;
 
     void assign_weight(std::string name, ggml_tensor * weight);
     void prep_constants(gguf_context * meta);
@@ -81,9 +48,6 @@ struct dac_model : tts_model {
 };
 
 // for loading DAC model from gguf file
-void assign_residual_unit(dac_model * model, dac_residual_unit * layer, std::string name, ggml_tensor * tensor);
-void assign_dac_layer(dac_model * model, dac_layer * layer, std::string name, ggml_tensor * tensor);
-void assign_quantizer_layer(dac_model * model, dac_quantize_layer  layer, std::string name, ggml_tensor * tensor);
 void assign_to_audio_encoder(dac_model * model, std::string name, ggml_tensor * tensor);
 
 // the context used for running the dac model
@@ -91,10 +55,7 @@ struct dac_context : runner_context {
     dac_context(dac_model * model, int n_threads): runner_context(n_threads), model(model) {};
     
     struct dac_model * model;
-    
-    size_t  logits_size = 0; // capacity (of floats) for logits
-    float * logits      = nullptr;
-    
+        
     struct ggml_tensor * inp_tokens;
     
     void build_schedule() {
@@ -109,9 +70,7 @@ struct dac_ubatch {
     uint32_t sequence_length;
 };
 
-static struct ggml_tensor * dac_build_audio_inputs(struct ggml_context * ctx, struct dac_context * dctx, const dac_ubatch & batch, std::vector<dac_quantize_layer> layers);
-static struct ggml_tensor * build_residual_unit(ggml_context * ctx, struct ggml_tensor * cur, dac_residual_unit & u, int padding, int dilation);
-static struct ggml_tensor * build_decoder_block(ggml_context * ctx, struct ggml_tensor * cur, dac_layer & l, struct dac_context * dctx);
+static struct ggml_tensor * dac_build_audio_inputs(struct ggml_context * ctx, struct dac_context * dctx, const dac_ubatch & batch, std::vector<general_neural_audio_codec::residual_vector_quantize_layer> layers);
 
 // This struct is intended to manage the dac model's graph compilation and compute function.
 struct dac_runner : tts_runner {

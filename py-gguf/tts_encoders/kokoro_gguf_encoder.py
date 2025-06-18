@@ -96,7 +96,7 @@ class KokoroEncoder(TTSEncoder):
     gguf_encoder.write()
     ```
     """
-    def __init__(self, model_path: Path | str = "./kokoro.gguf", repo_id: Path | str =DEFAULT_KOKORO_REPO,
+    def __init__(self, model_path: Path | str = "./kokoro.gguf", repo_id: Path | str = DEFAULT_KOKORO_REPO,
                  voices: Optional[List[str]] = None, use_espeak: bool = False,
                  phonemizer_repo: Path | str = DEFAULT_TTS_PHONEMIZER_REPO):
         """

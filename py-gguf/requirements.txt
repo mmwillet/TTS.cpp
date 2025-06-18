@@ -14,5 +14,6 @@ gradio-client==1.10.0
 llvmlite==0.44.0
 numba==0.61.2
 scipy>=1.15.2
+snac==1.2.1
 soundfile>=0.13.1
 nari-tts @ git+https://github.com/nari-labs/dia.git@7cf50c889c6013f74326cbdcb7696a985a4cf9c1

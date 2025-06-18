@@ -11,7 +11,7 @@ This simple example cli tool can be used to generate speach from a text prompt a
 
 In order to get a detailed breakdown the functionality currently available you can call the cli with the `--help` parameter. This will return a breakdown of all parameters:
 ```bash
-./cli --help
+./tts-cli --help
 
 --temperature (-t):
     The temperature to use when generating outputs. Defaults to 1.0.
@@ -52,24 +52,43 @@ In order to get a detailed breakdown the functionality currently available you c
 General usage should follow from these possible parameters. E.G. The following command will save generated speech to the `/tmp/test.wav` file.
 
 ```bash
-./cli --model-path /model/path/to/gguf_file.gguf --prompt "I am saying some words" --save-path /tmp/test.wav
+./tts-cli --model-path /model/path/to/gguf_file.gguf --prompt "I am saying some words" --save-path /tmp/test.wav
 ```
 
-#### Dia Generation Arguments
+#### Dia and Orpheus Generation Arguments
 
-Currently the default cli arguments are not aligned with Dia's default sampling settings. Specifically the temperature and topk settings should be changed to  `1.3` and `35` respectively when generating with Dia like so:
+Currently the default cli arguments are not aligned with Dia's or Orpheus' default sampling settings. Specifically the temperature and topk settings should be changed to  `1.3` and `35` respectively when generating with Dia like so:
 
-```base
-./cli --model-path /model/path/to/Dia.gguf --prompt "[S1] Hi, I am Dia, this is how I talk." --save-path /tmp/test.wav --topk 35 --temperature 1.3
+```bash
+./tts-cli --model-path /model/path/to/Dia.gguf --prompt "[S1] Hi, I am Dia, this is how I talk." --save-path /tmp/test.wav --topk 35 --temperature 1.3
 ```
+
+and the voice, temperature, and repetition penalty setting should be changed to a valid voice (e.g. `leah`), `0.7`, and `1.1` respectively when generating with Orpheus like so:
+
+```bash
+./tts-cli --model-path /model/path/to/Orpheus.gguf --prompt "Hi, I am Orpheus, this is how I talk." --save-path /tmp/test.wav --voice leah --temperature 0.7 --repetition-penalty 1.1
+```
+
 
 #### Conditional Generation
+
+Conditional generation is a Parler TTS specific behavior.
 
 By default the Parler TTS model is saved to the GGUF format with a pre-encoded conditional prompt (i.e. a prompt used to determine how to generate speech), but if the text encoder model, the T5-Encoder model, is avaiable in gguf format (see the [python convertion scripts](../../py-gguf/README.md) for more information on how to prepare the T5-Encoder model) then a new conditional prompt can be used for generation like so:
 
 ```bash
-./cli --model-path /model/path/to/gguf_file.gguf --prompt "I am saying some words" --save-path /tmp/test.wav --text-encoder-path /model/path/to/t5_encoder_file.gguf --consditional-prompt "deep voice"
+./tts-cli --model-path /model/path/to/gguf_file.gguf --prompt "I am saying some words" --save-path /tmp/test.wav --text-encoder-path /model/path/to/t5_encoder_file.gguf --consditional-prompt "deep voice"
 ```
+
+#### Distinct Voice Support
+
+Kokoro and Orpheus both support voices which can be set via the `--voice` (`-v`) argument. Orpheus supports the following voices:
+
+```
+"zoe", "zac","jess", "leo", "mia", "julia", "leah"
+```
+
+and Kokoro supports the voices listedin the section below.
 
 #### MultiLanguage Configuration
 

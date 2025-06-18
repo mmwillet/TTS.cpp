@@ -115,9 +115,6 @@ struct parler_context : runner_context {
     int32_t seq_id; // a unique identifier associated with the active sequence.
     
     std::vector<uint32_t> output_tokens;
-
-    size_t  logits_size = 0; // capacity (of floats) for logits
-    float * logits      = nullptr;
     
     struct ggml_tensor * inp_tokens;
     struct ggml_tensor * audio_inp_tokens;
@@ -206,7 +203,6 @@ struct parler_tts_runner : tts_runner {
     void init_build() {
         tts_runner::init_build(&pctx->buf_compute_meta);
     }
-
 
     void configure_generation(generation_configuration * config);
     void assign_weight(std::string name, ggml_tensor * tensor);
