@@ -7,42 +7,42 @@
 // Orpheus uses vLLM with a llama-3 architecture. The only critical difference from the normal llama architecture is the use of kv heads.
 
 struct orpheus_layer {
-	struct ggml_tensor * input_norm;
-	struct ggml_tensor * post_attention_norm;
-	struct ggml_tensor * q;
-	struct ggml_tensor * k;
-	struct ggml_tensor * v;
-	struct ggml_tensor * o;
-	struct ggml_tensor * gate;
-	struct ggml_tensor * up;
-	struct ggml_tensor * down;
+    struct ggml_tensor * input_norm;
+    struct ggml_tensor * post_attention_norm;
+    struct ggml_tensor * q;
+    struct ggml_tensor * k;
+    struct ggml_tensor * v;
+    struct ggml_tensor * o;
+    struct ggml_tensor * gate;
+    struct ggml_tensor * up;
+    struct ggml_tensor * down;
 };
 
 struct orpheus_model : tts_model {
-	uint32_t vocab_size = 156940;
-	uint32_t n_attn_heads = 24;
-	uint32_t n_kv_attn_heads = 8;
-	uint32_t head_size = 128;
+    uint32_t vocab_size = 156940;
+    uint32_t n_attn_heads = 24;
+    uint32_t n_kv_attn_heads = 8;
+    uint32_t head_size = 128;
     uint32_t max_context_length = 1024;
     // the generation size is technically arbitrary as the model can handle a large context. This size comes out to being 25.6 seconds.
-	uint32_t max_generation_size = 2100;
-	uint32_t stopping_token_id = 128258;
-	uint32_t eos_token_id = 128001;
-	uint32_t bos_token_id = 128000;
-	uint32_t hidden_size = 3072;
+    uint32_t max_generation_size = 2100;
+    uint32_t stopping_token_id = 128258;
+    uint32_t eos_token_id = 128001;
+    uint32_t bos_token_id = 128000;
+    uint32_t hidden_size = 3072;
     uint32_t kv_hidden_size = 1024;
     uint32_t audio_heads = 3;
     uint32_t heads[7] = {0, 1, 2, 2, 1, 2, 2};
 
     int n_layers = 28;
 
-	struct std::vector<orpheus_layer> layers;
-	struct ggml_tensor * head;
-	struct ggml_tensor * embd;
-	struct ggml_tensor * output_norm;
+    struct std::vector<orpheus_layer> layers;
+    struct ggml_tensor * head;
+    struct ggml_tensor * embd;
+    struct ggml_tensor * output_norm;
     struct ggml_tensor * rope_frequencies;
 
-	void assign_weight(std::string name, ggml_tensor * tensor);
+    void assign_weight(std::string name, ggml_tensor * tensor);
     void assign_to_layer(std::string part, orpheus_layer & layer, struct ggml_tensor * tensor);
     void prep_constants(gguf_context * meta);
     void prep_layers(gguf_context * meta);
@@ -126,8 +126,8 @@ struct orpheus_runner : tts_runner {
         tts_runner::init_build(&octx->buf_compute_meta);
     }
 
-	struct ggml_cgraph * build_orpheus_graph(orpheus_ubatch & batch);
-    void orpheus_kv_cach_init();
+    struct ggml_cgraph * build_orpheus_graph(orpheus_ubatch & batch);
+    void orpheus_kv_cache_init();
     void orpheus_build_kv_store(struct ggml_context * ctx, struct ggml_cgraph * graph, struct ggml_tensor * k_cur, struct ggml_tensor * v_cur, int index, uint32_t n_tokens, int repeat);
     void configure_generation(generation_configuration * config);
     void assign_weight(std::string name, ggml_tensor * tensor);

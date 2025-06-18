@@ -142,6 +142,10 @@ class OrpheusEncoder(TTSEncoder):
             self.set_tensor(f"snac.{name}", param)
 
     def prepare_rope_frequencies(self):
+        """
+        Because Llama-3 like Rotary Positional Embeddings are not currently supported out-of-the-box in GGML, 
+        we need to encode the rope frequency vectors to use directly.
+        """
         base = self.model.config.rope_theta
         dim = self.model.config.head_dim
         freqs = 1.0 / (base ** (torch.arange(0, dim, 2, dtype=torch.float32) / dim))

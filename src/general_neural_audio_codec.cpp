@@ -30,7 +30,6 @@ namespace general_neural_audio_codec {
         {".out_proj.bias", QUANTIZER_LAYER_OUT_BIAS},
         {".out_proj.weight", QUANTIZER_LAYER_OUT_KERNEL},
         {".codebook.weight", QUANTIZER_LAYER_CODEBOOK},
-
     };
 
     void assign_to_residual_unit(tts_model * model, residual_unit & unit, std::string name, struct ggml_tensor * tensor) {
@@ -143,7 +142,7 @@ namespace general_neural_audio_codec {
         }
         cur = ggml_add(ctx, cur, unit.in_conv_bias);
         cur = snake_1d(ctx, unit.out_alpha, cur);
-        cur = ggml_conv_1d(ctx, unit.out_conv_kernel,  cur, 1, 0, 1);
+        cur = ggml_conv_1d(ctx, unit.out_conv_kernel, cur, 1, 0, 1);
         cur = ggml_add(ctx, cur, unit.out_conv_bias);
         return ggml_add(ctx, cur, residual);
     }

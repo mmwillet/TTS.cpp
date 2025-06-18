@@ -148,7 +148,7 @@ orpheus_context * build_new_orpheus_context(orpheus_model * model, int n_threads
     return octx;
 }
 
-void orpheus_runner::orpheus_kv_cach_init() {    
+void orpheus_runner::orpheus_kv_cache_init() {    
     ggml_backend_buffer_type_t buft = nullptr;
     if (octx->backend != nullptr) {
 #ifdef GGML_USE_METAL
@@ -409,7 +409,7 @@ int orpheus_runner::generate(std::string sentence, struct tts_response * respons
     octx->reset();
     generation_sampler->reset();
     if  (!kv_self) {
-        orpheus_kv_cach_init();
+        orpheus_kv_cache_init();
     }
     generate_from_batch(batch, response);
     return 0;
@@ -454,7 +454,7 @@ void orpheus_runner::assign_weight(std::string name, ggml_tensor * tensor) {
 
 void orpheus_runner::prepare_post_load() {
     srunner->prepare_post_load();
-    orpheus_kv_cach_init();
+    orpheus_kv_cache_init();
     auto batch = build_worst_case_batch();
     auto gf = build_orpheus_graph(batch);
     octx->prep_schedule(gf);
