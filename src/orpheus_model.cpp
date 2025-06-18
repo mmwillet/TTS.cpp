@@ -396,7 +396,7 @@ void orpheus_runner::generate_from_batch(orpheus_ubatch & batch, struct tts_resp
         fprintf(stdout, "Warning: generation hit its max default length. The generated audio may not contain the entire prompt.\n");
     }
     std::vector<std::vector<uint32_t>> processed_output_tokens = prepare_output_tokens();
-    snac_runner->run(processed_output_tokens, output);
+    srunner->run(processed_output_tokens, output);
 }
 
 int orpheus_runner::generate(std::string sentence, struct tts_response * response) {
@@ -444,7 +444,7 @@ void orpheus_runner::assign_weight(std::string name, ggml_tensor * tensor) {
     }
 
     if (name.size() > 5 && name.substr(0, 5) == "snac.") {
-        snac_runner->model->assign_weight(name.substr(5), tensor);
+        srunner->model->assign_weight(name.substr(5), tensor);
     } else if (name.size() > 8 && name.substr(0, 8) == "orpheus.") {
         model->assign_weight(name.substr(8), tensor);
     } else {
@@ -453,7 +453,7 @@ void orpheus_runner::assign_weight(std::string name, ggml_tensor * tensor) {
 }
 
 void orpheus_runner::prepare_post_load() {
-    snac_runner->prepare_post_load();
+    srunner->prepare_post_load();
     orpheus_kv_cach_init();
     auto batch = build_worst_case_batch();
     auto gf = build_orpheus_graph(batch);

@@ -24,7 +24,7 @@ struct orpheus_model : tts_model {
 	uint32_t n_kv_attn_heads = 8;
 	uint32_t head_size = 128;
     uint32_t max_context_length = 1024;
-    // the generation size is technically arbitrary as the model can handle . This size comes out to being 25.6 seconds.
+    // the generation size is technically arbitrary as the model can handle a large context. This size comes out to being 25.6 seconds.
 	uint32_t max_generation_size = 2100;
 	uint32_t stopping_token_id = 128258;
 	uint32_t eos_token_id = 128001;
@@ -109,14 +109,14 @@ struct orpheus_runner : tts_runner {
             orpheus_context * octx, 
             bpe_tokenizer * bt, 
             sampler * samp, 
-            orpheus_kv_cache * cache): model(model), snac_runner(audio_decoder), octx(octx), tokenizer(bt), generation_sampler(samp), kv_self(cache) {
+            orpheus_kv_cache * cache): model(model), srunner(audio_decoder), octx(octx), tokenizer(bt), generation_sampler(samp), kv_self(cache) {
         tts_runner::sampling_rate = 24000.0f;
         generation_sampler->n_output_heads = 1;
         generation_sampler->vocab_size = model->vocab_size;
         generation_sampler->eos_token_id = model->eos_token_id;
     }
     orpheus_model * model;
-    snac_runner * snac_runner;
+    snac_runner * srunner;
     orpheus_context * octx;
     bpe_tokenizer * tokenizer;
     orpheus_kv_cache * kv_self;
