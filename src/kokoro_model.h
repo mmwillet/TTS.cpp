@@ -324,7 +324,6 @@ struct kokoro_duration_context : runner_context {
 
     
     size_t  logits_size = 0; // capacity (of floats) for logits
-    float * logits      = nullptr;
     float * lens 		= nullptr;
     
     struct ggml_tensor * inp_tokens;
@@ -405,10 +404,7 @@ struct kokoro_context : runner_context {
 
     uint32_t total_duration;
     uint32_t sequence_length;
-    
-    size_t  logits_size = 0; // capacity (of floats) for logits
-    float * logits      = nullptr;
-    
+
     struct ggml_tensor * inp_tokens;
     struct ggml_tensor * duration_pred;
     struct ggml_tensor * duration_mask;

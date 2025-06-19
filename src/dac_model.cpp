@@ -9,26 +9,12 @@ static const std::map<std::string, dac_tensor> DAC_TENSOR_GGUF_LOOKUP = {
     {"final.bias", DAC_ENCODER_OUT_BIAS},
     {"final.weight", DAC_ENCODER_OUT_KERNEL},
     {"final.alpha", DAC_ENCODER_SNAKE_ALPHA},
-    {".final.alpha", DAC_ENCODER_LAYER_SNAKE_ALPHA},
-    {".final.bias", DAC_ENCODER_LAYER_OUT_BIAS},
-    {".final.weight", DAC_ENCODER_LAYER_OUT_KERNEL},
-    {".res.initial.alpha", DAC_ENCODER_LAYER_RES_BLK_IN_SNAKE},
-    {".res.initial.bias", DAC_ENCODER_LAYER_RES_BLK_IN_BIAS},
-    {".res.initial.weight", DAC_ENCODER_LAYER_RES_BLK_IN_KERNEL},
-    {".res.final.alpha", DAC_ENCODER_LAYER_RES_BLK_OUT_SNAKE},
-    {".res.final.bias", DAC_ENCODER_LAYER_RES_BLK_OUT_BIAS},
-    {".res.final.weight", DAC_ENCODER_LAYER_RES_BLK_OUT_KERNEL},
-    {".in_proj.bias", DAC_QUANTIZER_LAYER_IN_BIAS},
-    {".in_proj.weight", DAC_QUANTIZER_LAYER_IN_KERNEL},
-    {".out_proj.bias", DAC_QUANTIZER_LAYER_OUT_BIAS},
-    {".out_proj.weight", DAC_QUANTIZER_LAYER_OUT_KERNEL},
-    {".codebook.weight", DAC_QUANTIZER_LAYER_CODEBOOK},
 };
 
 void dac_model::prep_constants(gguf_context * meta) {
     int output_heads_key = search_for_gguf_keys(meta, {"parler-tts.decoder.output_heads", "output_heads", "dia.decoder.output_heads"});
     if (output_heads_key != -1) {
-        n_heads = gguf_get_val_u32(meta, output_heads_key);;
+        n_heads = gguf_get_val_u32(meta, output_heads_key);
     }
 
     int sampling_factor_key = search_for_gguf_keys(meta, {"dac.up_sampling_factor", "up_sampling_factor"});
@@ -40,131 +26,35 @@ void dac_model::prep_constants(gguf_context * meta) {
     if (max_gen_key != -1) {
         max_generation_size = gguf_get_val_u32(meta, max_gen_key);
     }
-    
-    for (int i = 0; i < (int) layers.size(); i++)  {
-        std::string stride_kw = "dac_layer_stride_" + std::to_string(i);
-        std::string padding_kw = "dac_layer_padding_" + std::to_string(i);
-        int layer_stride_key = search_for_gguf_keys(meta, {"dac." + stride_kw, stride_kw});
-        if (layer_stride_key == -1) {
-            TTS_ABORT("key %s must be specified in gguf file.", ("dac." + stride_kw).c_str());
-        }
-        layers[i].stride = gguf_get_val_u32(meta, layer_stride_key);
-        int layer_padding_key = search_for_gguf_keys(meta, {"dac." + padding_kw, padding_kw});
-        if (layer_padding_key == -1) {
-            TTS_ABORT("key %s must be specified in gguf file.", ("dac." + padding_kw).c_str());
-        }
-        layers[i].padding = gguf_get_val_u32(meta, layer_padding_key);
-    }
 }
 
 void dac_model::prep_layers(gguf_context * meta) {
     for (int i = 0; i < n_heads; i++) {
-        dac_quantize_layer l;
-        quantizer_layers.push_back(l);
+        quantizer_layers.push_back(general_neural_audio_codec::residual_vector_quantize_layer{});
     }
     
     for (int i = 0; i < n_layers; i++) {
-        dac_layer l;
-        // all dac layers have 3 residual units
-        for (int ii = 0; ii < 3; ii++) {
-            dac_residual_unit u;
-            l.residual_blocks.push_back(u);
+        std::string stride_key = "dac_layer_stride_" + std::to_string(i);
+        std::string padding_key = "dac_layer_padding_" + std::to_string(i);
+        int layer_stride_key = search_for_gguf_keys(meta, {"dac." + stride_key, stride_key});
+        if (layer_stride_key == -1) {
+            TTS_ABORT("key %s must be specified in gguf file inorder to initialize the DAC audio decoder.", stride_key.c_str());
+        }        
+        int layer_padding_key = search_for_gguf_keys(meta, {"dac." + padding_key, padding_key});
+        if (layer_padding_key == -1) {
+            TTS_ABORT("key %s must be specified in gguf file inorder to initialize the DAC audio decoder.", padding_key.c_str());
         }
-        layers.push_back(l);
+        layers.push_back(
+            general_neural_audio_codec::layer{
+                gguf_get_val_u32(meta, layer_padding_key),
+                gguf_get_val_u32(meta, layer_stride_key),
+            }
+        );
     }
 }
 
 void dac_model::assign_weight(std::string name, ggml_tensor * tensor) {
     assign_to_audio_encoder(this, name, tensor);
-}
-
-void assign_residual_unit(dac_model * model, dac_residual_unit * l, std::string name, ggml_tensor * tensor) {
-    try {
-        dac_tensor tensor_type = DAC_TENSOR_GGUF_LOOKUP.at(name);
-        switch (tensor_type) {
-            case DAC_ENCODER_LAYER_RES_BLK_IN_SNAKE:
-                l->in_snake_alpha = ggml_dup_tensor(model->ctx, tensor);
-                model->set_tensor(l->in_snake_alpha, tensor);
-                break;
-            case DAC_ENCODER_LAYER_RES_BLK_OUT_SNAKE:
-                l->out_snake_alpha = ggml_dup_tensor(model->ctx, tensor);
-                model->set_tensor(l->out_snake_alpha, tensor);
-                break;
-            case DAC_ENCODER_LAYER_RES_BLK_IN_KERNEL:
-                l->in_conv_kernel = ggml_dup_tensor(model->ctx, tensor);
-                model->set_tensor(l->in_conv_kernel, tensor);
-                break;
-            case DAC_ENCODER_LAYER_RES_BLK_OUT_KERNEL:
-                l->out_conv_kernel = ggml_dup_tensor(model->ctx, tensor);
-                model->set_tensor(l->out_conv_kernel, tensor);
-                break;
-            case DAC_ENCODER_LAYER_RES_BLK_IN_BIAS:
-                l->in_conv_bias = ggml_dup_tensor(model->ctx, ggml_transpose(model->ctx, tensor));
-                model->set_tensor(l->in_conv_bias, tensor);
-                break;
-            case DAC_ENCODER_LAYER_RES_BLK_OUT_BIAS:
-                l->out_conv_bias = ggml_dup_tensor(model->ctx, ggml_transpose(model->ctx, tensor));
-                model->set_tensor(l->out_conv_bias, tensor);
-                break;
-            default:
-                fprintf(stdout, "residual unit unassigned tensor %s\n", name.c_str());
-                break;
-        }
-    } catch (const std::out_of_range& e) {
-        TTS_ABORT("Error: %s\nTensor, '%s', is not a valid tensor.", e.what(), name.c_str());
-    }
-
-}
-
-void assign_dac_layer(dac_model * model, dac_layer * layer, std::string name, ggml_tensor * tensor) {
-    if (DAC_TENSOR_GGUF_LOOKUP.find(name) != DAC_TENSOR_GGUF_LOOKUP.end()) {
-        switch(DAC_TENSOR_GGUF_LOOKUP.at(name)) {
-            case DAC_ENCODER_LAYER_SNAKE_ALPHA:
-                layer->snake_alpha_in = ggml_dup_tensor(model->ctx, tensor);
-                model->set_tensor(layer->snake_alpha_in, tensor);
-                break;
-            case DAC_ENCODER_LAYER_OUT_KERNEL:
-                layer->out_conv_kernel = ggml_dup_tensor(model->ctx, tensor);
-                model->set_tensor(layer->out_conv_kernel, tensor);
-                break;
-            case DAC_ENCODER_LAYER_OUT_BIAS:
-                layer->out_conv_bias = ggml_dup_tensor(model->ctx, ggml_transpose(model->ctx, tensor));
-                model->set_tensor(layer->out_conv_bias, tensor);
-                break;
-            default:
-                fprintf(stdout, "layer unassigned tensor %s\n", name.c_str());
-                break;
-        }
-    } else if (std::find_if(name.begin(), name.end(), ::isdigit) != name.end())  {
-        auto pair = parse_layer_count(name);
-        int l = pair.first;
-        std::string lt_name = pair.second;
-        assign_residual_unit(model, &layer->residual_blocks[l], lt_name, tensor);
-    }
-}
-
-void assign_quantizer_layer(dac_model * model, dac_quantize_layer * layer, std::string name, ggml_tensor * tensor) {
-    try {
-        switch(DAC_TENSOR_GGUF_LOOKUP.at(name)) {
-            case DAC_QUANTIZER_LAYER_OUT_KERNEL:
-                layer->out_proj_kernel = ggml_dup_tensor(model->ctx, tensor);
-                model->set_tensor(layer->out_proj_kernel, tensor);
-                break;
-            case DAC_QUANTIZER_LAYER_OUT_BIAS:
-                layer->out_proj_bias = ggml_dup_tensor(model->ctx, ggml_transpose(model->ctx, tensor));
-                model->set_tensor(layer->out_proj_bias, tensor);
-                break;
-            case DAC_QUANTIZER_LAYER_CODEBOOK:
-                layer->codebook = ggml_dup_tensor(model->ctx, tensor);
-                model->set_tensor(layer->codebook, tensor);
-                break;
-            default:
-                fprintf(stdout, "quantized layer unassigned tensor %s\n", name.c_str());
-                break;
-        }
-    }  catch (const std::out_of_range& e) {
-        TTS_ABORT("Error: %s\nTensor, '%s', is not a valid tensor.", e.what(), name.c_str());
-    }
 }
 
 void assign_to_audio_encoder(dac_model * model, std::string name, ggml_tensor * tensor) {
@@ -199,14 +89,14 @@ void assign_to_audio_encoder(dac_model * model, std::string name, ggml_tensor * 
         int l = pair.first;
         std::string lt_name = pair.second;
         if (name.find("quantizers") != std::string::npos) {
-            assign_quantizer_layer(model, &model->quantizer_layers[l], lt_name, tensor);
+            general_neural_audio_codec::assign_to_quantize_layer((tts_model *) model, model->quantizer_layers[l], lt_name, tensor);
         } else {
-            assign_dac_layer(model, &model->layers[l - 1], lt_name, tensor);
+            general_neural_audio_codec::assign_to_layer((tts_model *) model, model->layers[l - 1], lt_name, tensor);
         }
     }
 }
 
-static struct ggml_tensor * dac_build_audio_inputs(struct ggml_context * ctx, struct dac_context * dctx, const dac_ubatch & batch, std::vector<dac_quantize_layer> layers) {
+static struct ggml_tensor * dac_build_audio_inputs(struct ggml_context * ctx, struct dac_context * dctx, const dac_ubatch & batch, std::vector<general_neural_audio_codec::residual_vector_quantize_layer> layers) {
     struct ggml_tensor * embd;
     
     dctx->inp_tokens = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, batch.sequence_length*dctx->model->n_heads);
@@ -220,10 +110,7 @@ static struct ggml_tensor * dac_build_audio_inputs(struct ggml_context * ctx, st
         auto quantize_layer = dctx->model->quantizer_layers[i];
         struct ggml_tensor * code = ggml_cont(ctx, ggml_view_2d(ctx, dctx->inp_tokens, 1, batch.sequence_length, dctx->model->n_heads*ggml_type_size(GGML_TYPE_I32), i*ggml_type_size(GGML_TYPE_I32)));
         code = ggml_reshape_1d(ctx, code, batch.sequence_length);
-        code = ggml_get_rows(ctx, quantize_layer.codebook, code);
-        code = ggml_cont(ctx, ggml_transpose(ctx, code));
-        code = ggml_conv_1d(ctx, quantize_layer.out_proj_kernel, code, 1, 0, 1);
-        code = ggml_add(ctx, code, quantize_layer.out_proj_bias);
+        code = general_neural_audio_codec::build_quantize_layer(ctx, code, quantize_layer);
 
         if (i == 0) {
             embd = code;
@@ -232,27 +119,6 @@ static struct ggml_tensor * dac_build_audio_inputs(struct ggml_context * ctx, st
         }
     }
     return embd;
-}
-
-static struct ggml_tensor * build_residual_unit(ggml_context * ctx, struct ggml_tensor * cur, dac_residual_unit & u, int padding, int dilation) {
-    struct ggml_tensor * residual = cur;
-    cur = snake_1d(ctx, u.in_snake_alpha, cur);
-    cur = ggml_conv_1d(ctx, u.in_conv_kernel, cur, 1, padding, dilation);
-    cur = ggml_add(ctx, cur, u.in_conv_bias);
-    cur = snake_1d(ctx, u.out_snake_alpha, cur);
-    cur = ggml_conv_1d(ctx, u.out_conv_kernel,  cur, 1, 0, 1);
-    cur = ggml_add(ctx, cur, u.out_conv_bias);
-    return ggml_add(ctx, cur, residual);
-}
-
-static struct ggml_tensor * build_decoder_block(ggml_context * ctx, struct ggml_tensor * cur, dac_layer & l, struct dac_context * dctx) {
-    cur = snake_1d(ctx, l.snake_alpha_in, cur);
-    cur = ggml_conv_transpose_1d(ctx, l.out_conv_kernel, cur, l.stride, l.padding, 1, 0, 1);
-    cur = ggml_add(ctx, cur, l.out_conv_bias);
-    for (int i = 0; i < l.residual_blocks.size(); i++) {
-        cur = build_residual_unit(ctx, cur, l.residual_blocks[i], pow(3, (i + 1)), pow(3, i));
-    }
-    return cur;
 }
 
 struct dac_context * build_new_dac_context(struct dac_model * model, int n_threads, bool use_cpu) {
@@ -291,7 +157,7 @@ struct ggml_cgraph * dac_runner::build_dac_graph(dac_ubatch & batch) {
     cur = ggml_conv_1d(ctx, model->in_conv_kernel, inputs, 1, 3, 1);
     cur = ggml_add(ctx, cur, model->in_conv_bias);
     for (auto l : model->layers) {
-        cur = build_decoder_block(ctx, cur, l, dctx);
+        cur = general_neural_audio_codec::build_layer(ctx, cur, l);
     }
     cur = snake_1d(ctx, model->snake_alpha, cur);
     cur = ggml_conv_1d(ctx, model->out_conv_kernel, cur, 1, 3, 1);

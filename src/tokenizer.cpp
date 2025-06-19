@@ -206,3 +206,126 @@ struct single_pass_tokenizer * single_pass_tokenizer_from_gguf(gguf_context * me
     return new single_pass_tokenizer(tokens);
 }
 
+void bpe_symbol::add_merges(std::priority_queue<bpe_merge, std::vector<bpe_merge>, bpe_merge_comp> & merges, std::unordered_map<std::pair<std::string, std::string>, int, pair_hash> & rank_map, bool only_forward) {
+    if (!only_forward && last) {
+        auto rid = std::make_pair<std::string, std::string>(last->as_str(), as_str());
+        if (rank_map.find(rid) != rank_map.end()) {
+            bpe_merge m{last, this, rank_map[rid], last->size + size};
+            merges.push(m);
+        }
+    }
+
+    if (next) {
+        auto rid = std::make_pair<std::string, std::string>(as_str(), next->as_str());    
+        if (rank_map.find(rid) != rank_map.end()) {
+            bpe_merge m{this, next, rank_map[rid], size + next->size};
+            merges.push(m);
+        }
+    }
+}
+
+std::string bpe_symbol::as_str() {
+    return std::string(token, size);
+}
+
+bool bpe_merge_comp::operator() (const bpe_merge & a, const bpe_merge & b) {
+    return a.rank > b.rank || (a.rank == b.rank && a.a && b.a && a.a->pos > b.a->pos);
+}
+
+size_t pair_hash::operator() (const std::pair<std::string, std::string> & p) const {
+    return std::hash<std::string>{}(p.first) ^ (std::hash<std::string>{}(p.second) << 1);
+}
+
+bpe_symbol * bpe_merge::merge() {
+    a->size += b->size;
+    b->size = -1;
+    a->next = b->next;
+    if (a->next) {
+        a->next->last = a;
+    }
+    return a;
+}
+
+void pair_builder::join_pairs(std::unordered_map<std::pair<std::string, std::string>, int, pair_hash> & rank_map) {
+    std::priority_queue<bpe_merge, std::vector<bpe_merge>, bpe_merge_comp> merges;
+    for (auto part : parts) {
+        part->add_merges(merges, rank_map, true);
+    }
+    while (!merges.empty()) {
+        auto m = merges.top();
+        merges.pop();
+        if (m.a->size > 0 && m.b->size > 0 && m.new_size == m.a->size + m.b->size) {
+            m.merge();
+            m.a->add_merges(merges, rank_map);
+        }
+
+    }
+}
+
+void bpe_tokenizer::tokenize(const std::string & text, std::vector<uint32_t> & token_ids) {
+    std::vector<std::string> chunks = split(text, " ", true);
+    bool space_prior = false;
+    for (auto chunk : chunks) {
+        if (chunk != " ") {
+            bpe_tokenize(space_prior ? "Ġ" + chunk : chunk, token_ids);
+        } else {
+            space_prior = true;
+        }
+    }
+}
+
+void bpe_tokenizer::bpe_tokenize(std::string chunk, std::vector<uint32_t> & token_ids) {
+    if (tokens_to_ids.find(chunk) != tokens_to_ids.end()) {
+        token_ids.push_back(tokens_to_ids[chunk]);
+        return;
+    }
+    auto pb = pair_builder{chunk};
+    pb.join_pairs(ranks);
+    bpe_symbol * next = pb.parts[0];
+    while (next) {
+        token_ids.push_back(tokens_to_ids[next->as_str()]);
+        next = next->next;
+    }
+}
+
+bpe_tokenizer * bpe_tokenizer_from_gguf(gguf_context * meta, std::string base_name) {
+    int vocab_key = gguf_find_key(meta, (base_name + ".tokens").c_str());
+    if (vocab_key == -1) {
+        TTS_ABORT("The '%s' key must be set in order to support BPE tokenization.", (base_name + ".tokens").c_str());
+    }
+    int merges_key = gguf_find_key(meta, (base_name + ".merges").c_str());
+    if (merges_key == -1) {
+        TTS_ABORT("The '%s' key must be set in order to support BPE tokenization.", (base_name + ".merges").c_str());
+    }
+    int eos_token_id_key = gguf_find_key(meta, (base_name + ".eos_token_id").c_str());
+    if (eos_token_id_key == -1) {
+        TTS_ABORT("The '%s' key must be set in order to support BPE tokenization.", (base_name + ".eos_token_id").c_str());
+    }
+    int bos_token_id_key = gguf_find_key(meta, (base_name + ".bos_token_id").c_str());
+    if (bos_token_id_key == -1) {
+        TTS_ABORT("The '%s' key must be set in order to support BPE tokenization.", (base_name + ".bos_token_id").c_str());
+    }
+
+    uint32_t bos_token_id = gguf_get_val_u32(meta, bos_token_id_key);
+    uint32_t eos_token_id = gguf_get_val_u32(meta, eos_token_id_key);
+
+    std::unordered_map<std::string, uint32_t> vocab;
+    int token_count = gguf_get_arr_n(meta, vocab_key);
+    for (int i = 0; i < token_count; i++) {
+        vocab[gguf_get_arr_str(meta, vocab_key, i)] = (uint32_t) i;
+    }
+
+    std::unordered_map<std::pair<std::string, std::string>, int, pair_hash> ranks;
+    int merge_count = gguf_get_arr_n(meta, merges_key);
+
+    for (int i = 0; i < merge_count; i++) {
+        auto raw_merge = gguf_get_arr_str(meta, merges_key, i);
+        std::vector<std::string> pair = split(raw_merge, " ");
+        if (pair.size() != 2) {
+            TTS_ABORT("Invalid pair, '%s', found in BPE merges, '%s', at index %d.", raw_merge, (base_name + ".merges").c_str(), i);
+        }
+        ranks[std::make_pair<>(pair[0], pair[1])] = i;
+    }
+
+    return new bpe_tokenizer(vocab, ranks, bos_token_id, eos_token_id);
+}

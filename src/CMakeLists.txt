@@ -23,6 +23,9 @@ add_library(tts
             tts_model.cpp
             kokoro_model.cpp
             dia_model.cpp
+            orpheus_model.cpp
+            snac_model.cpp
+            general_neural_audio_codec.cpp
             )
 
 target_include_directories(tts PUBLIC . ../include ../ggml/src/)

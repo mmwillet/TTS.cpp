@@ -78,9 +78,6 @@ struct t5_context : runner_context {
     
     struct t5_encoder * model;
     
-    size_t  logits_size = 0; // capacity (of floats) for logits
-    float * logits      = nullptr;
-    
     struct ggml_tensor * inp_tokens;
     struct ggml_tensor * positions;
     struct ggml_tensor * attn_mask;

@@ -1249,7 +1249,7 @@ void kokoro_runner::prepare_post_load() {
 }
 
 void kokoro_runner::set_inputs(kokoro_ubatch & batch, uint32_t total_size) {
-	random_gen(total_size * model->up_sampling_factor * (model->harmonic_num + 1), ((float*)kctx->uv_noise_data->data) + 4);
+	random_uniform_gen(total_size * model->up_sampling_factor * (model->harmonic_num + 1), ((float*)kctx->uv_noise_data->data) + 4);
     ((float*) kctx->uv_noise_data->data)[0] = model->voice_threshold;
     ((float*) kctx->uv_noise_data->data)[1] = model->noise_std;
     ((float*) kctx->uv_noise_data->data)[2] = model->sin_amp;

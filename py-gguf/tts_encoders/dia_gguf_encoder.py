@@ -82,7 +82,7 @@ class DiaEncoder(DACEncoder):
             elif parts[0] == "norm":
                 self.set_tensor(f"{base}.norm", param)
             elif parts[0] == "logits_dense":
-                heads = param.shape[1];
+                heads = param.shape[1]
                 for i in range(heads):
                     head = param.data[:, i]
                     self.set_tensor(f"{base}.heads.{i}", head.transpose(0,1))

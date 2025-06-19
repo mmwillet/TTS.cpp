@@ -99,7 +99,6 @@ struct dia_context : runner_context {
     uint32_t current_position = 0;  // current position in the active sequence
     int delay_steps           = -1; // the max remaining steps to take before terminating; is set after an eos token is seen on the first output channel
     size_t prompt_size        = 0;
-    float * logits            = nullptr;
 
     uint32_t max_generation_size; // this is set by the generation context or defaults to the config set on dia model.
 

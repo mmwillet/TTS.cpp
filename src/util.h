@@ -26,7 +26,12 @@ struct model_tensor_meta {
 	size_t n_bytes = 0;
 };
 
-void random_gen(int count, float * tgt, float min = 0.0f, float max = 1.0);
+/**
+ * Both of these random fill the tgt array with count random floating point values.
+ * the default parameter values are consistent with pytorch random function defaults.
+ */
+void random_uniform_gen(int count, float * tgt, float min = 0.0f, float max = 1.0f);
+void random_normal_gen(int count, float * tgt, float mean = 0.0f, float std = 1.0f);
 
 std::pair<int, std::string> parse_layer_count(std::string name, int skip = 0);
 

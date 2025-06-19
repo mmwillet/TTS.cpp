@@ -11,7 +11,7 @@ void append_to_response(struct tts_response * response, struct tts_response * to
 using tensor_meta_callback = std::function<void(ggml_tensor*)>*;
 
 struct runner_context {
-	runner_context(int n_threads): n_threads(n_threads) {};
+    runner_context(int n_threads): n_threads(n_threads) {};
     virtual ~runner_context() {
         ggml_backend_sched_free(sched);
         ggml_threadpool_free(threadpool);
@@ -30,16 +30,18 @@ struct runner_context {
     ggml_backend_buffer_t buf_output = nullptr;
     ggml_backend_sched_t sched = nullptr;
     ggml_threadpool_t threadpool = nullptr;
+    float * logits = nullptr;
     int n_threads;
 
     void get_ggml_node_data(struct ggml_tensor * output_tensor, float * output, size_t output_size, ggml_backend_buffer_t buffer = nullptr);
     void set_threads();
     void build_schedule(size_t max_nodes);
     bool prep_schedule(ggml_cgraph * gf);
+    void prep_output_buffer(size_t new_size);
 };
 
 struct tts_model {
-	struct model_tensor_meta tensor_meta;
+    struct model_tensor_meta tensor_meta;
 
     // this is the current byte offset into the model's buffer.
     size_t offset = 0;
@@ -56,7 +58,7 @@ struct tts_model {
 
     struct ggml_context * ctx;
     
-	void prep_buffers_and_context(bool cpu_only, float size_offset, uint32_t dedicated_add_on_size);
+    void prep_buffers_and_context(bool cpu_only, float size_offset, uint32_t dedicated_add_on_size);
     void setup_from_file(gguf_context * meta_ctx, ggml_context * load_context, bool cpu_only, std::string model_prefix, float size_offset = 1.4, uint32_t dedicated_add_on_size = 0);
     void set_tensor(struct ggml_tensor * tensor, struct ggml_tensor * target);
     size_t max_nodes();
