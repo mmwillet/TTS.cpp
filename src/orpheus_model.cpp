@@ -298,6 +298,7 @@ struct ggml_cgraph * orpheus_runner::build_orpheus_graph(orpheus_ubatch & batch)
     }
     
     cur = orpheus_build_layer_norm(ctx, cur, model->output_norm);
+    // only about 40k of the output head is actually uses for generation purposes. Ideally the head tensor should be shrunk and sampled tokens should be incremented.
     cur = ggml_mul_mat(ctx, model->head, cur);
     if (batch.n_tokens > 1) {
         cur = ggml_cont(ctx, ggml_view_1d(ctx, cur, model->vocab_size, ggml_element_size(cur) * (cur->ne[1] - 1) * model->vocab_size));
@@ -374,6 +375,8 @@ std::vector<std::vector<uint32_t>> orpheus_runner::prepare_output_tokens() {
     for (int i = 0; i < chunks; i++) {
         for (int ii = 0; ii < 7; ii++) {
             uint32_t thead = model->heads[ii];
+            // the manipulations below are not configured because they are performed inline via undocumented constants in the Orpheus codebase.
+            // Essentially this is how Orpheus converts discrete samples from the output shape to the audio input shape.
             uint32_t t = octx->output_tokens[i*7 + ii] - 128266 - ((ii % 7) * 4096);
             output_tokens[thead].push_back(t);
         }

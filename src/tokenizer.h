@@ -91,11 +91,7 @@ struct bpe_merge_comp{
 };
 
 struct pair_hash {
-    size_t operator()(const std::pair<std::string, std::string> & p) const {
-        //std::string hashable = p.first + " " + p.second;
-        return std::hash<std::string>{}(p.first) ^  //create some hash for pair
-               (std::hash<std::string>{}(p.second) << 1);
-    }
+    size_t operator() (const std::pair<std::string, std::string> & p) const;
 };
 
 struct bpe_symbol {
@@ -115,6 +111,7 @@ struct pair_builder {
         bpe_symbol * last = nullptr;
         for (int i = 0; i < word.size(); i++) {
             int increment = 0;
+            // make sure we process each utf-8 character.
             while(i + increment + 1 < word.size() && (word[i+increment+1] & 0b11000000) == 0b10000000) {
                 ++increment;
             }

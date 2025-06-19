@@ -15,11 +15,6 @@ void snac_model::prep_constants(gguf_context * meta) {
     if (max_gen_key != -1) {
         max_generation_size = gguf_get_val_u32(meta, max_gen_key);
     }
-
-    int use_noise_key = gguf_find_key(meta, "snac.use_noise");
-    if (use_noise_key != -1) {
-        use_noise = gguf_get_val_bool(meta, use_noise_key);
-    }
 }
 
 void snac_model::prep_layers(gguf_context * meta) {
@@ -90,6 +85,7 @@ void snac_model::assign_weight(std::string name, ggml_tensor * tensor) {
 
 static struct ggml_tensor * snac_build_audio_inputs(struct ggml_context * ctx, struct snac_context * sctx, size_t sequence_length, std::vector<general_neural_audio_codec::residual_vector_quantize_layer> layers) {
     struct ggml_tensor * embd;
+    // these devisors represent the discreate repeats performed against each of the three input heads.
     sctx->inp_tokens = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, sequence_length / 4 + sequence_length / 2 + sequence_length);
     ggml_set_input(sctx->inp_tokens);
     size_t last_stride = 0;
@@ -100,7 +96,7 @@ static struct ggml_tensor * snac_build_audio_inputs(struct ggml_context * ctx, s
         struct ggml_tensor * code = general_neural_audio_codec::build_quantize_layer(ctx, inp_head, quantize_layer);
         if (sctx->model->repeats[i] > 1) {
             // this manipulation is equivalent to repeat_interleave against the first dimension of the tensor
-            code = ggml_repeat(ctx, ggml_cont_3d(ctx, code, 1, code->ne[0], code->ne[1]), ggml_new_tensor_3d(ctx, GGML_TYPE_F32, sctx->model->repeats[i], code->ne[0], sctx->model->embd)); //repeat_interleave(ctx, gf, code, ggml_cont(ctx, result), 0, sctx->model->repeats[i]);
+            code = ggml_repeat(ctx, ggml_cont_3d(ctx, code, 1, code->ne[0], code->ne[1]), ggml_new_tensor_3d(ctx, GGML_TYPE_F32, sctx->model->repeats[i], code->ne[0], sctx->model->embd));
             code = ggml_cont_2d(ctx, code, sequence_length, code->ne[2]);
         }
         if (i == 0) {
@@ -138,10 +134,8 @@ struct ggml_cgraph * snac_runner::build_snac_graph(size_t sequence_length) {
     struct ggml_tensor * cur;
     struct ggml_tensor * inputs;
 
-    if (model->use_noise) {
-        sctx->noise = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, model->noise_steps_sum * sequence_length);
-        ggml_set_input(sctx->noise);
-    }
+    sctx->noise = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, model->noise_steps_sum * sequence_length);
+    ggml_set_input(sctx->noise);
     
     inputs = snac_build_audio_inputs(ctx, sctx, sequence_length, model->quantizer_layers);
     cur = ggml_conv_1d_dw(ctx, model->in_conv_kernel, inputs, 1, 3, 1);
@@ -151,11 +145,8 @@ struct ggml_cgraph * snac_runner::build_snac_graph(size_t sequence_length) {
     size_t noise_offset = 0;
     for (int l = 0; l < model->layers.size(); l++) {
         auto layer = model->layers[l]; 
-        struct ggml_tensor * noise = nullptr;
-        if (model->use_noise) {
-            noise = ggml_cont(ctx, ggml_view_1d(ctx, sctx->noise, model->noise_steps[l] * sequence_length, noise_offset));
-            noise_offset += model->noise_steps[l] * sequence_length * sizeof(float);
-        }
+        struct ggml_tensor * noise = ggml_cont(ctx, ggml_view_1d(ctx, sctx->noise, model->noise_steps[l] * sequence_length, noise_offset));
+        noise_offset += model->noise_steps[l] * sequence_length * sizeof(float);
         cur = general_neural_audio_codec::build_layer(ctx, cur, layer, noise);
     }
     cur = snake_1d(ctx, model->snake_alpha, cur);
@@ -183,10 +174,8 @@ void snac_runner::set_inputs(std::vector<std::vector<uint32_t>> & tokens) {
         tokens[1].size()*ggml_element_size(sctx->inp_tokens)+tokens[0].size()*ggml_element_size(sctx->inp_tokens), 
         tokens[2].size()*ggml_element_size(sctx->inp_tokens)
     );
-    if (model->use_noise) {
-        size_t sequence_length = tokens[2].size();
-        random_normal_gen(model->noise_steps_sum * sequence_length, (float*) sctx->noise->data);
-    }
+    size_t sequence_length = tokens[2].size();
+    random_normal_gen(model->noise_steps_sum * sequence_length, (float*) sctx->noise->data);
 }
 
 void snac_runner::run(std::vector<std::vector<uint32_t>> & tokens, struct tts_response * outputs) {

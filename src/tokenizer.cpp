@@ -232,6 +232,10 @@ bool bpe_merge_comp::operator() (const bpe_merge & a, const bpe_merge & b) {
     return a.rank > b.rank || (a.rank == b.rank && a.a && b.a && a.a->pos > b.a->pos);
 }
 
+size_t pair_hash::operator() (const std::pair<std::string, std::string> & p) const {
+    return std::hash<std::string>{}(p.first) ^ (std::hash<std::string>{}(p.second) << 1);
+}
+
 bpe_symbol * bpe_merge::merge() {
     a->size += b->size;
     b->size = -1;
