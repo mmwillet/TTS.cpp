@@ -251,7 +251,7 @@ struct worker {
         }
     }
 
-    void process_task(struct simple_server_task * task) {
+    const void process_task(struct simple_server_task * task) {
         if (task->timed_out(task_timeout)) {
             return;
         }
@@ -279,16 +279,31 @@ struct worker {
                 response_map->push(task);
                 break;
             case VOICES:
-                if (!runner->supports_voices) {
-                    task->message = "Voices are not supported for architecture '" + runner->arch_name() + "'.";
-                    response_map->push(task);
-                    break;
-                }
-                for (auto voice : list_voices(runner)) {
-                    if (!task->message.empty()) {
-                        task->message += ",";
+                // Maybe there is a better way to pass the voices rather than
+                // needing a custom serialized message?
+                // Getting all voices
+                std::unordered_map<std::string, std::string> voice_map = {};
+                for (const auto &[id, runner] : runners) {
+                    if (!runner->supports_voices) {
+                        continue;
                     }
-                    task->message += voice;
+                    std::string voices_string = "";
+                    for (auto voice : list_voices(runner)) {
+                        if (!voices_string.empty()) {
+                            voices_string += ",";
+                        }
+                        voices_string += voice;
+                    }
+                    voice_map[id] = voices_string;
+                }
+                // Formatting final message
+                for (const auto &[id, voices] : voice_map) {
+                    if (!task->message.empty()) {
+                        task->message += ";";
+                    }
+                    task->message += id;
+                    task->message += "/";
+                    task->message += voices;
                 }
                 task->success = true;
                 response_map->push(task);
@@ -462,6 +477,7 @@ int main(int argc, const char ** argv) {
     svr.reset(new httplib::Server());
 #endif
 
+    // Models Variables
     std::unordered_map<std::string, std::string> model_map = {};
     const std::string model_path = args.get_string_param("--model-path");
     if (std::filesystem::is_directory(model_path)) {
@@ -509,6 +525,9 @@ int main(int argc, const char ** argv) {
     }
     const json models_json = {{"object", "list"}, {"data", models}};
 
+    // Voices Variables
+    json voices_json = nullptr;
+
     std::atomic<server_state> state{LOADING};
 
     svr->set_logger(log_server_request);
@@ -531,15 +550,6 @@ int main(int argc, const char ** argv) {
 
     auto res_ok_audio = [](httplib::Response & res, const std::vector<uint8_t> & audio, std::string mime_type) {
         res.set_content((char*)audio.data(), audio.size(), mime_type);
-        res.status = 200;
-    };
-
-    auto res_ok_voices = [](httplib::Response & res, const std::vector<std::string> & voices) {
-        json json_voices = json::array();
-        for (auto voice : voices) {
-            json_voices.push_back(voice);
-        }
-        res.set_content(safe_json_to_str(json_voices), MIMETYPE_JSON);
         res.status = 200;
     };
 
@@ -736,7 +746,7 @@ int main(int argc, const char ** argv) {
             return;
         }
         std::string prompt = data.at("input").get<std::string>();
-        struct simple_text_prompt_task * task = new simple_text_prompt_task(CONDITIONAL_PROMPT, prompt);
+        struct simple_server_task * task = new simple_server_task(CONDITIONAL_PROMPT, prompt);
 
         if (data.contains("model") && data.at("model").is_string()) {
             const std::string model = data.at("model");
@@ -770,10 +780,27 @@ int main(int argc, const char ** argv) {
         &models_json
     ](const httplib::Request & _, httplib::Response & res) {
         res_ok_json(res, models_json);
-    }
+    };
 
-    const auto handle_voices = [&args, &tqueue, &rmap, &res_error, &res_ok_voices](const httplib::Request & req, httplib::Response & res) {
+    const auto handle_voices = [
+        &args,
+        &tqueue,
+        &rmap,
+        &res_error,
+        &res_ok_json,
+        &voices_json,
+        &default_model
+    ](const httplib::Request & req, httplib::Response & res) {
+        // Using Cached Values
+        if (!voices_json.is_null()) {
+            res_ok_json(res, voices_json);
+            return;
+        }
+
         struct simple_server_task * task = new simple_server_task(VOICES);
+        // Setting the model to default model (as dummy value) so no new runner is created
+        task->model = default_model;
+
         int id = task->id;
         tqueue->push(task);
         struct simple_server_task * rtask = rmap->get(id);
@@ -787,8 +814,13 @@ int main(int argc, const char ** argv) {
             res_error(res, formatted_error);
             return;
         }
-        std::vector<std::string> voices = split(rtask->message, ",");
-        res_ok_voices(res, voices);
+        voices_json = json::object();
+        std::vector<std::string> model_voices = split(rtask->message, ";");
+        for (const std::string entry : model_voices) {
+            const std::vector<std::string> entry_split  = split(entry, "/");
+            voices_json[entry_split[0]] = split(entry_split[1], ",");
+        }
+        res_ok_json(res, voices_json);
     };
 
     // register API routes
