@@ -60,41 +60,6 @@
             gap: 10px;
         }
 
-        select {
-            appearance: base-select;
-            flex-grow: 1;
-            box-sizing: border-box;
-            padding: 10px;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-            background: none;
-            font-family: inherit;
-            font-size: 0.875rem;
-            transition:
-                border-color 0.2s,
-                box-shadow 0.2s;
-        }
-
-        select:focus {
-            outline: none;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-        }
-
-        ::picker(select) {
-            appearance: base-select;
-            flex-grow: 1;
-            box-sizing: border-box;
-            padding: 10px;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-            font-family: inherit;
-            font-size: 0.875rem;
-            transition:
-                border-color 0.2s,
-                box-shadow 0.2s;
-        }
-
         .refresh-btn {
             padding-right: 9.5px;
             padding-left: 9.5px;
@@ -136,7 +101,8 @@
         }
 
         textarea,
-        input[type="text"] {
+        input[type="text"],
+        select {
             box-sizing: border-box;
             width: 100%;
             padding: 10px;
@@ -148,7 +114,8 @@
         }
 
         textarea:focus,
-        input[type="text"]:focus {
+        input[type="text"]:focus,
+        select:focus {
             outline: none;
             border-color: #3b82f6;
             box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
@@ -157,6 +124,25 @@
         textarea {
             min-height: 100px;
             resize: vertical;
+        }
+
+        select {
+            appearance: base-select;
+            background: none;
+        }
+
+        ::picker(select) {
+            appearance: base-select;
+            flex-grow: 1;
+            box-sizing: border-box;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 0.875rem;
+            transition:
+                border-color 0.2s,
+                box-shadow 0.2s;
         }
 
         .slider-container {
@@ -370,6 +356,14 @@
                         </div>
 
                         <div class="form-group">
+                            <label for="voice-select">Voices</label>
+                            <select id="voice-select">
+                                <option value="" disabled selected>Loading voices...</option>
+                            </select>
+                            <p class="hint">Voice to use for the speech (not all model have voices)</p>
+                        </div>
+
+                        <div class="form-group">
                             <label for="temperature">
                                 Temperature: <span id="temperature-value" class="slider-value">1</span>
                             </label>
@@ -449,6 +443,8 @@
         // Advanced parameters
         const baseUrl = document.getElementById('base-url');
         const apiKey = document.getElementById('api-key');
+        /** @type{HTMLSelectElement} */
+        const voiceSelect = document.getElementById('voice-select');
         const temperature = document.getElementById('temperature');
         const temperatureValue = document.getElementById('temperature-value');
         const top_k = document.getElementById('top_k');
@@ -464,6 +460,47 @@
             }
             return base;
         }
+
+        // Start: Voices Logic
+        async function fetchVoices() {
+            const getURL = new URL("/v1/audio/voices", getBaseURL())
+            const auth = apiKey.value ? `Bearer ${apiKey.value}` : undefined;
+
+            try {
+                const response = await fetch(getURL, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': auth,
+                    },
+                });
+                return await response.json();
+            } catch (err) {
+                console.error('Error fetching voices:', err);
+                showError(err.toString());
+            }
+        }
+        function updateVoices() {
+            while (voiceSelect.options.length > 0) {
+                voiceSelect.remove(0)
+            }
+
+            if (voices === undefined) {
+                return;
+            }
+            const voiceList = voices[modelSelect.value];
+            if (voiceList === undefined) {
+                return;
+            }
+            for (const voice of voiceList) {
+                const option = document.createElement('option');
+                option.textContent = voice;
+                option.value = voice;
+                voiceSelect.add(option);
+            }
+        }
+        let voices = undefined;
+        modelSelect.addEventListener('input', updateVoices);
+        // End: Voices Logic
 
         // Start: Refresh Logic
         async function refreshModels() {
@@ -481,7 +518,7 @@
                 });
 
                 const models = (await response.json()).data;
-                for (let i = 0; i <= modelSelect.options.length; i++) {
+                while (modelSelect.options.length > 0) {
                     modelSelect.remove(0)
                 }
 
@@ -492,6 +529,10 @@
                     option.value = model.id;
                     modelSelect.add(option);
                 }
+
+                // Fetching voices
+                voices = await fetchVoices();
+                updateVoices();
             } catch (err) {
                 console.error('Error fetching models:', err);
                 showError(err.toString());
@@ -548,7 +589,8 @@
                     temperature: parseFloat(temperature.value),
                     top_k: parseInt(top_k.value),
                     repetition_penalty: parseFloat(repetition_penalty.value),
-                    model: modelSelect.value
+                    model: modelSelect.value,
+                    voice: voiceSelect.value,
                 };
 
                 const postURL = new URL(API_URL, getBaseURL())

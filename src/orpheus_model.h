@@ -126,6 +126,7 @@ struct orpheus_runner : tts_runner {
         tts_runner::init_build(&octx->buf_compute_meta);
     }
 
+    std::vector<std::string> list_voices();
     struct ggml_cgraph * build_orpheus_graph(orpheus_ubatch & batch);
     void orpheus_kv_cache_init();
     void orpheus_build_kv_store(struct ggml_context * ctx, struct ggml_cgraph * graph, struct ggml_tensor * k_cur, struct ggml_tensor * v_cur, int index, uint32_t n_tokens, int repeat);

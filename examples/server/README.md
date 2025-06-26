@@ -83,9 +83,16 @@ curl http://127.0.0.1:8080/v1/audio/speech  \
 
 The only required parameter is `input` otherwise generation configuration will be determined by the defaults set on server initialization, and the `response_format` will use `wav`. The `response_format` field currently supports only `wav` and `aiff` audio formats.
 
+#### Voices
+
+For models that support voices a complete json list of supported voices can be queried vis the voices endpoint, `/v1/audio/voices`:
+
+```bash
+curl http://127.0.0.1:8080/v1/audio/voices
+``` 
+
 ### Future Work
 
 Future work will include:
 * Support for token authentication and permissioning
-* Multiple model support
 * Streaming audio, for longform audio generation.
