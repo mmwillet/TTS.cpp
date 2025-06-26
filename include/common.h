@@ -28,10 +28,17 @@ const std::map<std::string, tts_arch> SUPPORTED_ARCHITECTURES = {
 	{ "orpheus", ORPHEUS_ARCH }
 };
 
-const std::map<tts_arch, std::string> ARCHITECTURE_NAMES = {
-	{ PARLER_TTS_ARCH, "parler-tts" },
-	{ KOKORO_ARCH, "kokoro" },
-};
+/// Given a map from keys to values, creates a new map from values to keys 
+template<typename K, typename V>
+static std::map<V, K> reverse_map(const std::map<K, V>& m) {
+    std::map<V, K> r;
+    for (const auto& kv : m) {
+        r[kv.second] = kv.first;
+    }
+    return r;
+}
+
+const std::map<tts_arch, std::string> ARCHITECTURE_NAMES = reverse_map(SUPPORTED_ARCHITECTURES);
 
 struct generation_configuration {
     generation_configuration(
