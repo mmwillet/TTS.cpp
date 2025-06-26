@@ -462,3 +462,12 @@ void orpheus_runner::prepare_post_load() {
     auto gf = build_orpheus_graph(batch);
     octx->prep_schedule(gf);
 }
+
+std::vector<std::string> list_voices() {
+	std::vector<std::string> voices;
+	voices.reserve(orpheus_voices.size());
+	for (auto voice : orpheus_voices) {
+		voices.push_back(voice);
+	}
+	return voices;
+}
