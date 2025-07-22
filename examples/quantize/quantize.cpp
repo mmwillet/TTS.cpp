@@ -9,9 +9,13 @@
 
 const std::map<std::string, ggml_type> valid_quantization_types = {
     {"FP16", GGML_TYPE_F16},
+    {"F16", GGML_TYPE_F16},
     {"Q4_0", GGML_TYPE_Q4_0},
+    {"Q4", GGML_TYPE_Q4_0},
     {"Q5_0", GGML_TYPE_Q5_0},
+    {"Q5", GGML_TYPE_Q5_0},
     {"Q8_0", GGML_TYPE_Q8_0},
+    {"Q8", GGML_TYPE_Q8_0},
 };
 
 int main(int argc, const char ** argv) {
