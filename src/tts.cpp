@@ -191,8 +191,7 @@ void update_conditional_prompt(tts_runner * runner, const std::string file_path,
 }
 
 bool kokoro_is_f16_compatible(std::string name) {
-    return name.find("voice_tensors") == std::string::npos && 
-           name.find("bias") == std::string::npos &&
+    return name.find("bias") == std::string::npos &&
            name.find("gamma") == std::string::npos &&
            name.find("beta") == std::string::npos &&
            name.find("alpha") == std::string::npos &&
