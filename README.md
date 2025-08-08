@@ -99,3 +99,11 @@ See the [quantization cli readme](./examples/quantize/README.md) for more detail
  Given that the central goal of this library is to support real time speech generation on OS X, generation speed has only been rigorously tested in that environment with supported models (i.e. Parler Mini version 1.0).
 
  With the introduction of metal acceleration support for the DAC audio decoder model, text to speech generation is nearly possible in real time on a standard Apple M1 Max with ~3GB memory overhead. The best real time factor for accelerated models is currently 1.112033. This means that for every second of generated audio, the accelerated models require approximately 1.112033 seconds of generation time (with Q5_0 quantization applied to the generative model). For the latest stats via the performance battery see the [readme therein](./examples/perf_battery/README.md).
+
+# License
+
+Unless indicated otherwise, this repo is `MIT`-licensed.
+
+To the extent required by law, parts derived from the models' original implementations retain their original `Apache-2.0` license. This may include hyperparameters and post-processing logic, but excludes our port to ggml and C++. This makes the resulting binary `Apache-2.0`-licensed if those models are compiled in.
+
+If eSpeak NG support is enabled, the resulting binary is `GPL-3.0-or-later`-licensed.
