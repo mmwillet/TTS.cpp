@@ -26,7 +26,9 @@ add_library(tts
             orpheus_model.cpp
             snac_model.cpp
             general_neural_audio_codec.cpp
+            conv1d_fast.cpp
             )
+set_source_files_properties(conv1d_fast.cpp PROPERTIES COMPILE_FLAGS "-march=native") # TODO rm
 
 target_include_directories(tts PUBLIC . ../include ../ggml/src/)
 

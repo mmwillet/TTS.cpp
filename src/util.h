@@ -67,4 +67,6 @@ std::string replace_any(std::string target, std::string to_replace, std::string 
 
 [[noreturn]] void tts_abort(const char * file, int line, const char * fmt, ...);
 
+ggml_tensor * tts_conv_1d(ggml_context * ctx, ggml_tensor * kernel, ggml_tensor * data, int s0, int p0, int d0);
+
 #endif
