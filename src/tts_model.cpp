@@ -1,4 +1,5 @@
 #include "tts_model.h"
+#include "llama-mmap.h"
 
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
@@ -100,6 +101,8 @@ void tts_runner::free_build() {
 }
 
 tts_generation_runner::tts_generation_runner(const tts_model_loader & loader) : loader{ ref(loader) } {}
+
+tts_generation_runner::~tts_generation_runner() {}
 
 std::vector<std::string_view> tts_generation_runner::list_voices() {
     GGML_ABORT("The architecture '%s' does not support #list_voices.", loader.get().arch);

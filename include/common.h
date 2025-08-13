@@ -78,10 +78,13 @@ struct tts_runner {
 
 struct ggml_tensor;
 struct tts_model_loader;
+struct llama_mmap;
 
 struct tts_generation_runner : tts_runner {
     const reference_wrapper<const tts_model_loader> loader;
+    unique_ptr<llama_mmap> buf;
     explicit tts_generation_runner(const tts_model_loader & loader);
+    ~tts_generation_runner() override;
 
     virtual void                assign_weight(const char * name, ggml_tensor & tensor) = 0;
     virtual void                prepare_post_load()                                    = 0;
