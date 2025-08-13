@@ -3,6 +3,15 @@
 #include "../../decoder/snac_model.h"
 #include "../../sampler.h"
 #include "../../tokenizer.h"
+#include "models/loaders.h"
+
+extern const struct orpheus_model_loader final : tts_model_loader {
+    explicit orpheus_model_loader();
+
+    unique_ptr<tts_generation_runner> from_file(gguf_context * meta_ctx, ggml_context * weight_ctx, int n_threads,
+                                                bool cpu_only, const generation_configuration & config) const override;
+} orpheus_loader;
+
 
 // Orpheus uses vLLM with a llama-3 architecture. The only critical difference from the normal llama architecture is the use of kv heads.
 
@@ -109,7 +118,7 @@ struct orpheus_runner : tts_generation_runner {
             orpheus_context * octx, 
             bpe_tokenizer * bt, 
             sampler * samp, 
-            orpheus_kv_cache * cache): model(model), srunner(audio_decoder), octx(octx), tokenizer(bt), generation_sampler(samp), kv_self(cache) {
+            orpheus_kv_cache * cache): tts_generation_runner{orpheus_loader}, model(model), srunner(audio_decoder), octx(octx), tokenizer(bt), generation_sampler(samp), kv_self(cache) {
         tts_runner::sampling_rate = 24000.0f;
         generation_sampler->n_output_heads = 1;
         generation_sampler->vocab_size = model->vocab_size;

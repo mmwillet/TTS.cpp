@@ -1,6 +1,8 @@
 #include "tts_model.h"
+
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
+#include "models/loaders.h"
 
 void append_to_response(tts_response & response, tts_response & to_append) {
     float * new_data = (float *) malloc((response.n_outputs + to_append.n_outputs) * sizeof(float));
@@ -97,12 +99,14 @@ void tts_runner::free_build() {
     }
 }
 
+tts_generation_runner::tts_generation_runner(const tts_model_loader & loader) : loader{ ref(loader) } {}
+
 std::vector<std::string_view> tts_generation_runner::list_voices() {
-    GGML_ABORT("The architecture '%d' does not support #list_voices.", arch);
+    GGML_ABORT("The architecture '%s' does not support #list_voices.", loader.get().arch);
 }
 
 void tts_generation_runner::update_conditional_prompt(const char * file_path, const char * prompt) {
-    GGML_ABORT("The architecture '%d' does not support update_conditional_prompt.", arch);
+    GGML_ABORT("The architecture '%s' does not support update_conditional_prompt.", loader.get().arch);
 }
 
 void tts_model::prep_buffers_and_context(bool cpu_only, float size_offset, uint32_t dedicated_add_on_size) {

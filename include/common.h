@@ -66,24 +66,23 @@ struct generation_configuration {
 };
 
 struct tts_runner {
-	tts_arch arch;
 	struct ggml_context * ctx = nullptr;
 	float sampling_rate = 44100.0f;
 	bool supports_voices = false;
 
     virtual ~tts_runner() = default;
 
-	std::string arch_name() {
-		return ARCHITECTURE_NAMES.at(arch);
-	}
-
 	void init_build(std::vector<uint8_t>* buf_compute_meta);
 	void free_build();
 };
 
 struct ggml_tensor;
+struct tts_model_loader;
 
 struct tts_generation_runner : tts_runner {
+    const reference_wrapper<const tts_model_loader> loader;
+    explicit tts_generation_runner(const tts_model_loader & loader);
+
     virtual void                assign_weight(const char * name, ggml_tensor & tensor) = 0;
     virtual void                prepare_post_load()                                    = 0;
     virtual vector<string_view> list_voices();

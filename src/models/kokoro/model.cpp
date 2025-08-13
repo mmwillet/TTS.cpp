@@ -1235,7 +1235,7 @@ struct ggml_cgraph * kokoro_runner::build_kokoro_graph(kokoro_ubatch & batch) {
 	ggml_set_input(kctx->window_sq_sum);
 
 	// run generation
-	cur = build_generator(ctx, model, kctx, cur, style_half2, f0_curve, model->decoder->generator, (int)kctx->sequence_length, kctx->window_sq_sum, gf);
+	cur = build_generator(ctx, &*model, kctx, cur, style_half2, f0_curve, model->decoder->generator, (int)kctx->sequence_length, kctx->window_sq_sum, gf);
     ggml_build_forward_expand(gf, cur);
     free_build();
     return gf;
@@ -1445,8 +1445,7 @@ std::vector<std::string_view> kokoro_runner::list_voices() {
     return std::vector(cbegin(voices), cend(voices));
 }
 
-
-std::string get_espeak_id_from_kokoro_voice(std::string voice) {
+const char * get_espeak_id_from_kokoro_voice(std::string voice) {
 	return !voice.empty() && KOKORO_LANG_TO_ESPEAK_ID.find(voice[0]) != KOKORO_LANG_TO_ESPEAK_ID.end() ? KOKORO_LANG_TO_ESPEAK_ID[voice[0]] : "gmw/en-US";
 }
 

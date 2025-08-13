@@ -1,9 +1,13 @@
 #include "../loaders.h"
-#include "ggml.h"
 #include "model.h"
 
-tts_runner * dia_from_file(gguf_context * meta_ctx, ggml_context * weight_ctx, int n_threads,
-                           const generation_configuration & config, tts_arch arch, bool cpu_only) {
+void dia_register() {}
+
+dia_model_loader::dia_model_loader() : tts_model_loader{ "dia" } {}
+
+unique_ptr<tts_generation_runner> dia_model_loader::from_file(gguf_context * meta_ctx, ggml_context * weight_ctx,
+                                                              int n_threads, bool cpu_only,
+                                                              const generation_configuration & config) const {
     dia_model * model       = new dia_model;
     dac_model * audio_model = new dac_model;
     model->setup_from_file(meta_ctx, weight_ctx, cpu_only);
@@ -13,6 +17,7 @@ tts_runner * dia_from_file(gguf_context * meta_ctx, ggml_context * weight_ctx, i
     dac_runner *   audio_decoder = new dac_runner(audio_model, dctx);
     dia_context *  diactx        = build_new_dia_context(model, n_threads, cpu_only);
     dia_kv_cache * cache         = new dia_kv_cache;
-    dia_runner *   runner        = new dia_runner(model, audio_decoder, diactx, samp, cache);
-    return runner;
+    return make_unique<dia_runner>(model, audio_decoder, diactx, samp, cache);
 }
+
+const dia_model_loader dia_loader{};

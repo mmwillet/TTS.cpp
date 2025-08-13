@@ -1,6 +1,16 @@
+#pragma once
+
 #include "../../decoder/dac_model.h"
 #include "../../sampler.h"
+#include "models/loaders.h"
 #include "t5/model.h"
+
+extern const struct parler_model_loader final : tts_model_loader {
+    explicit parler_model_loader();
+
+    unique_ptr<tts_generation_runner> from_file(gguf_context * meta_ctx, ggml_context * weight_ctx, int n_threads,
+                                                bool cpu_only, const generation_configuration & config) const override;
+} parler_loader;
 
 enum parler_tensor {
     PARLER_EMBD,
@@ -175,7 +185,7 @@ static struct parler_ubatch batch_from_sentence(std::string sentence, parler_tts
 // This struct is intended to support end-to-end TTS generation. As such, it manages the parler tts model compilation, compute and generation process,
 // the tokenization and sampling process, and uses the dac_runner struct to encode audio outputs.
 struct parler_tts_runner : tts_generation_runner {
-    parler_tts_runner(parler_tts_model * model, dac_runner * audio_decoder, parler_context * pctx, unigram_tokenizer * ut, sampler * samp, parler_kv_cache * cache): model(model), dac_runner(audio_decoder), pctx(pctx), tokenizer(ut), sampler(samp), kv_self(cache) {};
+    parler_tts_runner(parler_tts_model * model, dac_runner * audio_decoder, parler_context * pctx, unigram_tokenizer * ut, sampler * samp, parler_kv_cache * cache): tts_generation_runner{parler_loader}, model(model), dac_runner(audio_decoder), pctx(pctx), tokenizer(ut), sampler(samp), kv_self(cache) {};
     ~parler_tts_runner() {
         if (ctx) {
             ggml_free(ctx);

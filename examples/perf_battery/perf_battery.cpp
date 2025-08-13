@@ -8,11 +8,6 @@
 #include "args.h"
 #include "common.h"
 
-std::vector<std::string> ARCH_LOOKUP = {
-	"parler-tts",
-	"kokoro",
-};
-
 using perf_cb = std::function<void()>;
 
 double benchmark_ms(perf_cb func) {
@@ -68,15 +63,14 @@ double mean(std::vector<double> series) {
 	return (double) sum / series.size();
 }
 
-std::string benchmark_printout(tts_arch arch, std::vector<double> generation_samples, std::vector<double> output_times) {
-	std::string arch_name = ARCH_LOOKUP[(int)arch];
+std::string benchmark_printout(const char * arch, std::vector<double> generation_samples, std::vector<double> output_times) {
 	double gen_mean = mean(generation_samples);
 	std::vector<double> gen_output;
 	for (int i = 0; i < (int) output_times.size(); i++) {
 		gen_output.push_back(generation_samples[i]/output_times[i]);
 	}
 	double gen_out_mean = mean(gen_output);
-	std::string printout = (std::string) "Mean Stats for arch " + arch_name + ":\n\n" + (std::string) "  Generation Time (ms):             " +  std::to_string(gen_mean) + (std::string) "\n";
+	std::string printout = (std::string) "Mean Stats for arch " + arch + ":\n\n" + (std::string) "  Generation Time (ms):             " +  std::to_string(gen_mean) + (std::string) "\n";
 	printout += (std::string) "  Generation Real Time Factor (ms): " + std::to_string(gen_out_mean) + (std::string) "\n";
 	return printout;
 }
@@ -119,7 +113,7 @@ int main(int argc, const char ** argv) {
     	generation_samples.push_back(generation_ms);
     }
 
-    fprintf(stdout, "%s", benchmark_printout(runner->arch, generation_samples, output_times).c_str());
+    fprintf(stdout, "%s", benchmark_printout(runner->loader.get().arch, generation_samples, output_times).c_str());
     static_cast<void>(!runner.release()); // TODO the destructor doesn't work yet
 	return 0;
 }
