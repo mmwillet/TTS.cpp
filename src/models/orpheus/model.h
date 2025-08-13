@@ -130,13 +130,13 @@ struct orpheus_runner : tts_generation_runner {
     struct ggml_cgraph * build_orpheus_graph(orpheus_ubatch & batch);
     void orpheus_kv_cache_init();
     void orpheus_build_kv_store(struct ggml_context * ctx, struct ggml_cgraph * graph, struct ggml_tensor * k_cur, struct ggml_tensor * v_cur, int index, uint32_t n_tokens, int repeat);
-    void assign_weight(std::string name, ggml_tensor * tensor);
+    void assign_weight(const char * name, ggml_tensor & tensor) override;
     std::vector<std::vector<uint32_t>> prepare_output_tokens();
     orpheus_ubatch build_worst_case_batch();
     orpheus_ubatch batch_from_sentence(std::string sentence);
     void set_inputs(orpheus_ubatch & batch);
     void decode(orpheus_ubatch & batch);
-    void prepare_post_load();
+    void prepare_post_load() override;
     void generate(const char * sentence, tts_response & response, const generation_configuration & config) override;
     void generate_from_batch(orpheus_ubatch & batch, tts_response & output);
 };

@@ -12,26 +12,27 @@
 #define MIMETYPE_JSON "application/json; charset=utf-8"
 #define MIMETYPE_HTML "text/html; charset=utf-8"
 
+#include <signal.h>
+
 #include <atomic>
+#include <chrono>
+#include <cinttypes>
 #include <condition_variable>
 #include <cstddef>
-#include <cinttypes>
 #include <deque>
+#include <filesystem>
 #include <memory>
 #include <mutex>
-#include <signal.h>
 #include <thread>
 #include <unordered_map>
-#include <filesystem>
 #include <unordered_set>
-#include <chrono>
-#include "tts.h"
-#include "audio_file.h"
-#include "args.h"
-#include "common.h"
-#include "tts_server_threading_osx.h"
 
+#include "../../src/models/loaders.h"
+#include "args.h"
+#include "audio_file.h"
+#include "common.h"
 #include "index.html.hpp"
+#include "tts_server_threading_osx.h"
 
 enum server_state {
     LOADING,  // Server is starting up / model loading
@@ -224,14 +225,15 @@ void init_response_map(simple_response_map * rmap) {
 struct worker {
     worker(struct simple_task_queue * task_queue, struct simple_response_map * response_map, std::string text_encoder_path = "", int task_timeout = 300): task_queue(task_queue), response_map(response_map), text_encoder_path(text_encoder_path), task_timeout(task_timeout) {};
     ~worker() {
-        for (auto &[_, runner]: runners) {
-            delete runner;
+        // runners.clear();
+        for (auto & runner : views::values(runners)) {
+            static_cast<void>(!runner.release()); // TODO the destructor doesn't work yet
         }
     }
     struct simple_task_queue * task_queue;
     struct simple_response_map * response_map;
 
-    unordered_map<string, tts_generation_runner *> runners;
+    unordered_map<string, unique_ptr<tts_generation_runner>> runners{};
     std::string text_encoder_path;
     std::atomic<bool> running = true;
     tts_server_threading::native_thread * thread = nullptr;
@@ -256,14 +258,14 @@ struct worker {
             return;
         }
         tts_response * data = nullptr;
-        tts_generation_runner * runner = runners[task->model];
+        tts_generation_runner & runner{*runners[task->model]};
         switch(task->task) {
             case TTS:
                 data              = new tts_response;
-                runner->generate(task->prompt.c_str(), *data, task->gen_config);
+                runner.generate(task->prompt.c_str(), *data, task->gen_config);
                 task->response    = (void *) data->data;
                 task->length      = data->n_outputs;
-                task->sample_rate = runner->sampling_rate;
+                task->sample_rate = runner.sampling_rate;
                 task->success     = data->n_outputs != 0;
                 response_map->push(task);
                 break;
@@ -273,7 +275,7 @@ struct worker {
                     response_map->push(task);
                     break;
                 }
-                runner->update_conditional_prompt(text_encoder_path.c_str(), task->prompt.c_str());
+                runner.update_conditional_prompt(text_encoder_path.c_str(), task->prompt.c_str());
                 task->success = true;
                 response_map->push(task);
                 break;
@@ -313,7 +315,7 @@ struct worker {
 
 void init_worker(std::unordered_map<std::string, std::string>* model_path, int n_threads, bool cpu_only, const generation_configuration & config, worker * w) {
     for (const auto &[id, path] : *model_path) {
-        w->runners[id] = runner_from_file(path, n_threads, config, cpu_only);
+        w->runners[id] = runner_from_file(path.c_str(), n_threads, config, cpu_only);
     }
     w->loop();
 }

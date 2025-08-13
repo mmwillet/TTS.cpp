@@ -1,10 +1,10 @@
 #include <thread>
 
+#include "../../src/models/loaders.h"
 #include "args.h"
 #include "common.h"
 #include "ggml.h"
 #include "playback.h"
-#include "tts.h"
 #include "vad.h"
 #include "write_file.h"
 
@@ -76,7 +76,7 @@ int main(int argc, const char ** argv) {
         *args.get_int_param("--max-tokens"),
         *args.get_float_param("--top-p")};
 
-    tts_generation_runner * runner = runner_from_file(args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), config, !args.get_bool_param("--use-metal"));
+    unique_ptr<tts_generation_runner> runner{runner_from_file(args.get_string_param("--model-path").c_str(), *args.get_int_param("--n-threads"), config, !args.get_bool_param("--use-metal"))};
 
     if (!conditional_prompt.empty()) {
         runner->update_conditional_prompt(text_encoder_path.c_str(), conditional_prompt.c_str());
@@ -94,5 +94,6 @@ int main(int argc, const char ** argv) {
     if (!play_tts_response(args, data, runner->sampling_rate)) {
         write_audio_file(data, args.get_string_param("--save-path"), runner->sampling_rate);
     }
+    static_cast<void>(!runner.release()); // TODO the destructor doesn't work yet
     return 0;
 }

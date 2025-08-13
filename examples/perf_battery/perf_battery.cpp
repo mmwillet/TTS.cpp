@@ -1,11 +1,12 @@
-#include "tts.h"
-#include "args.h"
-#include "common.h"
 #include <stdio.h>
+
 #include <chrono>
 #include <functional>
 #include <thread>
 
+#include "../../src/models/loaders.h"
+#include "args.h"
+#include "common.h"
 
 std::vector<std::string> ARCH_LOOKUP = {
 	"parler-tts",
@@ -104,7 +105,7 @@ int main(int argc, const char ** argv) {
 
     const generation_configuration config{args.get_string_param("--voice"), *args.get_int_param("--topk"), *args.get_float_param("--temperature"), *args.get_float_param("--repetition-penalty"), !args.get_bool_param("--no-cross-attn")};
 
-    tts_generation_runner * runner = runner_from_file(args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), config, !args.get_bool_param("--use-metal"));
+    unique_ptr<tts_generation_runner> runner{runner_from_file(args.get_string_param("--model-path").c_str(), *args.get_int_param("--n-threads"), config, !args.get_bool_param("--use-metal"))};
     std::vector<double> generation_samples;
     std::vector<double> output_times;
     
@@ -119,5 +120,6 @@ int main(int argc, const char ** argv) {
     }
 
     fprintf(stdout, "%s", benchmark_printout(runner->arch, generation_samples, output_times).c_str());
+    static_cast<void>(!runner.release()); // TODO the destructor doesn't work yet
 	return 0;
 }

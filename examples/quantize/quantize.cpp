@@ -1,13 +1,12 @@
 #include <cstdio>
-
 #include <map>
 #include <thread>
 #include <vector>
 
+#include "../../src/models/loaders.h"
 #include "args.h"
 #include "ggml.h"
 #include "quantize_impl.h"
-#include "tts.h"
 
 const std::map<std::string, ggml_type> valid_quantization_types = {
     {"FP16", GGML_TYPE_F16},

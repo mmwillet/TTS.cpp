@@ -497,19 +497,13 @@ static struct parler_ubatch batch_from_sentence(std::string sentence, parler_tts
     return batch;
 }
 
-void parler_tts_runner::assign_weight(std::string name, ggml_tensor * tensor) {
-    std::string::size_type pos = name.find(".", 0);
-    std::string top_level(name.substr(0, pos));
-    std::string value(name.substr(pos + 1));
-    if (tensor->data == NULL) {
-        return;
-    }
-    if (top_level == "audio_encoder") {
-        dac_runner->model->assign_weight(value, tensor);
-    } else if (top_level == "decoder") {
-        model->assign_weight(value, tensor);
+void parler_tts_runner::assign_weight(const char * name, ggml_tensor & tensor) {
+    if (const string_view name_sv{ name }; name_sv.starts_with("audio_encoder.")) {
+        dac_runner->model->assign_weight(string{ name_sv.substr(sizeof("audio_encoder.") - 1) }, &tensor);
+    } else if (name_sv.starts_with("decoder.")) {
+        model->assign_weight(string{ name_sv.substr(sizeof("decoder.") - 1) }, &tensor);
     } else {
-        return;
+        fprintf(stdout, "Warning: function %s encountered an unhandled tensor named '%s'.\n", __func__, name);
     }
 }
 
@@ -708,6 +702,9 @@ parler_ubatch parler_tts_runner::build_worst_case_batch()  {
 }
 
 void parler_tts_runner::prepare_post_load() {
+    if (model->use_cross_attn) {
+        model->prep_cross_key_values(pctx->n_threads);
+    }
     dac_runner->prepare_post_load();
     parler_kv_cache_init(kv_self, model, pctx);
     auto batch = build_worst_case_batch();

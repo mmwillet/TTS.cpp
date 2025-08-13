@@ -192,12 +192,12 @@ struct dia_runner : tts_generation_runner {
 
     void tokenize_sentence(std::string sentence, dia_ubatch & tokens);
     dia_ubatch batch_from_sentence(std::string sentence);
-    void assign_weight(std::string name, ggml_tensor * tensor);
+    void assign_weight(const char * name, ggml_tensor & tensor) override;
     dia_ubatch build_worst_case_batch();
     struct ggml_cgraph * build_dia_graph(dia_ubatch & batch);
     void set_inputs(dia_ubatch & batch);
     int decode(dia_ubatch & batch);
-    void prepare_post_load();
+    void prepare_post_load() override;
     void generate(const char * sentence, tts_response & response, const generation_configuration & config) override;
     bool check_stopping(dia_ubatch & batch);
     void adjust_output_tokens(std::vector<uint32_t> & output_tokens, std::vector<uint32_t> & filtered);

@@ -1,6 +1,6 @@
+#include "../loaders.h"
 #include "ggml.h"
 #include "model.h"
-#include "tts.h"
 
 tts_runner * dia_from_file(gguf_context * meta_ctx, ggml_context * weight_ctx, int n_threads,
                            const generation_configuration & config, tts_arch arch, bool cpu_only) {
@@ -14,16 +14,5 @@ tts_runner * dia_from_file(gguf_context * meta_ctx, ggml_context * weight_ctx, i
     dia_context *  diactx        = build_new_dia_context(model, n_threads, cpu_only);
     dia_kv_cache * cache         = new dia_kv_cache;
     dia_runner *   runner        = new dia_runner(model, audio_decoder, diactx, samp, cache);
-
-    for (ggml_tensor * cur = ggml_get_first_tensor(weight_ctx); cur; cur = ggml_get_next_tensor(weight_ctx, cur)) {
-        runner->assign_weight(cur->name, cur);
-    }
-
-    runner->prepare_post_load();
-
-    gguf_free(meta_ctx);
-    ggml_free(weight_ctx);
-    runner->arch = arch;
-
     return runner;
 }

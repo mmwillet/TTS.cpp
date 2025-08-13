@@ -891,19 +891,10 @@ void dia_runner::generate(const char * sentence, tts_response & output, const ge
     generate_from_batch(batch, output);
 }
 
-void dia_runner::assign_weight(std::string name, ggml_tensor * tensor) {
-    if (tensor->data == NULL) {
-        return;
-    }
-
-    if (name.size() == 0) {
-        // handles the top level meta tensor
-        return;
-    }
-
-    if (name.size() > 14 && name.substr(0, 14) == "audio_encoder.") {
-        dac_runner->model->assign_weight(name.substr(14), tensor);
+void dia_runner::assign_weight(const char * name, ggml_tensor & tensor) {
+    if (const string_view name_sv{ name }; name_sv.starts_with("audio_encoder.")) {
+        dac_runner->model->assign_weight(string{ name_sv.substr(sizeof("audio_encoder.") - 1) }, &tensor);
     } else {
-        model->assign_weight(name, tensor);
-    }   
+        model->assign_weight(name, &tensor);
+    }
 }

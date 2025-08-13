@@ -198,12 +198,12 @@ struct parler_tts_runner : tts_generation_runner {
         tts_runner::init_build(&pctx->buf_compute_meta);
     }
 
-    void assign_weight(std::string name, ggml_tensor * tensor);
+    void assign_weight(const char * name, ggml_tensor & tensor) override;
     parler_ubatch build_worst_case_batch();
     struct ggml_cgraph * build_parler_graph(parler_ubatch & batch);
     void set_inputs(parler_ubatch & batch);
     int decode(parler_ubatch & batch);
-    void prepare_post_load();
+    void prepare_post_load() override;
     void generate(const char * sentence, tts_response & output, const generation_configuration & config) override;
     bool check_stopping();
     void adjust_output_tokens(std::vector<uint32_t> & output_tokens, std::vector<uint32_t> & filtered);

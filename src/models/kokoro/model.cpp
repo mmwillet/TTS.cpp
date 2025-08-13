@@ -410,24 +410,20 @@ void kokoro_model::assign_lstm(lstm * rnn, std::string name, ggml_tensor * tenso
 	}
 }
 
-void kokoro_model::assign_weight(std::string name, ggml_tensor * tensor) {
-	// all kokoro tensors are prepended by "kokoro" so lets trim that off and assign based on the module
-	std::vector<std::string> parts = split(name, ".");
-	if (parts.size() < 2) {
-		return; // handle the null context tensor;
-	}
-	if (parts[1] == "albert") {
-		assign_albert_weight(name.substr(7+parts[1].size()+1), tensor);
-	} else if (parts[1] == "duration_predictor") {
-		assign_duration_weight(name.substr(7+parts[1].size()+1), tensor);
-	} else if (parts[1] == "text_encoder") {
-		assign_text_encoder_weight(name.substr(7+parts[1].size()+1), tensor);
-	} else if (parts[1] == "decoder") {
-		assign_decoder_weight(name.substr(7+parts[1].size()+1), tensor);
-	} else if (parts[1] == "voice_tensors") {
-		voices[parts[2]] = ggml_dup_tensor(ctx, tensor);
-		set_tensor(voices[parts[2]], tensor);
-	}
+void kokoro_model::assign_weight(const char * name, ggml_tensor & tensor) {
+    if (const string_view name_sv{ name }; name_sv.starts_with("albert.")) {
+        assign_albert_weight(string{ name_sv.substr(sizeof("albert.") - 1) }, &tensor);
+    } else if (name_sv.starts_with("duration_predictor.")) {
+        assign_duration_weight(string{ name_sv.substr(sizeof("duration_predictor.") - 1) }, &tensor);
+    } else if (name_sv.starts_with("text_encoder.")) {
+        assign_text_encoder_weight(string{ name_sv.substr(sizeof("text_encoder.") - 1) }, &tensor);
+    } else if (name_sv.starts_with("decoder.")) {
+        assign_decoder_weight(string{ name_sv.substr(sizeof("decoder.") - 1) }, &tensor);
+    } else if (name_sv.starts_with("voice_tensors.")) {
+        const string voice{ name_sv.substr(sizeof("voice_tensors.") - 1) };
+        voices[voice] = ggml_dup_tensor(ctx, &tensor);
+        set_tensor(voices[voice], &tensor);
+    }
 }
 
 void kokoro_model::assign_generator_weight(kokoro_generator * generator, std::string name, ggml_tensor * tensor) {
@@ -1327,8 +1323,11 @@ void kokoro_runner::run(kokoro_ubatch & batch, tts_response & outputs) {
     return;
 }
 
-void kokoro_runner::assign_weight(std::string name, ggml_tensor * tensor) {
-	model->assign_weight(name, tensor);
+void kokoro_runner::assign_weight(const char * name, ggml_tensor & tensor) {
+    const string_view name_sv{ name };
+    GGML_ASSERT(name_sv.starts_with("kokoro."));
+    const string trimmed{ name_sv.substr(sizeof("kokoro.") - 1) };
+    model->assign_weight(trimmed.c_str(), tensor);
 }
 
 /*

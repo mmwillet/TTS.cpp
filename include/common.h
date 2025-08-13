@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <map>
+#include <memory>
 #include <vector>
 
 using namespace std;
@@ -80,7 +81,11 @@ struct tts_runner {
 	void free_build();
 };
 
+struct ggml_tensor;
+
 struct tts_generation_runner : tts_runner {
+    virtual void                assign_weight(const char * name, ggml_tensor & tensor) = 0;
+    virtual void                prepare_post_load()                                    = 0;
     virtual vector<string_view> list_voices();
     virtual void                update_conditional_prompt(const char * file_path, const char * prompt);
     virtual void generate(const char * sentence, tts_response & output, const generation_configuration & config) = 0;

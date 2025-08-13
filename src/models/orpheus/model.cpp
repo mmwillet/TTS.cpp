@@ -436,22 +436,13 @@ orpheus_ubatch orpheus_runner::build_worst_case_batch() {
     return batch;
 }
 
-void orpheus_runner::assign_weight(std::string name, ggml_tensor * tensor) {
-    if (tensor->data == NULL) {
-        return;
-    }
-
-    if (name.size() == 0) {
-        // handles the top level meta tensor
-        return;
-    }
-
-    if (name.size() > 5 && name.substr(0, 5) == "snac.") {
-        srunner->model->assign_weight(name.substr(5), tensor);
-    } else if (name.size() > 8 && name.substr(0, 8) == "orpheus.") {
-        model->assign_weight(name.substr(8), tensor);
+void orpheus_runner::assign_weight(const char * name, ggml_tensor & tensor) {
+    if (const string_view name_sv{ name }; name_sv.starts_with("snac.")) {
+        srunner->model->assign_weight(string{ name_sv.substr(sizeof("snac.") - 1) }, &tensor);
+    } else if (name_sv.starts_with("orpheus.")) {
+        model->assign_weight(string{ name_sv.substr(sizeof("orpheus.") - 1) }, &tensor);
     } else {
-        fprintf(stdout, "Warning: function %s encountered an unhandled tensor named '%s'.\n", __func__, name.c_str());
+        fprintf(stdout, "Warning: function %s encountered an unhandled tensor named '%s'.\n", __func__, name);
     }
 }
 

@@ -1,5 +1,5 @@
+#include "../loaders.h"
 #include "model.h"
-#include "tts.h"
 
 tts_runner * orpheus_from_file(gguf_context * meta_ctx, ggml_context * weight_ctx, int n_threads,
                                const generation_configuration & config, tts_arch arch, bool cpu_only) {
@@ -14,16 +14,5 @@ tts_runner * orpheus_from_file(gguf_context * meta_ctx, ggml_context * weight_ct
     orpheus_context *  octx          = build_new_orpheus_context(model, n_threads, cpu_only);
     orpheus_kv_cache * cache         = new orpheus_kv_cache;
     orpheus_runner *   runner        = new orpheus_runner(model, audio_decoder, octx, bt, samp, cache);
-
-    for (ggml_tensor * cur = ggml_get_first_tensor(weight_ctx); cur; cur = ggml_get_next_tensor(weight_ctx, cur)) {
-        runner->assign_weight(cur->name, cur);
-    }
-
-    runner->prepare_post_load();
-
-    gguf_free(meta_ctx);
-    ggml_free(weight_ctx);
-    runner->arch = arch;
-
     return runner;
 }

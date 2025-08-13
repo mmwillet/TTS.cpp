@@ -284,7 +284,7 @@ struct kokoro_model : tts_model {
 
 
 	void post_load_assign();
-    void assign_weight(std::string name, ggml_tensor * tensor);
+    void assign_weight(const char * name, ggml_tensor & tensor);
     void prep_layers(gguf_context * meta);
     void prep_constants(gguf_context * meta);
     void setup_from_file(gguf_context * meta_ctx, ggml_context * load_context, bool cpu_only = true) {
@@ -451,7 +451,7 @@ struct kokoro_runner : tts_generation_runner {
 
     std::vector<std::string_view> list_voices() override;
     std::vector<std::vector<uint32_t>> tokenize_chunks(std::vector<std::string> clauses);
-    void assign_weight(std::string name, ggml_tensor * tensor);
+    void assign_weight(const char * name, ggml_tensor & tensor);
     void prepare_post_load();
     kokoro_ubatch build_worst_case_batch();
     void set_inputs(kokoro_ubatch & batch, uint32_t total_size);

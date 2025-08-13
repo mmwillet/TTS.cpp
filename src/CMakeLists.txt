@@ -8,9 +8,7 @@ endif ()
 # TTS
 
 add_library(tts
-        ../include/tts.h
         ../include/args.h
-        tts.cpp
         tokenizer.cpp
         sampler.cpp
         sampler.h

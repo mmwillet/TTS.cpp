@@ -1,5 +1,5 @@
+#include "../loaders.h"
 #include "model.h"
-#include "tts.h"
 
 tts_runner * kokoro_from_file(gguf_context * meta_ctx, ggml_context * weight_ctx, int n_threads,
                               const generation_configuration & config, tts_arch arch, bool cpu_only) {
@@ -19,17 +19,5 @@ tts_runner * kokoro_from_file(gguf_context * meta_ctx, ggml_context * weight_ctx
     }
     phonemizer *    phmzr  = phonemizer_from_gguf(meta_ctx, espeak_voice_id);
     kokoro_runner * runner = new kokoro_runner(model, kctx, spt, duration_runner, phmzr);
-
-    // TODO: change this weight assignment pattern to mirror llama.cpp
-    for (ggml_tensor * cur = ggml_get_first_tensor(weight_ctx); cur; cur = ggml_get_next_tensor(weight_ctx, cur)) {
-        runner->assign_weight(cur->name, cur);
-    }
-
-    runner->prepare_post_load();
-
-    gguf_free(meta_ctx);
-    ggml_free(weight_ctx);
-    runner->arch = arch;
-
     return runner;
 }
