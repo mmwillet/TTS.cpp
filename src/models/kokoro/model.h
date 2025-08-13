@@ -422,7 +422,7 @@ static struct ggml_tensor * build_sin_gen(ggml_context * ctx, kokoro_model * mod
 struct kokoro_context * build_new_kokoro_context(struct kokoro_model * model, int n_threads, bool use_cpu = true);
 
 // This manages the graph compilation of computation for the Kokoro model.
-struct kokoro_runner : tts_runner {
+struct kokoro_runner : tts_generation_runner {
     kokoro_runner(kokoro_model * model, kokoro_context * context, single_pass_tokenizer * tokenizer, kokoro_duration_runner * drunner, phonemizer * phmzr): model(model), kctx(context), tokenizer(tokenizer), drunner(drunner), phmzr(phmzr) {
     	tts_runner::sampling_rate = 24000.0f;
     	tts_runner::supports_voices = true;
@@ -449,15 +449,15 @@ struct kokoro_runner : tts_runner {
         tts_runner::init_build(&kctx->buf_compute_meta);
     }
 
-    std::vector<std::string> list_voices();
+    std::vector<std::string_view> list_voices() override;
     std::vector<std::vector<uint32_t>> tokenize_chunks(std::vector<std::string> clauses);
     void assign_weight(std::string name, ggml_tensor * tensor);
     void prepare_post_load();
     kokoro_ubatch build_worst_case_batch();
     void set_inputs(kokoro_ubatch & batch, uint32_t total_size);
     struct ggml_cgraph * build_kokoro_graph(kokoro_ubatch & batch);
-    void run(kokoro_ubatch & batch, struct tts_response * outputs);
-    int generate(std::string prompt, struct tts_response * response, std::string voice, std::string voice_code = "");
+    void run(kokoro_ubatch & batch, tts_response & outputs);
+    void generate(const char * prompt, tts_response & response, const generation_configuration & config);
 };
 
 #endif

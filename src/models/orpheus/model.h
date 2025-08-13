@@ -102,7 +102,7 @@ struct orpheus_ubatch {
     std::vector<uint32_t> tokens;    // [n_tokens]
 };
 
-struct orpheus_runner : tts_runner {
+struct orpheus_runner : tts_generation_runner {
     orpheus_runner(
             orpheus_model * model, 
             snac_runner * audio_decoder, 
@@ -126,11 +126,10 @@ struct orpheus_runner : tts_runner {
         tts_runner::init_build(&octx->buf_compute_meta);
     }
 
-    std::vector<std::string> list_voices();
+    std::vector<std::string_view> list_voices() override;
     struct ggml_cgraph * build_orpheus_graph(orpheus_ubatch & batch);
     void orpheus_kv_cache_init();
     void orpheus_build_kv_store(struct ggml_context * ctx, struct ggml_cgraph * graph, struct ggml_tensor * k_cur, struct ggml_tensor * v_cur, int index, uint32_t n_tokens, int repeat);
-    void configure_generation(generation_configuration * config);
     void assign_weight(std::string name, ggml_tensor * tensor);
     std::vector<std::vector<uint32_t>> prepare_output_tokens();
     orpheus_ubatch build_worst_case_batch();
@@ -138,8 +137,8 @@ struct orpheus_runner : tts_runner {
     void set_inputs(orpheus_ubatch & batch);
     void decode(orpheus_ubatch & batch);
     void prepare_post_load();
-    int generate(std::string sentence, struct tts_response * response);
-    void generate_from_batch(orpheus_ubatch & batch, struct tts_response * output);
+    void generate(const char * sentence, tts_response & response, const generation_configuration & config) override;
+    void generate_from_batch(orpheus_ubatch & batch, tts_response & output);
 };
 
 static struct ggml_tensor * orpheus_build_layer_norm(ggml_context * ctx, struct ggml_tensor * x, struct ggml_tensor * weight);

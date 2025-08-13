@@ -386,7 +386,7 @@ std::vector<std::vector<uint32_t>> orpheus_runner::prepare_output_tokens() {
     return output_tokens;
 }
 
-void orpheus_runner::generate_from_batch(orpheus_ubatch & batch, struct tts_response * output) {
+void orpheus_runner::generate_from_batch(orpheus_ubatch & batch, tts_response & output) {
     while ((octx->output_tokens.size() == 0 || octx->output_tokens.back() != model->stopping_token_id) && octx->output_tokens.size() < model->max_generation_size) {
         decode(batch);
         generation_sampler->sample(octx->logits + octx->n_outputs * model->vocab_size, octx->output_tokens);
@@ -401,10 +401,21 @@ void orpheus_runner::generate_from_batch(orpheus_ubatch & batch, struct tts_resp
         fprintf(stdout, "Warning: generation hit its max default length. The generated audio may not contain the entire prompt.\n");
     }
     std::vector<std::vector<uint32_t>> processed_output_tokens = prepare_output_tokens();
-    srunner->run(processed_output_tokens, output);
+    srunner->run(processed_output_tokens, &output);
 }
 
-int orpheus_runner::generate(std::string sentence, struct tts_response * response) {
+void orpheus_runner::generate(const char * sentence, tts_response & response, const generation_configuration & config) {
+    generation_sampler->temperature        = config.temperature;
+    generation_sampler->repetition_penalty = config.repetition_penalty;
+    generation_sampler->do_sample          = config.sample;
+    generation_sampler->top_k              = config.top_k;
+    generation_sampler->top_p              = config.top_p;
+    if (std::find(orpheus_voices.begin(), orpheus_voices.end(), config.voice) == orpheus_voices.end() &&
+        !config.voice.empty()) {
+        TTS_ABORT("Voice '%s' is not a valid voice for Orpheus.", config.voice.c_str());
+    }
+    octx->voice = config.voice;
+
     orpheus_ubatch batch = batch_from_sentence(sentence);
     // it should be possible to update the max context window size, but currently it is extremely unlikely that a single prompt will
     // surpass the default size.
@@ -417,19 +428,6 @@ int orpheus_runner::generate(std::string sentence, struct tts_response * respons
         orpheus_kv_cache_init();
     }
     generate_from_batch(batch, response);
-    return 0;
-}
-
-void orpheus_runner::configure_generation(generation_configuration * config) {
-    generation_sampler->temperature = config->temperature;
-    generation_sampler->repetition_penalty = config->repetition_penalty;
-    generation_sampler->do_sample = config->sample;
-    generation_sampler->top_k = config->top_k;
-    generation_sampler->top_p = config->top_p;
-    if (std::find(orpheus_voices.begin(), orpheus_voices.end(), config->voice) == orpheus_voices.end() && !config->voice.empty()) {
-        TTS_ABORT("Voice '%s' is not a valid voice for Orpheus.", config->voice.c_str());
-    }
-    octx->voice = config->voice;
 }
 
 orpheus_ubatch orpheus_runner::build_worst_case_batch() {
@@ -465,11 +463,6 @@ void orpheus_runner::prepare_post_load() {
     octx->prep_schedule(gf);
 }
 
-std::vector<std::string> list_voices() {
-	std::vector<std::string> voices;
-	voices.reserve(orpheus_voices.size());
-	for (auto voice : orpheus_voices) {
-		voices.push_back(voice);
-	}
-	return voices;
+std::vector<std::string_view> orpheus_runner::list_voices() {
+    return vector<string_view>(cbegin(orpheus_voices), cend(orpheus_voices));
 }

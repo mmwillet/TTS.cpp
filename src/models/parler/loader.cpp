@@ -2,12 +2,12 @@
 #include "tts.h"
 
 tts_runner * parler_tts_from_file(gguf_context * meta_ctx, ggml_context * weight_ctx, int n_threads,
-                                  generation_configuration * config, tts_arch arch, bool cpu_only) {
+                                  const generation_configuration & config, tts_arch arch, bool cpu_only) {
     parler_tts_model *  model       = new parler_tts_model;
     dac_model *         audio_model = new dac_model;
     unigram_tokenizer * ut          = unigram_tokenizer_from_gguf(meta_ctx);
     ut->initialize_tokenizer();
-    model->use_cross_attn = config->use_cross_attn;
+    model->use_cross_attn = config.use_cross_attn;
     model->setup_from_file(meta_ctx, weight_ctx, cpu_only);
     audio_model->setup_from_file(meta_ctx, weight_ctx, cpu_only);
     sampler *           samp          = new sampler;
@@ -22,7 +22,7 @@ tts_runner * parler_tts_from_file(gguf_context * meta_ctx, ggml_context * weight
         runner->assign_weight(cur->name, cur);
     }
 
-    if (config->use_cross_attn) {
+    if (config.use_cross_attn) {
         runner->model->prep_cross_key_values(n_threads);
     }
 

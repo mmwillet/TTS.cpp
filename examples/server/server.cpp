@@ -106,7 +106,7 @@ struct simple_server_task {
     task_type task;
     int id;
     std::string prompt;
-    generation_configuration * gen_config;
+    generation_configuration gen_config;
     void * response;
     size_t length;
     bool success = false;
@@ -231,7 +231,7 @@ struct worker {
     struct simple_task_queue * task_queue;
     struct simple_response_map * response_map;
 
-    std::unordered_map<std::string, struct tts_runner *> runners;
+    unordered_map<string, tts_generation_runner *> runners;
     std::string text_encoder_path;
     std::atomic<bool> running = true;
     tts_server_threading::native_thread * thread = nullptr;
@@ -255,17 +255,16 @@ struct worker {
         if (task->timed_out(task_timeout)) {
             return;
         }
-        int outcome;
         tts_response * data = nullptr;
-        tts_runner* runner = runners[task->model];
+        tts_generation_runner * runner = runners[task->model];
         switch(task->task) {
             case TTS:
-                data = new tts_response;
-                outcome = generate(runner, task->prompt, data, task->gen_config);
-                task->response = (void*) data->data;
-                task->length = data->n_outputs;
+                data              = new tts_response;
+                runner->generate(task->prompt.c_str(), *data, task->gen_config);
+                task->response    = (void *) data->data;
+                task->length      = data->n_outputs;
                 task->sample_rate = runner->sampling_rate;
-                task->success = outcome == 0;
+                task->success     = data->n_outputs != 0;
                 response_map->push(task);
                 break;
             case CONDITIONAL_PROMPT:
@@ -274,7 +273,7 @@ struct worker {
                     response_map->push(task);
                     break;
                 }
-                update_conditional_prompt(runner, text_encoder_path, task->prompt);
+                runner->update_conditional_prompt(text_encoder_path.c_str(), task->prompt.c_str());
                 task->success = true;
                 response_map->push(task);
                 break;
@@ -287,8 +286,8 @@ struct worker {
                     if (!runner->supports_voices) {
                         continue;
                     }
-                    std::string voices_string = "";
-                    for (auto voice : list_voices(runner)) {
+                    std::string voices_string{};
+                    for (const auto voice : runner->list_voices()) {
                         if (!voices_string.empty()) {
                             voices_string += ",";
                         }
@@ -312,7 +311,7 @@ struct worker {
     }
 };
 
-void init_worker(std::unordered_map<std::string, std::string>* model_path, int n_threads, bool cpu_only, generation_configuration * config, worker * w) {
+void init_worker(std::unordered_map<std::string, std::string>* model_path, int n_threads, bool cpu_only, const generation_configuration & config, worker * w) {
     for (const auto &[id, path] : *model_path) {
         w->runners[id] = runner_from_file(path, n_threads, config, cpu_only);
     }
@@ -444,7 +443,7 @@ int main(int argc, const char ** argv) {
         exit(1);
     }
 
-    generation_configuration * default_generation_config = new generation_configuration(
+    const generation_configuration default_generation_config{
         args.get_string_param("--voice"),
         *args.get_int_param("--topk"),
         *args.get_float_param("--temperature"),
@@ -452,7 +451,7 @@ int main(int argc, const char ** argv) {
         !args.get_bool_param("--no-cross-attn"),
         args.get_string_param("--espeak-voice-id"),
         0,
-        *args.get_float_param("--top-p"));
+        *args.get_float_param("--top-p")};
 
     worker_pool * pool = nullptr;
     struct simple_task_queue * tqueue = new simple_task_queue;
@@ -651,34 +650,33 @@ int main(int argc, const char ** argv) {
         }
         struct simple_server_task * task = new simple_server_task(TTS, prompt);
         int id = task->id;
-        generation_configuration * conf = new generation_configuration();
-        std::memcpy((void*)conf, default_generation_config, sizeof(generation_configuration));
+        generation_configuration conf{default_generation_config};
         float temp;
         float rep_pen;
         float top_p;
         int top_k;
         if (data.contains("temperature") && data.at("temperature").is_number()) {
             temp = data.at("temperature").get<float>();
-            conf->temperature = temp;
+            conf.temperature = temp;
         }
 
         if (data.contains("top_k") && data.at("top_k").is_number()) {
             top_k = data.at("top_k").get<int>();
-            conf->top_k = top_k;
+            conf.top_k = top_k;
         }
 
         if (data.contains("top_p") && data.at("top_p").is_number()) {
             top_p = data.at("top_p").get<float>();
-            conf->top_p = top_p;
+            conf.top_p = top_p;
         }
 
         if (data.contains("repetition_penalty") && data.at("repetition_penalty").is_number()) {
             rep_pen = data.at("repetition_penalty").get<float>();
-            conf->repetition_penalty = rep_pen;
+            conf.repetition_penalty = rep_pen;
         }
 
         if (data.contains("voice") && data.at("voice").is_string()) {
-            conf->voice = data.at("voice").get<std::string>();
+            conf.voice = data.at("voice").get<std::string>();
         }
 
         if (data.contains("model") && data.at("model").is_string()) {

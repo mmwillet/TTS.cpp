@@ -3,7 +3,7 @@
 #include "tts.h"
 
 tts_runner * dia_from_file(gguf_context * meta_ctx, ggml_context * weight_ctx, int n_threads,
-                           generation_configuration * config, tts_arch arch, bool cpu_only) {
+                           const generation_configuration & config, tts_arch arch, bool cpu_only) {
     dia_model * model       = new dia_model;
     dac_model * audio_model = new dac_model;
     model->setup_from_file(meta_ctx, weight_ctx, cpu_only);

@@ -102,16 +102,16 @@ int main(int argc, const char ** argv) {
     }
     args.validate();
 
-    generation_configuration * config = new generation_configuration(args.get_string_param("--voice"), *args.get_int_param("--topk"), *args.get_float_param("--temperature"), *args.get_float_param("--repetition-penalty"), !args.get_bool_param("--no-cross-attn"));
+    const generation_configuration config{args.get_string_param("--voice"), *args.get_int_param("--topk"), *args.get_float_param("--temperature"), *args.get_float_param("--repetition-penalty"), !args.get_bool_param("--no-cross-attn")};
 
-    struct tts_runner * runner = runner_from_file(args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), config, !args.get_bool_param("--use-metal"));
+    tts_generation_runner * runner = runner_from_file(args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), config, !args.get_bool_param("--use-metal"));
     std::vector<double> generation_samples;
     std::vector<double> output_times;
     
     for (std::string sentence : TEST_SENTENCES) {
     	tts_response response;
     	perf_cb cb = [&]{
-    		generate(runner, sentence, &response, config);
+    		runner->generate(sentence.c_str(), response, config);
     	};
     	double generation_ms = benchmark_ms(cb);
     	output_times.push_back((double)(response.n_outputs / 44.1));

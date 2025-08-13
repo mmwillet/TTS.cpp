@@ -165,7 +165,7 @@ static struct ggml_tensor * build_dia_decoder( ggml_cgraph * gf, ggml_context * 
 
 // This struct is intended to support end-to-end TTS generation for the Dia model. As such, it manages Dia's model compilation, compute, generation,
 // tokenizationm and sampling process, and uses the dac_runner struct to encode audio outputs.
-struct dia_runner : tts_runner {
+struct dia_runner : tts_generation_runner {
     dia_runner(dia_model * model, dac_runner * audio_decoder, dia_context * dctx, sampler * samp, dia_kv_cache * cache): model(model), dac_runner(audio_decoder), dctx(dctx), decode_sampler(samp), kv_cross_self(cache) {
         decode_sampler->vocab_size = model->output_vocab_size;
     };
@@ -192,15 +192,14 @@ struct dia_runner : tts_runner {
 
     void tokenize_sentence(std::string sentence, dia_ubatch & tokens);
     dia_ubatch batch_from_sentence(std::string sentence);
-    void configure_generation(generation_configuration * config);
     void assign_weight(std::string name, ggml_tensor * tensor);
     dia_ubatch build_worst_case_batch();
     struct ggml_cgraph * build_dia_graph(dia_ubatch & batch);
     void set_inputs(dia_ubatch & batch);
     int decode(dia_ubatch & batch);
     void prepare_post_load();
-    int generate(std::string sentence, struct tts_response * response);
+    void generate(const char * sentence, tts_response & response, const generation_configuration & config) override;
     bool check_stopping(dia_ubatch & batch);
     void adjust_output_tokens(std::vector<uint32_t> & output_tokens, std::vector<uint32_t> & filtered);
-    int generate_from_batch(dia_ubatch & batch, struct tts_response * output);
+    int generate_from_batch(dia_ubatch & batch, tts_response & output);
 };

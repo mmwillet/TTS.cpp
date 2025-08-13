@@ -1,10 +1,11 @@
-#ifndef common_h
-#define common_h
+#pragma once
 
 #include <cstdint>
 #include <string>
 #include <map>
 #include <vector>
+
+using namespace std;
 
 // Using this simple struct as opposed to a common std::vector allows us to return the cpu buffer
 // pointer directly rather than copying the contents of the buffer to a predefined std::vector.
@@ -28,7 +29,7 @@ const std::map<std::string, tts_arch> SUPPORTED_ARCHITECTURES = {
 	{ "orpheus", ORPHEUS_ARCH }
 };
 
-/// Given a map from keys to values, creates a new map from values to keys 
+/// Given a map from keys to values, creates a new map from values to keys
 template<typename K, typename V>
 static std::map<V, K> reverse_map(const std::map<K, V>& m) {
     std::map<V, K> r;
@@ -43,10 +44,10 @@ const std::map<tts_arch, std::string> ARCHITECTURE_NAMES = reverse_map(SUPPORTED
 struct generation_configuration {
     generation_configuration(
     	std::string voice = "",
-    	int top_k = 50, 
-    	float temperature = 1.0, 
-    	float repetition_penalty = 1.0, 
-    	bool use_cross_attn = true, 
+    	int top_k = 50,
+    	float temperature = 1.0,
+    	float repetition_penalty = 1.0,
+    	bool use_cross_attn = true,
     	std::string espeak_voice_id = "",
     	int max_tokens = 0,
     	float top_p = 1.0,
@@ -69,6 +70,8 @@ struct tts_runner {
 	float sampling_rate = 44100.0f;
 	bool supports_voices = false;
 
+    virtual ~tts_runner() = default;
+
 	std::string arch_name() {
 		return ARCHITECTURE_NAMES.at(arch);
 	}
@@ -77,4 +80,8 @@ struct tts_runner {
 	void free_build();
 };
 
-#endif
+struct tts_generation_runner : tts_runner {
+    virtual vector<string_view> list_voices();
+    virtual void                update_conditional_prompt(const char * file_path, const char * prompt);
+    virtual void generate(const char * sentence, tts_response & output, const generation_configuration & config) = 0;
+};

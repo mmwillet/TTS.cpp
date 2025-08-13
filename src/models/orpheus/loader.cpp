@@ -2,7 +2,7 @@
 #include "tts.h"
 
 tts_runner * orpheus_from_file(gguf_context * meta_ctx, ggml_context * weight_ctx, int n_threads,
-                               generation_configuration * config, tts_arch arch, bool cpu_only) {
+                               const generation_configuration & config, tts_arch arch, bool cpu_only) {
     orpheus_model * model       = new orpheus_model;
     snac_model *    audio_model = new snac_model;
     bpe_tokenizer * bt          = bpe_tokenizer_from_gguf(meta_ctx);

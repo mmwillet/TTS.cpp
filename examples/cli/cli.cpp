@@ -66,24 +66,24 @@ int main(int argc, const char ** argv) {
         exit(1);
     }
 
-    generation_configuration * config = new generation_configuration(
-        args.get_string_param("--voice"), 
-        *args.get_int_param("--topk"), 
-        *args.get_float_param("--temperature"), 
-        *args.get_float_param("--repetition-penalty"), 
+    const generation_configuration config{
+        args.get_string_param("--voice"),
+        *args.get_int_param("--topk"),
+        *args.get_float_param("--temperature"),
+        *args.get_float_param("--repetition-penalty"),
         !args.get_bool_param("--no-cross-attn"),
         args.get_string_param("--espeak-voice-id"),
         *args.get_int_param("--max-tokens"),
-        *args.get_float_param("--top-p"));
+        *args.get_float_param("--top-p")};
 
-    struct tts_runner * runner = runner_from_file(args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), config, !args.get_bool_param("--use-metal"));
+    tts_generation_runner * runner = runner_from_file(args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), config, !args.get_bool_param("--use-metal"));
 
-    if (conditional_prompt.size() > 0) {
-        update_conditional_prompt(runner, text_encoder_path, conditional_prompt, true);
+    if (!conditional_prompt.empty()) {
+        runner->update_conditional_prompt(text_encoder_path.c_str(), conditional_prompt.c_str());
     }
     tts_response data;
 
-    generate(runner, args.get_string_param("--prompt"), &data, config);
+    runner->generate(args.get_string_param("--prompt").c_str(), data, config);
     if (data.n_outputs == 0) {
         fprintf(stderr, "Got empty response for prompt, '%s'.\n", args.get_string_param("--prompt").c_str());
         exit(1);
