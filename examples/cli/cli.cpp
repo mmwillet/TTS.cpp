@@ -1,10 +1,12 @@
-#include "tts.h"
+#include <thread>
+
 #include "args.h"
 #include "common.h"
+#include "ggml.h"
 #include "playback.h"
+#include "tts.h"
 #include "vad.h"
 #include "write_file.h"
-#include <thread>
 
 class tts_timing_printer {
     const int64_t start_us{[] {
