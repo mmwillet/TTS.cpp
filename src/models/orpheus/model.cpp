@@ -1,4 +1,4 @@
-#include "orpheus_model.h"
+#include "model.h"
 
 #include <array>
 

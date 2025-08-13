@@ -1,9 +1,9 @@
 #ifndef parler_model_h
 #define parler_model_h
 
-#include "dac_model.h"
-#include "t5_encoder_model.h"
-#include "sampler.h"
+#include "../../decoder/dac_model.h"
+#include "../../sampler.h"
+#include "t5/model.h"
 
 enum parler_tensor {
     PARLER_EMBD,

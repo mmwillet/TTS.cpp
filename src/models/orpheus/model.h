@@ -1,8 +1,8 @@
 #pragma once
 
-#include "sampler.h"
-#include "tokenizer.h"
-#include "snac_model.h"
+#include "../../decoder/snac_model.h"
+#include "../../sampler.h"
+#include "../../tokenizer.h"
 
 // Orpheus uses vLLM with a llama-3 architecture. The only critical difference from the normal llama architecture is the use of kv heads.
 

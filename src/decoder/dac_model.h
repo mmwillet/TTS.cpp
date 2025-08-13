@@ -1,8 +1,9 @@
 #ifndef dac_model_h
 #define dac_model_h
 
-#include "general_neural_audio_codec.h"
 #include <map>
+
+#include "general_neural_audio_codec.h"
 
 enum dac_tensor {
     DAC_ENCODER_IN_KERNEL,

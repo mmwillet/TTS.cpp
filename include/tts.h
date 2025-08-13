@@ -1,13 +1,14 @@
 #ifndef tts_h
 #define tts_h
 
-#include "parler_model.h"
-#include "kokoro_model.h"
-#include "dia_model.h"
-#include "orpheus_model.h"
-#include <thread>
-#include <fstream>
 #include <array>
+#include <fstream>
+#include <thread>
+
+#include "../src/models/dia/model.h"
+#include "../src/models/kokoro/model.h"
+#include "../src/models/orpheus/model.h"
+#include "../src/models/parler/model.h"
 
 struct tts_runner * parler_tts_from_file(gguf_context * meta_ctx, ggml_context * weight_ctx, int n_threads, generation_configuration * config, tts_arch arch, bool cpu_only);
 struct tts_runner * kokoro_from_file(gguf_context * meta_ctx, ggml_context * weight_ctx, int n_threads, generation_configuration * config, tts_arch arch, bool cpu_only);

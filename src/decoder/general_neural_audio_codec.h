@@ -1,6 +1,6 @@
 #pragma once
 
-#include "tts_model.h"
+#include "../tts_model.h"
 
 // This namespace implements a general abstraction of the core functionality used in common neural audio codecs like DAC and SNAC.
 namespace general_neural_audio_codec {

@@ -1,4 +1,4 @@
-#include "parler_model.h"
+#include "model.h"
 
 // For loading parler model from gguf file.
 static const std::map<std::string, parler_tensor> PARLER_TENSOR_GGUF_LOOKUP = {

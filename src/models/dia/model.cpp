@@ -1,4 +1,4 @@
-#include "dia_model.h"
+#include "model.h"
 
 void dia_model::assign_weight(std::string name, struct ggml_tensor * tensor) {
     std::vector<std::string> parts = split(name, ".");

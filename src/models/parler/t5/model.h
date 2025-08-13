@@ -1,9 +1,7 @@
-#ifndef t5_encoder_model_h
-#define t5_encoder_model_h
+#pragma once
 
-#include "tts_model.h"
-#include "tokenizer.h"
-
+#include "../../../tokenizer.h"
+#include "../../../tts_model.h"
 
 enum t5_tensor {
     T5_EMBD,
@@ -126,5 +124,3 @@ struct t5_runner : tts_runner {
 };
 
 struct t5_runner * text_encoder_from_file(std::string file_path, int n_threads, unigram_tokenizer * tokenizer, bool cpu_only = true);
-
-#endif

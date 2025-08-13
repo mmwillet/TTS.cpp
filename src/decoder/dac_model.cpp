@@ -1,4 +1,5 @@
 #include "dac_model.h"
+
 #include <algorithm>
 #include <stdexcept>
 
@@ -209,4 +210,3 @@ void dac_runner::run(uint32_t * input_tokens, uint32_t sequence_length, struct t
     outputs->n_outputs = sequence_length * model->up_sampling_factor;
     return;
 }
-

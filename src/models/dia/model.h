@@ -1,7 +1,7 @@
 #pragma once
 
-#include "dac_model.h"
-#include "sampler.h"
+#include "../../decoder/dac_model.h"
+#include "../../sampler.h"
 
 struct dia_encoder_layer {
     struct ggml_tensor * k;

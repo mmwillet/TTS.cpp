@@ -1,4 +1,4 @@
-#include "t5_encoder_model.h"
+#include "model.h"
 
 static const std::map<std::string, t5_tensor> T5_TENSOR_GGUF_LOOKUP = {
     {"t5encoder.token_embd", T5_EMBD},
@@ -139,7 +139,7 @@ void t5_encoder::prep_constants(gguf_context * meta) {
     int bos_token_id_key = gguf_find_key(meta, "tokenizer.ggml.bos_token_id");
     if (bos_token_id_key != -1) {
         bos_token_id = gguf_get_val_u32(meta, bos_token_id_key);
-    }    
+    }
 
     int eos_token_id_key = gguf_find_key(meta, "tokenizer.ggml.eos_token_id");
     if (eos_token_id_key != -1) {
@@ -219,7 +219,7 @@ struct ggml_cgraph * t5_runner::build_t5_graph(t5_ubatch & batch) {
 
     struct ggml_tensor * cur;
     struct ggml_tensor * inpL;
-    
+
     //t5ctx->positions = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, batch.n_tokens);
     //ggml_set_input(t5ctx->positions);
 
@@ -233,7 +233,7 @@ struct ggml_cgraph * t5_runner::build_t5_graph(t5_ubatch & batch) {
 
     struct ggml_tensor * KQ_mask_dec = build_t5_attn_mask(ctx, t5ctx, batch);
     struct ggml_tensor * pos_bias = build_t5_pos_bias(ctx, t5ctx->inp_pos_bucket, model->relative_attn_bias);
-    
+
     for (int l = 0; l < model->n_layers; l++) {
         struct ggml_tensor * residual = inpL;
 
@@ -293,7 +293,7 @@ struct ggml_cgraph * t5_runner::build_t5_graph(t5_ubatch & batch) {
     ggml_build_forward_expand(gf, cur);
 
     free_build();
-    
+
     return gf;
 }
 
@@ -312,7 +312,7 @@ void t5_runner::set_inputs(t5_ubatch & batch) {
         for (int ii = 0; ii < batch.n_tokens; ii++) {
         	int ab_rpos = abs(i - ii);
         	int rpos = i - ii;
-            attn_mask[i*batch.n_tokens + ii] = 0.0f; //ii > i ? -INFINITY : 0.0f; 
+            attn_mask[i*batch.n_tokens + ii] = 0.0f; //ii > i ? -INFINITY : 0.0f;
             pos_bucket[i*batch.n_tokens + ii] = (uint32_t) (rpos > 0 ? n_buckets : 0) + (ab_rpos < max_exact ? ab_rpos : std::min((n_buckets - 1), (max_exact + (int)((log((ab_rpos / max_exact)) / logarithmic_denominator) * max_exact))));
         }
     }
@@ -324,10 +324,10 @@ void t5_runner::run(uint32_t * input_tokens, uint32_t sequence_length, struct tt
     batch.input_tokens = input_tokens;
     batch.n_tokens = sequence_length;
     ggml_backend_sched_reset(t5ctx->sched);
-    
+
     const size_t prev_size = t5ctx->buf_output ? ggml_backend_buffer_get_size(t5ctx->buf_output) : 0;
     const size_t new_size = model->max_context_length * model->output_size * sizeof(float);
-    
+
     if (!t5ctx->buf_output || prev_size < new_size) {
         if (t5ctx->buf_output) {
             ggml_backend_buffer_free(t5ctx->buf_output);
@@ -337,7 +337,7 @@ void t5_runner::run(uint32_t * input_tokens, uint32_t sequence_length, struct tt
 
         t5ctx->buf_output = ggml_backend_buft_alloc_buffer(t5ctx->backend_cpu_buffer, new_size);
     }
-    
+
     outputs->data = (float *) ggml_backend_buffer_get_base(t5ctx->buf_output);
     ggml_backend_buffer_clear(t5ctx->buf_output, 0);
     struct ggml_cgraph * gf = NULL;

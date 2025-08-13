@@ -2,8 +2,9 @@
 #define kokoro_model_h
 
 #include <stdlib.h>
-#include "tts_model.h"
-#include "tokenizer.h"
+
+#include "../../tokenizer.h"
+#include "../../tts_model.h"
 #include "phonemizer.h"
 
 // Rather than using ISO 639-2 language codes, Kokoro voice pack specify their corresponding language via their first letter.
