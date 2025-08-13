@@ -18,17 +18,4 @@ int generate(tts_runner * runner, std::string sentence, struct tts_response * re
 void update_conditional_prompt(tts_runner * runner, const std::string file_path, const std::string prompt, bool cpu_only = true);
 std::vector<std::string> list_voices(tts_runner * runner);
 
-struct quantization_params {
-    quantization_params(uint32_t n_threads, enum ggml_type quantize_type): n_threads(n_threads), quantize_type(quantize_type) {};
-    uint32_t n_threads;
-    enum ggml_type quantize_type; // quantization type
-    bool quantize_output_heads = false;
-    bool quantize_text_embeddings = false;
-    bool quantize_cross_attn_kv = false;
-    bool convert_dac_to_f16 = false;
-    bool convert_non_quantizable_to_f16 = false;
-};
-
-void quantize_gguf(const std::string & ifile, const std::string & ofile, struct quantization_params * params);
-
 #endif

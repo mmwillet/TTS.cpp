@@ -1,10 +1,12 @@
-#include <stdio.h>
-#include <thread>
+#include <cstdio>
+
 #include <map>
+#include <thread>
 #include <vector>
 
 #include "args.h"
 #include "ggml.h"
+#include "quantize_impl.h"
 #include "tts.h"
 
 const std::map<std::string, ggml_type> valid_quantization_types = {
@@ -42,12 +44,15 @@ int main(int argc, const char ** argv) {
                 qtype.c_str());
         exit(1);
     }
-    struct quantization_params * qp = new quantization_params((uint32_t) *args.get_int_param("--n-threads"), valid_quantization_types.at(qtype));
-    qp->quantize_output_heads = args.get_bool_param("--quantize-output-heads");
-    qp->quantize_text_embeddings = args.get_bool_param("--quantize-text-embedding");
-    qp->quantize_cross_attn_kv = args.get_bool_param("--quantize-cross-attn-kv");
-    qp->convert_dac_to_f16 = args.get_bool_param("--convert-dac-to-f16");
-    qp->convert_non_quantizable_to_f16 = args.get_bool_param("--convert-non-quantized-to-f16");
-  	quantize_gguf(args.get_string_param("--model-path"), args.get_string_param("--quantized-model-path"), qp);
+    quantization_params qp {
+        .n_threads{ static_cast<uint32_t>(*args.get_int_param("--n-threads")) },
+        .quantize_type{valid_quantization_types.at(qtype)},  // quantization type
+        .quantize_output_heads{ args.get_bool_param("--quantize-output-heads")},
+        .quantize_text_embeddings{args.get_bool_param("--quantize-text-embedding")},
+        .quantize_cross_attn_kv{ args.get_bool_param("--quantize-cross-attn-kv")},
+        .convert_dac_to_f16{ args.get_bool_param("--convert-dac-to-f16")},
+        .convert_non_quantizable_to_f16{ args.get_bool_param("--convert-non-quantized-to-f16")},
+    };
+    quantize_gguf(args.get_string_param("--model-path").c_str(), args.get_string_param("--quantized-model-path").c_str(), qp);
     return 0;
 }
