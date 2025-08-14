@@ -409,7 +409,7 @@ void word_phonemizer::add_rule(std::vector<std::string> keys, std::string phonem
 	phonemizer_rule * current_rule = nullptr;
 	for (int i = 0; i < keys.size(); i++) {
 		if (current_rule) {
-			if (current_rule->rules.find(keys[i]) == rules.end()) {
+			if (!current_rule->rules.contains(keys[i])) {
 				phonemizer_rule * nrule = new phonemizer_rule;
 				current_rule->rules[keys[i]] = nrule;
 				current_rule = nrule;
@@ -1178,4 +1178,3 @@ struct phonemizer * phonemizer_from_file(const std::string fname, const std::str
     }
     return phonemizer_from_gguf(meta_ctx, espeak_voice_code);
 }
-
