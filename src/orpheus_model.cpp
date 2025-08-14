@@ -1,8 +1,10 @@
 #include "orpheus_model.h"
 
+#include <array>
+
 // These tokens and variables aren't defined in the Orpheus' model configuration but instead are defined inline in various python functions.
 // As such, they are not discoverable so defining them as unconfigurable constants should be fine.
-static constexpr std::array<std::string, 7> orpheus_voices = {"zoe", "zac","jess", "leo", "mia", "julia", "leah"};
+static constexpr std::array<const char *, 7> orpheus_voices{"zoe", "zac","jess", "leo", "mia", "julia", "leah"};
 static constexpr std::array<uint32_t, 2> orpheus_prepended_tokens = { 128259, 128000 };
 static constexpr std::array<uint32_t, 4> orpheus_appended_tokens = { 128009, 128260, 128261, 128257 };
 
