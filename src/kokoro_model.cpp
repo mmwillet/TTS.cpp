@@ -30,15 +30,18 @@ static struct ggml_tensor * build_albert_norm(ggml_context * ctx, ggml_tensor * 
     return cur;
 }
 
-static struct ggml_tensor * build_lstm(ggml_context * ctx, ggml_tensor * input, lstm* rnn, uint32_t sequence_length) {
+static struct ggml_tensor * build_lstm_run(ggml_context * ctx, ggml_cgraph * gf, ggml_tensor * input, ggml_tensor * h_0, ggml_tensor * c_0, std::vector<ggml_tensor*> weights, std::vector<ggml_tensor*> biases, uint32_t sequence_length, bool reversed = false);
+
+static struct ggml_tensor * build_lstm(ggml_context * ctx, ggml_tensor * input, lstm* rnn, uint32_t sequence_length, ggml_cgraph * gf) {
 	struct ggml_tensor * resp = input;
 	struct ggml_tensor * reverse_resp = input;
 
 	// iterate over cells first so that at each pass to the next cell we have a fully formed vector (this improves performance as well as allocation for stacked lstms)
 	for (int c = 0; c < rnn->cells.size(); c++) {
-		resp = build_lstm_run(ctx, resp, rnn->hidden[c], rnn->states[c], rnn->cells[c]->weights, rnn->cells[c]->biases, sequence_length);
+		ggml_build_forward_expand(gf, resp);
+		resp = build_lstm_run(ctx, gf, resp, rnn->hidden[c], rnn->states[c], rnn->cells[c]->weights, rnn->cells[c]->biases, sequence_length);
 		if (rnn->bidirectional) {
-			reverse_resp = build_lstm_run(ctx, reverse_resp, rnn->hidden[c], rnn->states[c], rnn->cells[c]->reverse_weights, rnn->cells[c]->reverse_biases, sequence_length, true);
+			reverse_resp = build_lstm_run(ctx, gf, reverse_resp, rnn->hidden[c], rnn->states[c], rnn->cells[c]->reverse_weights, rnn->cells[c]->reverse_biases, sequence_length, true);
 		}
 	}
 	if (rnn->bidirectional) {
@@ -47,7 +50,7 @@ static struct ggml_tensor * build_lstm(ggml_context * ctx, ggml_tensor * input, 
 	return resp;
 }
 
-static struct ggml_tensor * build_lstm_run(ggml_context * ctx, ggml_tensor * input, ggml_tensor * h_0, ggml_tensor * c_0, std::vector<ggml_tensor*> weights, std::vector<ggml_tensor*> biases, uint32_t sequence_length, bool reversed) {
+static struct ggml_tensor * build_lstm_run(ggml_context * ctx, ggml_cgraph * gf, ggml_tensor * input, ggml_tensor * h_0, ggml_tensor * c_0, std::vector<ggml_tensor*> weights, std::vector<ggml_tensor*> biases, uint32_t sequence_length, bool reversed) {
 	struct ggml_tensor * I = ggml_add(ctx, ggml_mul_mat(ctx, weights[0], input), biases[0]);
 	struct ggml_tensor * F = ggml_add(ctx, ggml_mul_mat(ctx, weights[2], input), biases[2]);
 	struct ggml_tensor * G = ggml_add(ctx, ggml_mul_mat(ctx, weights[4], input), biases[4]);
@@ -77,6 +80,7 @@ static struct ggml_tensor * build_lstm_run(ggml_context * ctx, ggml_tensor * inp
 		} else {
 			outputs = reversed ? ggml_concat(ctx, h_0, outputs, 1) : ggml_concat(ctx, outputs, h_0, 1);
 		}
+		ggml_build_forward_expand(gf, outputs);
 	}
 	return outputs;
 }
@@ -222,6 +226,7 @@ static struct ggml_tensor * build_generator(ggml_context * ctx, kokoro_model * m
 			}
 		}
 		cur = ggml_cont(ctx, ggml_transpose(ctx, ggml_div(ctx, cur, model->n_kernels_tensor)));
+		ggml_build_forward_expand(gf, cur);
 	}
 
 	cur = ggml_leaky_relu(ctx, cur, 0.01f, false);
@@ -235,7 +240,6 @@ static struct ggml_tensor * build_generator(ggml_context * ctx, kokoro_model * m
 	cur = ggml_concat(ctx, spec, phase, 3); // istft expects the magnitude and phase concatenated after the batch;
 	cur = istft(ctx, ggml_cont(ctx, ggml_transpose(ctx, cur)), window_sq_sum, generator->window, model->true_n_fft, model->stft_hop, true, true);
 	ggml_set_name(cur, "after_res_gen");
-	ggml_build_forward_expand(gf, cur);
 	return cur;
 }
 
@@ -1004,6 +1008,7 @@ struct ggml_cgraph * kokoro_duration_runner::build_kokoro_duration_graph(kokoro_
 			cur = ggml_add(ctx, cur, residualffn);
 			cur = build_albert_norm(ctx, cur, model->layers[l]->layer_output_norm_weight, model->layers[l]->layer_output_norm_bias);
 	    }
+        ggml_build_forward_expand(gf, cur);
     }
 
     // duration / prosody prediction
@@ -1014,7 +1019,7 @@ struct ggml_cgraph * kokoro_duration_runner::build_kokoro_duration_graph(kokoro_
 	cur = ggml_concat(ctx, cur, ggml_repeat(ctx, style_half, ggml_new_tensor_2d(ctx, GGML_TYPE_F32, style_half->ne[0], cur->ne[1])), 0);
 
     for (auto l : model->prosody_pred->layers) {
-    	cur = build_lstm(ctx, cur, l->rnn, batch.n_tokens);
+    	cur = build_lstm(ctx, cur, l->rnn, batch.n_tokens, gf);
 
     	struct ggml_tensor * gamma = ggml_add(ctx, ggml_mul_mat(ctx, l->ada_norm_gamma_weight, style_half), l->ada_norm_gamma_bias);
     	struct ggml_tensor * beta = ggml_add(ctx, ggml_mul_mat(ctx, l->ada_norm_beta_weight, style_half), l->ada_norm_beta_bias);
@@ -1025,7 +1030,6 @@ struct ggml_cgraph * kokoro_duration_runner::build_kokoro_duration_graph(kokoro_
 		// An optimal remedy to this would be to increment the gamma bias above by one when preparing the gguf file for the model.
     	cur = ggml_add(ctx, ggml_add(ctx, cur, ggml_mul(ctx, cur, gamma)), beta);
     	cur = ggml_concat(ctx, cur, ggml_repeat(ctx, style_half, ggml_new_tensor_2d(ctx, GGML_TYPE_F32, style_half->ne[0], cur->ne[1])), 0);
-		ggml_build_forward_expand(gf, cur);
     }
 
     struct ggml_tensor * d = ggml_cont(ctx, cur);
@@ -1033,7 +1037,7 @@ struct ggml_cgraph * kokoro_duration_runner::build_kokoro_duration_graph(kokoro_
     ggml_build_forward_expand(gf, d);
 
     struct ggml_tensor * len;
-    cur = build_lstm(ctx, cur, model->prosody_pred->duration_proj_lstm, batch.n_tokens);
+    cur = build_lstm(ctx, cur, model->prosody_pred->duration_proj_lstm, batch.n_tokens, gf);
     cur = ggml_sigmoid(ctx, ggml_add(ctx, ggml_mul_mat(ctx, model->prosody_pred->duration_proj, cur), model->prosody_pred->duration_proj_bias));
     // If we were to support speed we would add a constant tensor for the speed and divide here.
     len = ggml_round(ctx, ggml_sum_rows(ctx, cur));
@@ -1163,7 +1167,7 @@ struct ggml_cgraph * kokoro_runner::build_kokoro_graph(kokoro_ubatch & batch) {
     cur = ggml_mul_mat(ctx, ggml_cont(ctx, ggml_transpose(ctx, kctx->duration_mask)), ggml_cont(ctx, ggml_transpose(ctx, kctx->duration_pred)));
     cur = ggml_cont(ctx, ggml_transpose(ctx, cur));
 
-    cur = build_lstm(ctx, cur, model->prosody_pred->shared_lstm, cur->ne[1]);
+    cur = build_lstm(ctx, cur, model->prosody_pred->shared_lstm, cur->ne[1], gf);
 
 
     struct ggml_tensor * f0_curve = cur;
@@ -1202,7 +1206,7 @@ struct ggml_cgraph * kokoro_runner::build_kokoro_graph(kokoro_ubatch & batch) {
 			cur = ggml_leaky_relu(ctx, cur, 0.2f, false);
 		}
 
-		cur = build_lstm(ctx, cur, model->text_encoder->out_lstm, kctx->sequence_length);
+		cur = build_lstm(ctx, cur, model->text_encoder->out_lstm, kctx->sequence_length, gf);
 		asr = ggml_mul_mat(ctx, ggml_cont(ctx, ggml_transpose(ctx, cur)), ggml_cont(ctx, ggml_transpose(ctx, kctx->duration_mask)));
 	}
 
@@ -1217,6 +1221,7 @@ struct ggml_cgraph * kokoro_runner::build_kokoro_graph(kokoro_ubatch & batch) {
 		n_base = ggml_add(ctx, ggml_conv_1d(ctx, model->decoder->n_conv, n, 2, 1, 1), model->decoder->n_conv_bias);
 		cur = ggml_concat(ctx, ggml_concat(ctx, ggml_cont(ctx, ggml_transpose(ctx, asr)), f0, 1), n_base, 1);
 		cur = build_ada_residual_conv(ctx, cur, model->decoder->encoder_block, style_half2, model->sqrt_tensor);
+		ggml_build_forward_expand(gf, cur);
 
 		asr_res = ggml_mul_mat(ctx, model->decoder->asr_conv, asr);
 		asr_res = ggml_add(ctx, asr_res, ggml_transpose(ctx, model->decoder->asr_conv_bias));
@@ -1225,6 +1230,7 @@ struct ggml_cgraph * kokoro_runner::build_kokoro_graph(kokoro_ubatch & batch) {
 		for (auto l : model->decoder->decoder_blocks) {
 			cur = ggml_concat(ctx, ggml_concat(ctx, ggml_concat(ctx, cur, asr_res, 1), f0, 1), n_base, 1 );
 			cur = build_ada_residual_conv(ctx, cur, l, style_half2, model->sqrt_tensor);
+			ggml_build_forward_expand(gf, cur);
 		}
 		cur = ggml_cont(ctx, ggml_transpose(ctx, cur));
 	}
