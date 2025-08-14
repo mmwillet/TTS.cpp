@@ -14,6 +14,8 @@ In this endeavor, MacOS and metal support will be treated as the primary platfor
 
 #### Model Support
 
+**Kokoro** is the recommended model. It reliably produces articulate and coherent speech for a variety of prompt sizes. Most of the other models are too large (read: slow), but may support finer-grained voice customization.
+
 | Models | CPU | Metal Acceleration | Quantization | GGUF files |
 |--------------------------------------------------------------------------|-------|-------|-------|--------------------------------------------------------|
 | [Parler TTS Mini](https://huggingface.co/parler-tts/parler-tts-mini-v1)  |&check;|&check;|&check;|[here](https://huggingface.co/mmwillet2/Parler_TTS_GGUF)|
