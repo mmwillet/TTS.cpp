@@ -339,8 +339,6 @@ struct kokoro_duration_context : runner_context {
 static struct ggml_tensor * build_albert_attn_mask(ggml_context * ctx, struct kokoro_duration_context *kctx, const kokoro_ubatch & batch);
 static struct ggml_tensor * build_albert_inputs(ggml_context * ctx, kokoro_model * model, ggml_tensor * input_tokens, ggml_tensor * positions, ggml_tensor * token_types);
 static struct ggml_tensor * build_albert_norm(ggml_context * ctx, ggml_tensor * cur, ggml_tensor * weight, ggml_tensor * bias);
-static struct ggml_tensor * build_lstm(ggml_context * ctx, ggml_tensor * input, lstm* rnn, uint32_t sequence_length);
-static struct ggml_tensor * build_lstm_run(ggml_context * ctx, ggml_tensor * input, ggml_tensor * h_0, ggml_tensor * c_0, std::vector<ggml_tensor*> weights, std::vector<ggml_tensor*> biases, uint32_t sequence_length, bool reversed = false);
 static struct ggml_tensor * build_ada_residual_conv(ggml_context * ctx, struct ggml_tensor * x, ada_residual_conv_block * block, struct ggml_tensor * style, struct ggml_tensor * sqrt_tensor);
 static struct ggml_tensor * build_kokoro_generator_res_block(ggml_context * ctx, struct ggml_tensor * x, struct ggml_tensor * style, kokoro_generator_residual_block * block);
 static struct ggml_tensor * build_noise_block(ggml_context * ctx, kokoro_noise_residual_block * block, struct ggml_tensor * x, struct ggml_tensor * style);
