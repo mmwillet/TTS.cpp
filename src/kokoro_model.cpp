@@ -148,7 +148,7 @@ static struct ggml_tensor * build_kokoro_generator_res_block(ggml_context * ctx,
 		cur   = ggml_add(ctx, ggml_add(ctx, cur, ggml_mul(ctx, cur, gamma)), beta);
 		cur   = snake_1d(ctx, block->input_alphas[i], ggml_cont(ctx, ggml_transpose(ctx, cur)));
 
-		cur   = ggml_add(ctx, ggml_conv_1d(ctx, block->convs1_weights[i], cur, 1, block->conv1_paddings[i], block->conv1_dilations[i]), block->convs1_biases[i]);
+		cur   = ggml_add(ctx, tts_conv_1d(ctx, block->convs1_weights[i], cur, 1, block->conv1_paddings[i], block->conv1_dilations[i]), block->convs1_biases[i]);
 		gamma = ggml_add(ctx, ggml_mul_mat(ctx, block->adain1d_2_gamma_weights[i], style), block->adain1d_2_gamma_biases[i]);
 		beta  = ggml_add(ctx, ggml_mul_mat(ctx, block->adain1d_2_beta_weights[i], style), block->adain1d_2_beta_biases[i]);
 		cur   = ggml_cont(ctx, ggml_transpose(ctx, ggml_norm(ctx, cur, 0.00001)));
@@ -158,7 +158,7 @@ static struct ggml_tensor * build_kokoro_generator_res_block(ggml_context * ctx,
 		cur   = ggml_cont(ctx, ggml_transpose(ctx, ggml_add(ctx, ggml_add(ctx, cur, ggml_mul(ctx, cur, gamma)), beta)));
 
 		cur   = snake_1d(ctx, block->output_alphas[i], cur);
-		cur   = ggml_add(ctx, ggml_conv_1d(ctx, block->convs2_weights[i], cur, 1, block->conv1_paddings[0], 1), block->convs2_biases[i]);
+		cur   = ggml_add(ctx, tts_conv_1d(ctx, block->convs2_weights[i], cur, 1, block->conv1_paddings[0], 1), block->convs2_biases[i]);
 		inpl   = ggml_add(ctx, inpl, cur);
 	}
 	return inpl;

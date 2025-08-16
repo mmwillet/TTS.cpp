@@ -64,6 +64,30 @@ int main(int argc, const char ** argv) {
         exit(1);
     }
 
+    // if (true) {
+    //     float a_buf[128*128];
+    //     float b_buf[128];
+    //     float c_buf[128];
+    //     std::ranges::generate(a_buf, []{return rand();});
+    //     std::ranges::generate(b_buf, []{return rand();});
+    //     std::ranges::fill(c_buf, 0);
+    //     ggml_context *ctx = ggml_init({100000, nullptr, true});
+    //     ggml_tensor *a = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, 128, 128);
+    //     ggml_tensor *b = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, 128);
+    //     ggml_tensor *c = ggml_mul_mat(ctx, a, b);
+    //     a->data = a_buf;
+    //     b->data = b_buf;
+    //     c->data = c_buf;
+    //     ggml_cgraph * g = ggml_new_graph(ctx);
+    //     ggml_build_forward_expand(g, c);
+    //     const long start = ggml_time_ms();
+    //     ggml_graph_compute_with_ctx(ctx, g, 1);
+    //     const long end = ggml_time_ms();
+    //     const long duration = end - start;
+    //     printf("%ld\n", duration);
+    //     return 0;
+    // }
+
     generation_configuration * config = new generation_configuration(
         args.get_string_param("--voice"), 
         *args.get_int_param("--topk"), 
