@@ -18,9 +18,9 @@ void append_to_response(tts_response & response, tts_response & to_append) {
     response.n_outputs += to_append.n_outputs;
 }
 
-/* 
- * Pulls output_size to prepped buffer 'output' from 'output_node' tensor. If no buffer is passed will default to the existing output buffer present 
- * on runner_context. 
+/*
+ * Pulls output_size to prepped buffer 'output' from 'output_node' tensor. If no buffer is passed will default to the existing output buffer present
+ * on runner_context.
  */
 void runner_context::get_ggml_node_data(struct ggml_tensor * output_node, float * output, size_t output_size, ggml_backend_buffer_t buffer) {
     if (buffer == nullptr) {
@@ -92,7 +92,7 @@ void tts_runner::init_build(std::vector<uint8_t>* buf_compute_meta) {
 
     ctx = ggml_init(params);
 }
-    
+
 void tts_runner::free_build() {
     if (ctx) {
         ggml_free(ctx);
@@ -110,6 +110,19 @@ std::vector<std::string_view> tts_generation_runner::list_voices() {
 
 void tts_generation_runner::update_conditional_prompt(const char * file_path, const char * prompt) {
     GGML_ABORT("The architecture '%s' does not support update_conditional_prompt.", loader.get().arch);
+}
+
+test_tts_generation_runner::test_tts_generation_runner(const tts_model_loader & loader) :
+    tts_generation_runner{ loader } {
+    GGML_ASSERT(loader.is_test);
+}
+
+void test_tts_generation_runner::assign_weight(const char *, ggml_tensor &) {
+    GGML_ABORT("Assumed loader.is_test");
+}
+
+void test_tts_generation_runner::prepare_post_load() {
+    GGML_ABORT("Assumed loader.is_test");
 }
 
 void tts_model::prep_buffers_and_context(bool cpu_only, float size_offset, uint32_t dedicated_add_on_size) {

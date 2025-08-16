@@ -10,17 +10,19 @@
 
 static unordered_map<string_view, reference_wrapper<const tts_model_loader>> LOADERS;
 
-tts_model_loader::tts_model_loader(const char * arch) : arch{ arch } {
+tts_model_loader::tts_model_loader(const char * arch, bool is_test) : arch{ arch }, is_test{ is_test } {
     LOADERS.emplace(arch, ref(*this));
 }
 
 void dia_register();
+void dummy_register();
 void kokoro_register();
 void orpheus_register();
 void parler_register();
 
 [[maybe_unused]] static bool loaders = [] {
     dia_register();
+    dummy_register();
     kokoro_register();
     orpheus_register();
     parler_register();
@@ -31,6 +33,15 @@ void parler_register();
 // so cpu_only only describes whether or not to try to load and run on metal.
 unique_ptr<tts_generation_runner> runner_from_file(const char * fname, int n_threads,
                                                    const generation_configuration & config, bool cpu_only) {
+    string_view fname_sv{ fname };
+    if (fname_sv.starts_with("test:")) {
+        fname_sv.remove_prefix(sizeof("test:") - 1);
+        const auto found{LOADERS.find(fname_sv)};
+        if (found == LOADERS.end()) {
+            GGML_ABORT("Unknown test model/backend %s\n", fname);
+        }
+        return found->second.get().from_file(nullptr, nullptr, 0, false, config);
+    }
     static const bool use_mmap{ !getenv("OLLAMA_NO_MMAP") };  // TODO(danielzgtg) temporary, will be --no-mmap later
     unique_ptr<llama_mmap> in_mmap{};
     if (use_mmap) {

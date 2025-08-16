@@ -92,3 +92,10 @@ struct tts_generation_runner : tts_runner {
     virtual void                update_conditional_prompt(const char * file_path, const char * prompt);
     virtual void generate(const char * sentence, tts_response & output, const generation_configuration & config) = 0;
 };
+
+struct test_tts_generation_runner : tts_generation_runner {
+    explicit test_tts_generation_runner(const tts_model_loader & loader);
+
+    void assign_weight(const char * name, ggml_tensor & tensor) final;
+    void prepare_post_load() final;
+};
