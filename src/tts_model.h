@@ -3,10 +3,13 @@
 
 #include <cstring>
 #include <functional>
+#include <ranges>
 #include "util.h"
 #include "common.h"
 
-void append_to_response(struct tts_response * response, struct tts_response * to_append);
+using namespace std;
+
+void append_to_response(tts_response & response, tts_response & to_append);
 
 using tensor_meta_callback = std::function<void(ggml_tensor*)>*;
 

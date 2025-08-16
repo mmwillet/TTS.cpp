@@ -1,4 +1,4 @@
-#include "dia_model.h"
+#include "model.h"
 
 void dia_model::assign_weight(std::string name, struct ggml_tensor * tensor) {
     std::vector<std::string> parts = split(name, ".");
@@ -720,16 +720,6 @@ struct ggml_cgraph * dia_runner::build_dia_graph(dia_ubatch & batch) {
     return gf;
 }
 
-void dia_runner::configure_generation(generation_configuration * config) {
-    GGML_ASSERT(config->max_tokens == 0 || config->max_tokens > model->max_delay);
-    decode_sampler->temperature = config->temperature;
-    decode_sampler->repetition_penalty = config->repetition_penalty;
-    decode_sampler->do_sample = config->sample;
-    decode_sampler->top_k = config->top_k;
-    decode_sampler->top_p = config->top_p;
-    dctx->max_generation_size = config->max_tokens > model->max_delay ? config->max_tokens : model->max_generation_size;
-}
-
 void dia_runner::set_inputs(dia_ubatch & batch) {
     if (batch.encoder_step) {
         ggml_backend_tensor_set(dctx->inp_tokens, batch.tokens.data(), 0, batch.tokens.size()*ggml_element_size(dctx->inp_tokens));
@@ -856,7 +846,7 @@ void dia_runner::adjust_output_tokens(std::vector<uint32_t> & output_tokens, std
     }
 }
 
-int dia_runner::generate_from_batch(dia_ubatch & batch, struct tts_response * output) {
+int dia_runner::generate_from_batch(dia_ubatch & batch, tts_response & output) {
     while (!check_stopping(batch)) {
         int state = decode(batch);
         if (state != 0) {
@@ -875,11 +865,19 @@ int dia_runner::generate_from_batch(dia_ubatch & batch, struct tts_response * ou
     std::vector<uint32_t> filtered_output_tokens;
     adjust_output_tokens(dctx->output_tokens, filtered_output_tokens);
 
-    dac_runner->run(filtered_output_tokens.data(), (int32_t) filtered_output_tokens.size() / model->n_output_heads, output);
+    dac_runner->run(filtered_output_tokens.data(), (int32_t) filtered_output_tokens.size() / model->n_output_heads, &output);
     return 0;
 }
 
-int dia_runner::generate(std::string sentence, struct tts_response * output) {
+void dia_runner::generate(const char * sentence, tts_response & output, const generation_configuration & config) {
+    GGML_ASSERT(config.max_tokens == 0 || config.max_tokens > model->max_delay);
+    decode_sampler->temperature        = config.temperature;
+    decode_sampler->repetition_penalty = config.repetition_penalty;
+    decode_sampler->do_sample          = config.sample;
+    decode_sampler->top_k              = config.top_k;
+    decode_sampler->top_p              = config.top_p;
+    dctx->max_generation_size = config.max_tokens > model->max_delay ? config.max_tokens : model->max_generation_size;
+
     dia_ubatch batch = batch_from_sentence(sentence);
     dctx->reset();
     decode_sampler->reset();
@@ -887,25 +885,16 @@ int dia_runner::generate(std::string sentence, struct tts_response * output) {
     if (!kv_cross_self) {
         kv_cross_self = new dia_kv_cache;
         if (!dia_kv_cache_init(kv_cross_self, model, dctx)) {
-            return 1;
+            return;
         }
     }
-    return generate_from_batch(batch, output);
+    generate_from_batch(batch, output);
 }
 
-void dia_runner::assign_weight(std::string name, ggml_tensor * tensor) {
-    if (tensor->data == NULL) {
-        return;
-    }
-
-    if (name.size() == 0) {
-        // handles the top level meta tensor
-        return;
-    }
-
-    if (name.size() > 14 && name.substr(0, 14) == "audio_encoder.") {
-        dac_runner->model->assign_weight(name.substr(14), tensor);
+void dia_runner::assign_weight(const char * name, ggml_tensor & tensor) {
+    if (const string_view name_sv{ name }; name_sv.starts_with("audio_encoder.")) {
+        dac_runner->model->assign_weight(string{ name_sv.substr(sizeof("audio_encoder.") - 1) }, &tensor);
     } else {
-        model->assign_weight(name, tensor);
-    }   
+        model->assign_weight(name, &tensor);
+    }
 }

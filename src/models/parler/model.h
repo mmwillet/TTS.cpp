@@ -1,9 +1,16 @@
-#ifndef parler_model_h
-#define parler_model_h
+#pragma once
 
-#include "dac_model.h"
-#include "t5_encoder_model.h"
-#include "sampler.h"
+#include "../../decoder/dac_model.h"
+#include "../../sampler.h"
+#include "models/loaders.h"
+#include "t5/model.h"
+
+extern const struct parler_model_loader final : tts_model_loader {
+    explicit parler_model_loader();
+
+    unique_ptr<tts_generation_runner> from_file(gguf_context * meta_ctx, ggml_context * weight_ctx, int n_threads,
+                                                bool cpu_only, const generation_configuration & config) const override;
+} parler_loader;
 
 enum parler_tensor {
     PARLER_EMBD,
@@ -112,8 +119,7 @@ struct parler_context : runner_context {
     int32_t n_outputs   = 0; // number of actually-used outputs in the current ubatch or last logical batch
     uint32_t current_position = 0; // current position in the active sequence
     uint32_t prompt_end_position = 0; // the position of the text prompt termination (used for adjusting the cache when incrementally generating)
-    int32_t seq_id; // a unique identifier associated with the active sequence.
-    
+
     std::vector<uint32_t> output_tokens;
     
     struct ggml_tensor * inp_tokens;
@@ -129,8 +135,6 @@ struct parler_context : runner_context {
 };
 
 struct parler_kv_cache {
-    int32_t seq_id;
-    
     ggml_type type_k = GGML_TYPE_F32;
     ggml_type type_v = GGML_TYPE_F32;
 
@@ -168,7 +172,7 @@ struct parler_ubatch {
 };
 
 struct parler_context * build_new_parler_context(struct parler_tts_model * model, int n_threads, bool use_cpu = true);
-static bool parler_kv_cache_init(struct parler_kv_cache * cache, parler_tts_model * model, parler_context * pctx, int32_t seq_id);
+static bool parler_kv_cache_init(struct parler_kv_cache * cache, parler_tts_model * model, parler_context * pctx);
 
 struct ggml_tensor * parler_build_inp_embd(struct ggml_context * ctx, struct parler_context * pctx, parler_tts_model * model, const parler_ubatch & batch);
 struct ggml_tensor * parler_build_layer_norm(struct ggml_context * ctx, struct ggml_tensor * inputs, struct ggml_tensor * weight, struct ggml_tensor * bias);
@@ -180,8 +184,8 @@ static struct parler_ubatch batch_from_sentence(std::string sentence, parler_tts
 
 // This struct is intended to support end-to-end TTS generation. As such, it manages the parler tts model compilation, compute and generation process,
 // the tokenization and sampling process, and uses the dac_runner struct to encode audio outputs.
-struct parler_tts_runner : tts_runner {
-    parler_tts_runner(parler_tts_model * model, dac_runner * audio_decoder, parler_context * pctx, unigram_tokenizer * ut, sampler * samp, parler_kv_cache * cache): model(model), dac_runner(audio_decoder), pctx(pctx), tokenizer(ut), sampler(samp), kv_self(cache) {};
+struct parler_tts_runner : tts_generation_runner {
+    parler_tts_runner(parler_tts_model * model, dac_runner * audio_decoder, parler_context * pctx, unigram_tokenizer * ut, sampler * samp, parler_kv_cache * cache): tts_generation_runner{parler_loader}, model(model), dac_runner(audio_decoder), pctx(pctx), tokenizer(ut), sampler(samp), kv_self(cache) {};
     ~parler_tts_runner() {
         if (ctx) {
             ggml_free(ctx);
@@ -204,22 +208,18 @@ struct parler_tts_runner : tts_runner {
         tts_runner::init_build(&pctx->buf_compute_meta);
     }
 
-    void configure_generation(generation_configuration * config);
-    void assign_weight(std::string name, ggml_tensor * tensor);
+    void assign_weight(const char * name, ggml_tensor & tensor) override;
     parler_ubatch build_worst_case_batch();
     struct ggml_cgraph * build_parler_graph(parler_ubatch & batch);
     void set_inputs(parler_ubatch & batch);
     int decode(parler_ubatch & batch);
-    void prepare_post_load();
-    bool adjust_for_sequence_continuation(struct parler_ubatch & batch);
-    int generate(std::string sentence, struct tts_response * response, int32_t seq_id = -1);
+    void prepare_post_load() override;
+    void generate(const char * sentence, tts_response & output, const generation_configuration & config) override;
     bool check_stopping();
     void adjust_output_tokens(std::vector<uint32_t> & output_tokens, std::vector<uint32_t> & filtered);
-    int generate_from_batch(parler_ubatch & batch, struct tts_response * output);
+    int generate_from_batch(parler_ubatch & batch, tts_response & output);
     void parler_graph_compute(ggml_cgraph * gf);
     void just_audio_token_decode(uint32_t * tokens, int32_t sq_len, struct tts_response * output);
     int generate_audio_tokens(std::string sentence);
-    void update_conditional_prompt(const std::string file_path, const std::string prompt, int n_threads, bool cpu_only = true);
+    void update_conditional_prompt(const char * file_path, const char * prompt) override;
 };
-
-#endif

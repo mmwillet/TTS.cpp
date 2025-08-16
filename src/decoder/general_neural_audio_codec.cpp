@@ -1,7 +1,8 @@
 #include "general_neural_audio_codec.h"
+
 #include <algorithm>
-#include <stdexcept>
 #include <map>
+#include <stdexcept>
 
 namespace general_neural_audio_codec {
     // This contains a mapping between string names and gguf_tensor enum values for the purposes of assigning the weights from a gguf file

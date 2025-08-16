@@ -1,15 +1,23 @@
-#ifndef kokoro_model_h
-#define kokoro_model_h
+#pragma once
 
-#include <stdlib.h>
-#include "tts_model.h"
-#include "tokenizer.h"
+#include <cstdlib>
+
+#include "../../tokenizer.h"
+#include "../../tts_model.h"
+#include "models/loaders.h"
 #include "phonemizer.h"
+
+extern const struct kokoro_model_loader final : tts_model_loader {
+    explicit kokoro_model_loader();
+
+    unique_ptr<tts_generation_runner> from_file(gguf_context * meta_ctx, ggml_context * weight_ctx, int n_threads,
+                                                bool cpu_only, const generation_configuration & config) const override;
+} kokoro_loader;
 
 // Rather than using ISO 639-2 language codes, Kokoro voice pack specify their corresponding language via their first letter.
 // Below is a map that describes the relationship between those designations and espeak-ng's voice identifiers so that the 
 // appropriate phonemization protocol can inferred from the Kokoro voice.
-static std::map<char, std::string> KOKORO_LANG_TO_ESPEAK_ID = {
+static std::map<char, const char *> KOKORO_LANG_TO_ESPEAK_ID = {
 	{'a', "gmw/en-US"},
 	{'b', "gmw/en"},
 	{'e', "roa/es"},
@@ -283,7 +291,7 @@ struct kokoro_model : tts_model {
 
 
 	void post_load_assign();
-    void assign_weight(std::string name, ggml_tensor * tensor);
+    void assign_weight(const char * name, ggml_tensor & tensor);
     void prep_layers(gguf_context * meta);
     void prep_constants(gguf_context * meta);
     void setup_from_file(gguf_context * meta_ctx, ggml_context * load_context, bool cpu_only = true) {
@@ -344,9 +352,9 @@ static struct ggml_tensor * build_kokoro_generator_res_block(ggml_context * ctx,
 static struct ggml_tensor * build_noise_block(ggml_context * ctx, kokoro_noise_residual_block * block, struct ggml_tensor * x, struct ggml_tensor * style);
 static kokoro_generator_residual_block * build_res_block_from_file(gguf_context * meta, std::string base_config_key);
 static kokoro_noise_residual_block * build_noise_block_from_file(gguf_context * meta, int index);
-static kokoro_generator_upsample_block* kokoro_generator_upsample_block(gguf_context * meta, int index);
+static kokoro_generator_upsample_block * kokoro_generator_upsample_block(gguf_context * meta, int index);
 
-std::string get_espeak_id_from_kokoro_voice(std::string voice);
+const char * get_espeak_id_from_kokoro_voice(std::string voice);
 struct kokoro_duration_context * build_new_duration_kokoro_context(struct kokoro_model * model, int n_threads, bool use_cpu = true);
 
 struct kokoro_duration_response {
@@ -421,8 +429,8 @@ static struct ggml_tensor * build_sin_gen(ggml_context * ctx, kokoro_model * mod
 struct kokoro_context * build_new_kokoro_context(struct kokoro_model * model, int n_threads, bool use_cpu = true);
 
 // This manages the graph compilation of computation for the Kokoro model.
-struct kokoro_runner : tts_runner {
-    kokoro_runner(kokoro_model * model, kokoro_context * context, single_pass_tokenizer * tokenizer, kokoro_duration_runner * drunner, phonemizer * phmzr): model(model), kctx(context), tokenizer(tokenizer), drunner(drunner), phmzr(phmzr) {
+struct kokoro_runner : tts_generation_runner {
+    kokoro_runner(unique_ptr<kokoro_model> model, kokoro_context * context, single_pass_tokenizer * tokenizer, kokoro_duration_runner * drunner, phonemizer * phmzr): tts_generation_runner{kokoro_loader}, model{move(model)}, kctx(context), tokenizer(tokenizer), drunner(drunner), phmzr(phmzr) {
     	tts_runner::sampling_rate = 24000.0f;
     	tts_runner::supports_voices = true;
     };
@@ -432,12 +440,11 @@ struct kokoro_runner : tts_runner {
         }
         delete drunner;
         model->free();
-        delete model;
         delete kctx;
         delete phmzr;
     }
     struct single_pass_tokenizer * tokenizer;
-    kokoro_model * model;
+    unique_ptr<kokoro_model> model;
     kokoro_context * kctx;
     kokoro_duration_runner * drunner;
     phonemizer * phmzr;
@@ -448,15 +455,13 @@ struct kokoro_runner : tts_runner {
         tts_runner::init_build(&kctx->buf_compute_meta);
     }
 
-    std::vector<std::string> list_voices();
+    std::vector<std::string_view> list_voices() override;
     std::vector<std::vector<uint32_t>> tokenize_chunks(std::vector<std::string> clauses);
-    void assign_weight(std::string name, ggml_tensor * tensor);
+    void assign_weight(const char * name, ggml_tensor & tensor);
     void prepare_post_load();
     kokoro_ubatch build_worst_case_batch();
     void set_inputs(kokoro_ubatch & batch, uint32_t total_size);
     struct ggml_cgraph * build_kokoro_graph(kokoro_ubatch & batch);
-    void run(kokoro_ubatch & batch, struct tts_response * outputs);
-    int generate(std::string prompt, struct tts_response * response, std::string voice, std::string voice_code = "");
+    void run(kokoro_ubatch & batch, tts_response & outputs);
+    void generate(const char * prompt, tts_response & response, const generation_configuration & config);
 };
-
-#endif

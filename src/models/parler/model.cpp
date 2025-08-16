@@ -1,4 +1,4 @@
-#include "parler_model.h"
+#include "model.h"
 
 // For loading parler model from gguf file.
 static const std::map<std::string, parler_tensor> PARLER_TENSOR_GGUF_LOOKUP = {
@@ -336,10 +336,9 @@ struct parler_context * build_new_parler_context(struct parler_tts_model * model
     return pctx;
 }
 
-static bool parler_kv_cache_init(struct parler_kv_cache * cache, parler_tts_model * model, parler_context * pctx, int32_t seq_id) {
+static bool parler_kv_cache_init(struct parler_kv_cache * cache, parler_tts_model * model, parler_context * pctx) {
     const int64_t n_layer = (int64_t) model->layers.size();
-    cache->seq_id = seq_id;
-    
+
     ggml_backend_buffer_type_t buft = nullptr;
     // this will only really support cpu or metal for the time being;
     if (pctx->backend != nullptr) {
@@ -498,31 +497,25 @@ static struct parler_ubatch batch_from_sentence(std::string sentence, parler_tts
     return batch;
 }
 
-void parler_tts_runner::assign_weight(std::string name, ggml_tensor * tensor) {
-    std::string::size_type pos = name.find(".", 0);
-    std::string top_level(name.substr(0, pos));
-    std::string value(name.substr(pos + 1));
-    if (tensor->data == NULL) {
-        return;
-    }
-    if (top_level == "audio_encoder") {
-        dac_runner->model->assign_weight(value, tensor);
-    } else if (top_level == "decoder") {
-        model->assign_weight(value, tensor);
+void parler_tts_runner::assign_weight(const char * name, ggml_tensor & tensor) {
+    if (const string_view name_sv{ name }; name_sv.starts_with("audio_encoder.")) {
+        dac_runner->model->assign_weight(string{ name_sv.substr(sizeof("audio_encoder.") - 1) }, &tensor);
+    } else if (name_sv.starts_with("decoder.")) {
+        model->assign_weight(string{ name_sv.substr(sizeof("decoder.") - 1) }, &tensor);
     } else {
-        return;
+        fprintf(stdout, "Warning: function %s encountered an unhandled tensor named '%s'.\n", __func__, name);
     }
 }
 
-void parler_tts_runner::update_conditional_prompt(const std::string file_path, const std::string prompt, int n_threads, bool cpu_only) {
+void parler_tts_runner::update_conditional_prompt(const char * file_path, const char * prompt) {
+    const int      n_threads{ pctx->n_threads };
+    constexpr bool cpu_only{true}; // TODO
     t5_runner * text_encoder = text_encoder_from_file(file_path, n_threads, tokenizer, cpu_only);
     tts_response* response;
     text_encoder->generate(prompt, response);
     model->prep_cross_key_values(n_threads, response);
     delete text_encoder;
-    return;
 }
-
 
 struct ggml_cgraph * parler_tts_runner::build_parler_graph(parler_ubatch & batch) {
     init_build();
@@ -620,15 +613,6 @@ struct ggml_cgraph * parler_tts_runner::build_parler_graph(parler_ubatch & batch
     return gf;
 }
 
-void parler_tts_runner::configure_generation(generation_configuration * config) {
-    sampler->temperature = config->temperature;
-    sampler->repetition_penalty = config->repetition_penalty;
-    sampler->do_sample = config->sample;
-    sampler->top_k = config->top_k;
-    sampler->top_p = config->top_p;
-    model->use_cross_attn = config->use_cross_attn;
-}
-
 void parler_tts_runner::set_inputs(parler_ubatch & batch) {
     if (batch.audio_generation) {
         ggml_backend_tensor_set(pctx->audio_inp_tokens, batch.audio_tokens, 0, batch.n_audio_tokens*ggml_element_size(pctx->audio_inp_tokens));
@@ -718,15 +702,14 @@ parler_ubatch parler_tts_runner::build_worst_case_batch()  {
 }
 
 void parler_tts_runner::prepare_post_load() {
+    if (model->use_cross_attn) {
+        model->prep_cross_key_values(pctx->n_threads);
+    }
     dac_runner->prepare_post_load();
-    parler_kv_cache_init(kv_self, model, pctx, std::mt19937(std::random_device{}())());
+    parler_kv_cache_init(kv_self, model, pctx);
     auto batch = build_worst_case_batch();
     auto gf = build_parler_graph(batch);
     pctx->prep_schedule(gf);
-}
-
-bool parler_tts_runner::adjust_for_sequence_continuation(struct parler_ubatch & batch) {
-    return false; // not implemneted
 }
 
 bool parler_tts_runner::check_stopping() {
@@ -776,7 +759,7 @@ void parler_tts_runner::adjust_output_tokens(std::vector<uint32_t> & output_toke
     }
 }
 
-int parler_tts_runner::generate_from_batch(parler_ubatch & batch, struct tts_response * output) {
+int parler_tts_runner::generate_from_batch(parler_ubatch & batch, tts_response & output) {
     std::vector<uint32_t> next_decoder_token_ids;
     next_decoder_token_ids.reserve(model->n_output_heads);
 
@@ -804,7 +787,7 @@ int parler_tts_runner::generate_from_batch(parler_ubatch & batch, struct tts_res
 
     std::vector<uint32_t> filtered_output_tokens;
     adjust_output_tokens(pctx->output_tokens, filtered_output_tokens);
-    dac_runner->run(filtered_output_tokens.data(), (int32_t) filtered_output_tokens.size() / model->n_output_heads, output);
+    dac_runner->run(filtered_output_tokens.data(), (int32_t) filtered_output_tokens.size() / model->n_output_heads, &output);
     return 0;
 }
 
@@ -815,7 +798,7 @@ int parler_tts_runner::generate_audio_tokens(std::string sentence) {
     int32_t seq_id = std::mt19937(std::random_device{}())();
     if (!kv_self) {
         kv_self = new parler_kv_cache;
-        if (!parler_kv_cache_init(kv_self, model, pctx, seq_id)) {
+        if (!parler_kv_cache_init(kv_self, model, pctx)) {
             return 1;
         }
     }
@@ -852,23 +835,24 @@ void parler_tts_runner::just_audio_token_decode(uint32_t * tokens, int32_t sq_le
     dac_runner->run(tokens, sq_len, outputs);
 }
 
-int parler_tts_runner::generate(std::string sentence, struct tts_response * output, int32_t seq_id) {
+void parler_tts_runner::generate(const char * sentence, tts_response & output,
+                                 const generation_configuration & config) {
+    sampler->temperature        = config.temperature;
+    sampler->repetition_penalty = config.repetition_penalty;
+    sampler->do_sample          = config.sample;
+    sampler->top_k              = config.top_k;
+    sampler->top_p              = config.top_p;
+    model->use_cross_attn       = config.use_cross_attn;
+
     parler_ubatch batch = batch_from_sentence(sentence, model, tokenizer);
     pctx->reset(model->n_output_heads);
     sampler->reset();
-    if (pctx->seq_id != seq_id || seq_id == -1) {
-        seq_id = std::mt19937(std::random_device{}())();
-        pctx->current_position = 0;
-        if (!kv_self) {
-            kv_self = new parler_kv_cache;
-            if (!parler_kv_cache_init(kv_self, model, pctx, seq_id)) {
-                return 1;
-            }
-        }
-    } else {
-        if (!adjust_for_sequence_continuation(batch)) {
-            return 2;
+    pctx->current_position = 0;
+    if (!kv_self) {
+        kv_self = new parler_kv_cache;
+        if (!parler_kv_cache_init(kv_self, model, pctx)) {
+            return;
         }
     }
-    return generate_from_batch(batch, output);
+    generate_from_batch(batch, output);
 }

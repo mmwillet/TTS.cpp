@@ -1,18 +1,21 @@
 #include "tts_model.h"
+#include "llama-mmap.h"
+
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
+#include "models/loaders.h"
 
-void append_to_response(struct tts_response * response, struct tts_response * to_append) {
-    float * new_data = (float *) malloc((response->n_outputs + to_append->n_outputs) * sizeof(float));
-    if (response->n_outputs > 0) {
-        std::memcpy(new_data, response->data, response->n_outputs*sizeof(float));
+void append_to_response(tts_response & response, tts_response & to_append) {
+    float * new_data = (float *) malloc((response.n_outputs + to_append.n_outputs) * sizeof(float));
+    if (response.n_outputs > 0) {
+        std::memcpy(new_data, response.data, response.n_outputs*sizeof(float));
     }
-    if (to_append->n_outputs > 0) {
-        float * next_loc = new_data + response->n_outputs;
-        std::memcpy(next_loc, to_append->data, to_append->n_outputs*sizeof(float));
+    if (to_append.n_outputs > 0) {
+        float * next_loc = new_data + response.n_outputs;
+        std::memcpy(next_loc, to_append.data, to_append.n_outputs*sizeof(float));
     }
-    response->data = new_data;
-    response->n_outputs += to_append->n_outputs;
+    response.data = new_data;
+    response.n_outputs += to_append.n_outputs;
 }
 
 /* 
@@ -95,6 +98,18 @@ void tts_runner::free_build() {
         ggml_free(ctx);
         ctx = nullptr;
     }
+}
+
+tts_generation_runner::tts_generation_runner(const tts_model_loader & loader) : loader{ ref(loader) } {}
+
+tts_generation_runner::~tts_generation_runner() {}
+
+std::vector<std::string_view> tts_generation_runner::list_voices() {
+    GGML_ABORT("The architecture '%s' does not support #list_voices.", loader.get().arch);
+}
+
+void tts_generation_runner::update_conditional_prompt(const char * file_path, const char * prompt) {
+    GGML_ABORT("The architecture '%s' does not support update_conditional_prompt.", loader.get().arch);
 }
 
 void tts_model::prep_buffers_and_context(bool cpu_only, float size_offset, uint32_t dedicated_add_on_size) {

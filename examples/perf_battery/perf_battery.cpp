@@ -1,16 +1,12 @@
-#include "tts.h"
-#include "args.h"
-#include "common.h"
 #include <stdio.h>
+
 #include <chrono>
 #include <functional>
 #include <thread>
 
-
-std::vector<std::string> ARCH_LOOKUP = {
-	"parler-tts",
-	"kokoro",
-};
+#include "../../src/models/loaders.h"
+#include "args.h"
+#include "common.h"
 
 using perf_cb = std::function<void()>;
 
@@ -67,15 +63,14 @@ double mean(std::vector<double> series) {
 	return (double) sum / series.size();
 }
 
-std::string benchmark_printout(tts_arch arch, std::vector<double> generation_samples, std::vector<double> output_times) {
-	std::string arch_name = ARCH_LOOKUP[(int)arch];
+std::string benchmark_printout(const char * arch, std::vector<double> generation_samples, std::vector<double> output_times) {
 	double gen_mean = mean(generation_samples);
 	std::vector<double> gen_output;
 	for (int i = 0; i < (int) output_times.size(); i++) {
 		gen_output.push_back(generation_samples[i]/output_times[i]);
 	}
 	double gen_out_mean = mean(gen_output);
-	std::string printout = (std::string) "Mean Stats for arch " + arch_name + ":\n\n" + (std::string) "  Generation Time (ms):             " +  std::to_string(gen_mean) + (std::string) "\n";
+	std::string printout = (std::string) "Mean Stats for arch " + arch + ":\n\n" + (std::string) "  Generation Time (ms):             " +  std::to_string(gen_mean) + (std::string) "\n";
 	printout += (std::string) "  Generation Real Time Factor (ms): " + std::to_string(gen_out_mean) + (std::string) "\n";
 	return printout;
 }
@@ -102,22 +97,23 @@ int main(int argc, const char ** argv) {
     }
     args.validate();
 
-    generation_configuration * config = new generation_configuration(args.get_string_param("--voice"), *args.get_int_param("--topk"), *args.get_float_param("--temperature"), *args.get_float_param("--repetition-penalty"), !args.get_bool_param("--no-cross-attn"));
+    const generation_configuration config{args.get_string_param("--voice"), *args.get_int_param("--topk"), *args.get_float_param("--temperature"), *args.get_float_param("--repetition-penalty"), !args.get_bool_param("--no-cross-attn")};
 
-    struct tts_runner * runner = runner_from_file(args.get_string_param("--model-path"), *args.get_int_param("--n-threads"), config, !args.get_bool_param("--use-metal"));
+    unique_ptr<tts_generation_runner> runner{runner_from_file(args.get_string_param("--model-path").c_str(), *args.get_int_param("--n-threads"), config, !args.get_bool_param("--use-metal"))};
     std::vector<double> generation_samples;
     std::vector<double> output_times;
     
     for (std::string sentence : TEST_SENTENCES) {
     	tts_response response;
     	perf_cb cb = [&]{
-    		generate(runner, sentence, &response, config);
+    		runner->generate(sentence.c_str(), response, config);
     	};
     	double generation_ms = benchmark_ms(cb);
     	output_times.push_back((double)(response.n_outputs / 44.1));
     	generation_samples.push_back(generation_ms);
     }
 
-    fprintf(stdout, "%s", benchmark_printout(runner->arch, generation_samples, output_times).c_str());
+    fprintf(stdout, "%s", benchmark_printout(runner->loader.get().arch, generation_samples, output_times).c_str());
+    static_cast<void>(!runner.release()); // TODO the destructor doesn't work yet
 	return 0;
 }

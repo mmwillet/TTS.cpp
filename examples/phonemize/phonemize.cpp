@@ -1,6 +1,7 @@
-#include "phonemizer.h"
-#include "args.h"
 #include <stdio.h>
+
+#include "../../src/models/kokoro/phonemizer.h"
+#include "args.h"
 
 int main(int argc, const char ** argv) {
     arg_list args;
