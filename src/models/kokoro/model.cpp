@@ -1389,7 +1389,7 @@ std::vector<std::vector<uint32_t>> kokoro_runner::tokenize_chunks(std::vector<st
 
 void kokoro_runner::propagate_voice_setting() {
     if (voice.empty()) {
-        voice = "af_alloy";
+        voice = "af_heart";
     }
     if (!model->voices.contains(voice)) {
         TTS_ABORT("Failed to find Kokoro voice '%s' aborting.\n", voice.c_str());
