@@ -4,7 +4,9 @@ target_sources(tts PRIVATE
 )
 
 add_subdirectory(dia)
-add_subdirectory(dummy)
+if (LINUX)
+    add_subdirectory(dummy)
+endif ()
 add_subdirectory(kokoro)
 add_subdirectory(orpheus)
 add_subdirectory(parler)
