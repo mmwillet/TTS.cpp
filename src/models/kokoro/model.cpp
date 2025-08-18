@@ -1242,6 +1242,7 @@ struct ggml_cgraph * kokoro_runner::build_kokoro_graph(kokoro_ubatch & batch) {
 }
 
 void kokoro_runner::prepare_post_load() {
+    propagate_voice_setting();
 	model->post_load_assign();
 	drunner->prepare_post_load();
     auto batch = build_worst_case_batch();
@@ -1386,21 +1387,29 @@ std::vector<std::vector<uint32_t>> kokoro_runner::tokenize_chunks(std::vector<st
 	return chunks;
 }
 
-void kokoro_runner::generate(const char * prompt, tts_response & response, const generation_configuration & config) {
-	if (model->voices.find(config.voice) == model->voices.end()) {
-		TTS_ABORT("Failed to find Kokoro voice '%s' aborting.\n", config.voice.c_str());
-    } else {
-    	// if the language changed then we should change the phonemization voice
-    	if (phmzr->mode == ESPEAK && kctx->voice[0] != config.voice[0]) {
-            std::string voice_code{config.espeak_voice_id};
-    		if (voice_code.empty()) {
-    			voice_code = get_espeak_id_from_kokoro_voice(config.voice);
-    		}
-    		update_voice(voice_code);
-    	}
-        kctx->voice = config.voice;
-        drunner->kctx->voice = config.voice;
+void kokoro_runner::propagate_voice_setting() {
+    if (voice.empty()) {
+        voice = "af_alloy";
     }
+    if (!model->voices.contains(voice)) {
+        TTS_ABORT("Failed to find Kokoro voice '%s' aborting.\n", voice.c_str());
+    }
+    // if the language changed then we should change the phonemization voice
+    if (phmzr->mode == ESPEAK && kctx->voice[0] != voice[0]) {
+        std::string voice_code{ espeak_voice_id };
+        if (voice_code.empty()) {
+            voice_code = get_espeak_id_from_kokoro_voice(voice);
+        }
+        update_voice(voice_code);
+    }
+    kctx->voice          = voice;
+    drunner->kctx->voice = voice;
+}
+
+void kokoro_runner::generate(const char * prompt, tts_response & response, const generation_configuration & config) {
+    voice = config.voice;
+    espeak_voice_id = config.espeak_voice_id;
+    propagate_voice_setting();
     // replace all non-sentence terminating characters with '--' which espeak will treat as a pause.
     // We preserve the other punctuation for cleaner chunking pre-tokenization
     std::string normalized{prompt};

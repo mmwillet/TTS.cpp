@@ -21,7 +21,7 @@ unique_ptr<tts_generation_runner> kokoro_model_loader::from_file(
         espeak_voice_id = get_espeak_id_from_kokoro_voice(config.voice);
     }
     phonemizer * phmzr = phonemizer_from_gguf(meta_ctx, espeak_voice_id);
-    return make_unique<kokoro_runner>(move(model), kctx, spt, duration_runner, phmzr);
+    return make_unique<kokoro_runner>(move(model), kctx, spt, duration_runner, phmzr, config.voice);
 }
 
 const kokoro_model_loader kokoro_loader{};

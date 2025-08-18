@@ -15,7 +15,7 @@ extern const struct kokoro_model_loader final : tts_model_loader {
 } kokoro_loader;
 
 // Rather than using ISO 639-2 language codes, Kokoro voice pack specify their corresponding language via their first letter.
-// Below is a map that describes the relationship between those designations and espeak-ng's voice identifiers so that the 
+// Below is a map that describes the relationship between those designations and espeak-ng's voice identifiers so that the
 // appropriate phonemization protocol can inferred from the Kokoro voice.
 static std::map<char, const char *> KOKORO_LANG_TO_ESPEAK_ID = {
 	{'a', "gmw/en-US"},
@@ -30,7 +30,7 @@ static std::map<char, const char *> KOKORO_LANG_TO_ESPEAK_ID = {
 };
 
 struct lstm_cell {
-	std::vector<ggml_tensor*> weights; 
+	std::vector<ggml_tensor*> weights;
 	std::vector<ggml_tensor*> biases;
 	std::vector<ggml_tensor*> reverse_weights;
 	std::vector<ggml_tensor*> reverse_biases;
@@ -205,8 +205,8 @@ struct kokoro_model : tts_model {
 	// standard configuration for duration prediction
 	uint32_t f0_n_blocks = 3;
 	uint32_t n_duration_prediction_layers = 3;
-	// while it is technically possible for the duration predictor to assign 50 values per token there is no practical need to 
-	// allocate that many items to the sequence as it is impossible for all tokens to require such long durations and each 
+	// while it is technically possible for the duration predictor to assign 50 values per token there is no practical need to
+	// allocate that many items to the sequence as it is impossible for all tokens to require such long durations and each
 	// allocation increases node allocation size by O(N)
 	uint32_t max_duration_per_token = 20;
 	uint32_t style_half_size = 128;
@@ -229,7 +229,7 @@ struct kokoro_model : tts_model {
 	float noise_std = 0.003f;
 	float voice_threshold = 10.0f;
 	float sample_rate = 24000.0f;
-	std::string window = "hann"; 
+	std::string window = "hann";
 
 	// It is really annoying that ggml doesn't allow using non ggml tensors as the operator for simple math ops.
 	// This is just the constant defined above as a tensor.
@@ -267,7 +267,7 @@ struct kokoro_model : tts_model {
 	// Decoding and Generation portion of the model
 	struct kokoro_decoder * decoder;
 
-	// the default hidden states need to be initialized 
+	// the default hidden states need to be initialized
 	std::vector<lstm*> lstms;
 
 	size_t duration_node_counter = 0;
@@ -325,15 +325,15 @@ struct kokoro_duration_context : runner_context {
     ~kokoro_duration_context() {
         ggml_backend_buffer_free(buf_len_output);
     }
-    
-    std::string voice = "af_alloy";
+
+    std::string voice{};
     struct kokoro_model * model;
     ggml_backend_buffer_t buf_len_output = nullptr;
 
-    
+
     size_t  logits_size = 0; // capacity (of floats) for logits
     float * lens 		= nullptr;
-    
+
     struct ggml_tensor * inp_tokens;
     struct ggml_tensor * positions;
     struct ggml_tensor * attn_mask;
@@ -364,7 +364,7 @@ struct kokoro_duration_response {
 };
 
 // This struct is intended to manage graph and compute for the duration prediction portion of the kokoro model.
-// Duration computation and speech generation are separated into distinct graphs because the precomputed graph structure of ggml doesn't 
+// Duration computation and speech generation are separated into distinct graphs because the precomputed graph structure of ggml doesn't
 // support the tensor dependent views that would otherwise be necessary.
 struct kokoro_duration_runner : tts_runner {
     kokoro_duration_runner(kokoro_model * model, kokoro_duration_context * context, single_pass_tokenizer * tokenizer): model(model), kctx(context), tokenizer(tokenizer) {};
@@ -383,7 +383,7 @@ struct kokoro_duration_runner : tts_runner {
     void init_build() {
         tts_runner::init_build(&kctx->buf_compute_meta);
     }
-    
+
     void prepare_post_load();
     struct kokoro_ubatch build_worst_case_batch();
     void set_inputs(kokoro_ubatch & batch);
@@ -405,7 +405,7 @@ struct kokoro_context : runner_context {
     }
 
     std::string voice = "af_alloy";
-    
+
     struct kokoro_model * model;
 
     uint32_t total_duration;
@@ -416,7 +416,7 @@ struct kokoro_context : runner_context {
     struct ggml_tensor * duration_mask;
     struct ggml_tensor * window_sq_sum; // needs to be calculatd from the generator window.
     struct ggml_tensor * uv_noise_data;
-    
+
     void build_schedule() {
         runner_context::build_schedule(model->max_gen_nodes()*30);
     }
@@ -430,7 +430,7 @@ struct kokoro_context * build_new_kokoro_context(struct kokoro_model * model, in
 
 // This manages the graph compilation of computation for the Kokoro model.
 struct kokoro_runner : tts_generation_runner {
-    kokoro_runner(unique_ptr<kokoro_model> model, kokoro_context * context, single_pass_tokenizer * tokenizer, kokoro_duration_runner * drunner, phonemizer * phmzr): tts_generation_runner{kokoro_loader}, model{move(model)}, kctx(context), tokenizer(tokenizer), drunner(drunner), phmzr(phmzr) {
+    kokoro_runner(unique_ptr<kokoro_model> model, kokoro_context * context, single_pass_tokenizer * tokenizer, kokoro_duration_runner * drunner, phonemizer * phmzr, const generation_configuration & config): tts_generation_runner{kokoro_loader}, model{move(model)}, kctx(context), tokenizer(tokenizer), drunner(drunner), phmzr(phmzr), voice{config.voice}, espeak_voice_id{config.espeak_voice_id} {
     	tts_runner::sampling_rate = 24000.0f;
     	tts_runner::supports_voices = true;
     };
@@ -449,8 +449,6 @@ struct kokoro_runner : tts_generation_runner {
     kokoro_duration_runner * drunner;
     phonemizer * phmzr;
 
-    std::string default_voice = "af_alloy";
-
     void init_build() {
         tts_runner::init_build(&kctx->buf_compute_meta);
     }
@@ -464,4 +462,8 @@ struct kokoro_runner : tts_generation_runner {
     struct ggml_cgraph * build_kokoro_graph(kokoro_ubatch & batch);
     void run(kokoro_ubatch & batch, tts_response & outputs);
     void generate(const char * prompt, tts_response & response, const generation_configuration & config);
+private:
+    string voice{};
+    string espeak_voice_id{};
+    void propagate_voice_setting();
 };
