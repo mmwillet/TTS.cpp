@@ -146,3 +146,5 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/tts.pc"
 if (TTS_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
+
+add_subdirectory(tests)
