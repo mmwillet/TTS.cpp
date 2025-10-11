@@ -30,3 +30,4 @@ if(TTS_CLI_SDL)
 endif()
 
 target_link_libraries(${TARGET} PRIVATE ggml tts)
+install(TARGETS ${TARGET} RUNTIME)

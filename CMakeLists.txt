@@ -109,10 +109,9 @@ get_target_property(GGML_LINK_LIBRARIES ggml LINK_LIBRARIES)
 # all public headers
 set(TTS_PUBLIC_HEADERS
     include/common.h
-    include/tts.h
     include/audio_file.h
     include/args.h
-    include/phonemizer.h)
+    )
 
 set_target_properties(tts PROPERTIES PUBLIC_HEADER "${TTS_PUBLIC_HEADERS}")
 install(TARGETS tts LIBRARY PUBLIC_HEADER)
@@ -131,7 +130,6 @@ write_basic_package_version_file(
     COMPATIBILITY SameMajorVersion)
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/tts-config.cmake
-              ${CMAKE_CURRENT_BINARY_DIR}/parer-version.cmake
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/tts)
 
 configure_file(cmake/tts.pc.in
