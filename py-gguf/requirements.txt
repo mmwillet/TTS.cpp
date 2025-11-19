@@ -1,7 +1,7 @@
 torch>=2.4.0
 torchaudio>=2.4.0
 gguf==0.10.0
-spacy==3.8.5
+spacy==3.8.7
 kokoro==0.9.4
 huggingface-hub>=0.26.5
 transformers>=4.46.0
